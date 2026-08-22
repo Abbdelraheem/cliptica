@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Cliptica — 3D Atelier</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,500&family=Jost:wght@300;400;500;600&display=swap" rel="stylesheet" />
+<style>
+  :root{
+    --onyx:#070608;
+    --onyx-2:#0e0c10;
+    --pearl:#f3ede1;
+    --champagne:#d9b676;
+    --gold:#e8c987;
+    --gold-2:#b8924f;
+    --emerald:#1f5145;
+    --mist:rgba(243,237,225,.55);
+    --mist-2:rgba(243,237,225,.32);
+    --hair:rgba(216,182,118,.22);
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{background:var(--onyx);color:var(--pearl);font-family:'Jost',sans-serif;overflow-x:hidden;-webkit-font-smoothing:antialiased}
+
+  /* ambient glow — toned down, more breathable */
+  .amb{position:fixed;inset:0;z-index:0;pointer-events:none;
+    background:
+      radial-gradient(55vw 55vw at 80% 8%,rgba(31,81,69,.20),transparent 62%),
+      radial-gradient(45vw 45vw at 10% 88%,rgba(216,182,118,.08),transparent 62%),
+      radial-gradient(70vw 70vw at 50% 50%,rgba(14,12,16,.4),transparent 72%);
+    filter:blur(48px)}
+
+  /* BACKGROUND 3D RING — rotating clip cards */
+  .bgstage{position:fixed;inset:0;z-index:1;pointer-events:none;display:flex;align-items:center;justify-content:center;
+    perspective:1500px;perspective-origin:50% 44%;overflow:hidden}
+  .bgring{position:relative;width:1px;height:1px;transform-style:preserve-3d;animation:ringspin 38s linear infinite;filter:blur(.6px)}
+  @keyframes ringspin{to{transform:rotateX(-12deg) rotateY(360deg)}}
+  .clipcard{position:absolute;width:150px;height:255px;border-radius:16px;overflow:hidden;transform-style:preserve-3d;
+    border:1px solid rgba(216,182,118,.18);background:linear-gradient(165deg,rgba(20,18,22,.85),rgba(34,30,38,.7));
+    box-shadow:0 22px 60px rgba(0,0,0,.55),inset 0 0 30px rgba(216,182,118,.07);backface-visibility:hidden}
+  .clipcard .thumb{position:absolute;inset:0;
+    background:radial-gradient(120% 80% at 30% 18%,rgba(31,81,69,.55),transparent 60%),
+              linear-gradient(150deg,rgba(216,182,118,.22),rgba(14,12,16,.2))}
+  .clipcard .play{position:absolute;top:50%;left:50%;width:42px;height:42px;transform:translate(-50%,-50%);
+    border:1px solid rgba(243,237,225,.6);border-radius:50%;display:flex;align-items:center;justify-content:center}
+  .clipcard .play::after{content:"";border-left:11px solid rgba(243,237,225,.75);border-top:7px solid transparent;border-bottom:7px solid transparent;margin-left:3px}
+  .clipcard .cap{position:absolute;left:10px;right:10px;bottom:10px;font-family:'Jost';font-size:.62rem;letter-spacing:.06em;
+    color:var(--pearl);padding:7px 9px;border-radius:8px;background:rgba(7,6,8,.6);backdrop-filter:blur(4px);text-transform:uppercase}
+  .clipcard .score{position:absolute;top:10px;right:10px;font-family:'Cormorant Garamond',serif;font-style:italic;font-size:1rem;color:var(--gold)}
+  /* mask for readability */
+  .bgstage::after{content:"";position:absolute;inset:0;
+    background:radial-gradient(60vw 50vh at 50% 46%,rgba(7,6,8,.0),rgba(7,6,8,.72) 78%);}
+
+  .wrap{position:relative;z-index:3;max-width:1180px;margin:0 auto;padding:0 28px}
+
+  /* NAV */
+  nav{position:fixed;top:20px;left:0;right:0;z-index:60;display:flex;justify-content:center;padding:0 24px}
+  .navpill{display:flex;align-items:center;gap:30px;padding:11px 12px 11px 24px;border-radius:100px;
+    background:rgba(14,12,16,.5);backdrop-filter:blur(20px);border:1px solid var(--hair);box-shadow:0 10px 50px rgba(0,0,0,.5)}
+  .brand{font-family:'Cormorant Garamond',serif;font-weight:600;font-size:1.5rem;letter-spacing:.04em;display:flex;align-items:center;gap:10px}
+  .brand .gem{width:11px;height:11px;transform:rotate(45deg);
+    background:linear-gradient(135deg,var(--gold),var(--emerald));box-shadow:0 0 14px var(--champagne)}
+  .navpill a{color:var(--mist);text-decoration:none;font-size:.9rem;transition:color .3s}
+  .navpill a:hover{color:var(--gold)}
+  .btn{font-family:'Jost';cursor:pointer;border:none;border-radius:100px;font-size:.9rem;font-weight:500;transition:.3s}
+  .btn-ghost{background:transparent;color:var(--pearl);padding:10px 18px}
+  .btn-ghost:hover{color:var(--gold)}
+  .btn-gold{background:linear-gradient(120deg,var(--gold),var(--gold-2));color:var(--onyx);padding:10px 22px}
+  .btn-gold:hover{box-shadow:0 10px 34px rgba(216,182,118,.4);transform:translateY(-2px)}
+
+  /* HERO with 3D stage */
+  .stage{position:relative;perspective:1400px;perspective-origin:50% 42%;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:140px 0 80px}
+  .scene{transform-style:preserve-3d;width:100%;display:flex;flex-direction:column;align-items:center;text-align:center;will-change:transform;transition:transform .15s ease-out}
+
+  .eyebrow{font-size:.74rem;letter-spacing:.34em;text-transform:uppercase;color:var(--champagne);
+    border:1px solid var(--hair);padding:9px 18px;border-radius:100px;background:rgba(14,12,16,.4);backdrop-filter:blur(8px)}
+
+  h1{font-family:'Cormorant Garamond',serif;font-weight:600;font-size:clamp(3rem,8.5vw,7rem);line-height:.96;letter-spacing:-.01em;margin:26px 0 18px}
+  h1 .it{font-style:italic;font-weight:500;background:linear-gradient(100deg,var(--gold),var(--champagne) 45%,var(--gold-2));-webkit-background-clip:text;background-clip:text;color:transparent}
+  .lede{max-width:600px;color:var(--mist);font-size:1.08rem;line-height:1.7;font-weight:300}
+
+  /* 3D PRISM */
+  .prism-wrap{margin:60px 0 40px;transform-style:preserve-3d;width:240px;height:300px;position:relative}
+  .prism{position:absolute;inset:0;transform-style:preserve-3d;animation:spin 22s linear infinite}
+  @keyframes spin{to{transform:rotateY(360deg)}}
+  .face{position:absolute;inset:0;border:1px solid var(--hair);
+    background:linear-gradient(160deg,rgba(216,182,118,.16),rgba(31,81,69,.10));
+    backdrop-filter:blur(6px);box-shadow:inset 0 0 40px rgba(216,182,118,.12)}
+  .f1{transform:rotateY(0deg) translateZ(120px)}
+  .f2{transform:rotateY(60deg) translateZ(120px)}
+  .f3{transform:rotateY(120deg) translateZ(120px)}
+  .f4{transform:rotateY(180deg) translateZ(120px)}
+  .f5{transform:rotateY(240deg) translateZ(120px)}
+  .f6{transform:rotateY(300deg) translateZ(120px)}
+  .prism-core{position:absolute;inset:38%;border-radius:50%;
+    background:radial-gradient(circle,var(--gold),transparent 70%);filter:blur(14px);transform:translateZ(0)}
+
+  .cta{display:flex;gap:16px;margin-top:10px;flex-wrap:wrap;justify-content:center}
+
+  /* marquee */
+  .ticker{margin:70px 0;overflow:hidden;border-top:1px solid var(--hair);border-bottom:1px solid var(--hair);padding:16px 0;
+    -webkit-mask-image:linear-gradient(90deg,transparent,#000 12%,#000 88%,transparent)}
+  .track{display:flex;gap:54px;white-space:nowrap;width:max-content;animation:scrollx 30s linear infinite}
+  .track span{font-family:'Cormorant Garamond',serif;font-style:italic;font-size:1.6rem;color:var(--mist-2)}
+  .track span::after{content:"❖";margin-left:54px;color:var(--champagne);font-style:normal}
+  @keyframes scrollx{to{transform:translateX(-50%)}}
+
+  section{padding:96px 0;position:relative;z-index:3}
+  .sec-head{text-align:center;max-width:660px;margin:0 auto 56px}
+  .sec-head .k{font-size:.74rem;letter-spacing:.3em;text-transform:uppercase;color:var(--champagne)}
+  .sec-head h2{font-family:'Cormorant Garamond',serif;font-weight:600;font-size:clamp(2.2rem,5vw,3.6rem);letter-spacing:-.01em;margin:14px 0 14px;line-height:1.05}
+  .sec-head h2 .it{font-style:italic;font-weight:500}
+  .sec-head p{color:var(--mist);font-size:1.05rem;font-weight:300}
+
+  .grid{display:grid;gap:22px}
+  .g3{grid-template-columns:repeat(3,1fr)}
+  .g2{grid-template-columns:repeat(2,1fr)}
+
+  /* luxury card with 3D tilt */
+  .card{position:relative;border-radius:18px;padding:32px;overflow:hidden;transform-style:preserve-3d;
+    background:linear-gradient(165deg,rgba(243,237,225,.05),rgba(243,237,225,.012));
+    border:1px solid var(--hair);backdrop-filter:blur(14px);transition:transform .35s cubic-bezier(.2,.7,.2,1),border-color .35s}
+  .card:hover{border-color:var(--champagne)}
+  .card .ix{width:50px;height:50px;border-radius:14px;display:flex;align-items:center;justify-content:center;margin-bottom:20px;
+    background:linear-gradient(135deg,rgba(216,182,118,.28),rgba(31,81,69,.2));border:1px solid var(--hair);
+    font-family:'Cormorant Garamond',serif;font-size:1.6rem;color:var(--gold);transform:translateZ(40px)}
+  .card h3{font-family:'Cormorant Garamond',serif;font-weight:600;font-size:1.5rem;margin-bottom:10px;transform:translateZ(30px)}
+  .card p{color:var(--mist);font-size:.95rem;line-height:1.65;font-weight:300;transform:translateZ(20px)}
+  .card .num{position:absolute;top:22px;right:26px;font-family:'Cormorant Garamond',serif;font-style:italic;font-size:3rem;color:rgba(216,182,118,.2)}
+
+  .step{display:flex;gap:24px;align-items:flex-start;padding:28px;border-radius:18px;border:1px solid rgba(216,182,118,.1);background:rgba(14,12,16,.35)}
+  .step .n{font-family:'Cormorant Garamond',serif;font-style:italic;font-size:2.8rem;color:var(--gold);min-width:70px;line-height:1}
+  .step h4{font-family:'Cormorant Garamond',serif;font-weight:600;font-size:1.4rem;margin-bottom:8px}
+  .step p{color:var(--mist);font-size:.94rem;line-height:1.6;font-weight:300}
+
+  .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:20px;text-align:center}
+  .stat .v{font-family:'Cormorant Garamond',serif;font-weight:600;font-size:clamp(2.6rem,6vw,4.4rem);
+    background:linear-gradient(120deg,var(--pearl),var(--gold));-webkit-background-clip:text;background-clip:text;color:transparent}
+  .stat .l{color:var(--mist);font-size:.86rem;margin-top:4px;letter-spacing:.04em;font-weight:300}
+
+  .price{position:relative;border-radius:22px;padding:36px 32px;border:1px solid var(--hair);
+    background:linear-gradient(165deg,rgba(243,237,225,.05),rgba(243,237,225,.01));backdrop-filter:blur(14px)}
+  .price.feat{border-color:transparent}
+  .price.feat::after{content:"";position:absolute;inset:0;border-radius:22px;padding:1.5px;pointer-events:none;
+    background:linear-gradient(130deg,var(--gold),var(--champagne),var(--emerald),var(--gold));background-size:300% 300%;
+    -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask-composite:exclude;animation:flow 6s linear infinite}
+  @keyframes flow{to{background-position:300% 0}}
+  .price .name{font-size:.8rem;letter-spacing:.24em;text-transform:uppercase;color:var(--champagne)}
+  .price .amt{font-family:'Cormorant Garamond',serif;font-weight:600;font-size:3.4rem;margin:14px 0 4px}
+  .price .amt small{font-family:'Jost';font-size:1rem;color:var(--mist);font-weight:300}
+  .price ul{list-style:none;margin:24px 0 28px;display:grid;gap:12px}
+  .price li{color:var(--mist);font-size:.94rem;font-weight:300;display:flex;gap:11px}
+  .price li::before{content:"❖";color:var(--champagne)}
+  .price .btn{width:100%;padding:14px}
+  .price.feat .btn{background:linear-gradient(120deg,var(--gold),var(--gold-2));color:var(--onyx)}
+  .badge-pop{position:absolute;top:20px;right:20px;font-size:.66rem;letter-spacing:.16em;text-transform:uppercase;background:var(--gold);color:var(--onyx);padding:5px 12px;border-radius:100px;font-weight:500}
+
+  .quote{max-width:860px;margin:0 auto;text-align:center}
+  .quote blockquote{font-family:'Cormorant Garamond',serif;font-style:italic;font-size:clamp(1.8rem,4vw,3rem);line-height:1.28;font-weight:500}
+  .quote blockquote b{font-style:normal;font-family:'Jost';font-weight:500;background:linear-gradient(100deg,var(--gold),var(--champagne));-webkit-background-clip:text;background-clip:text;color:transparent}
+  .quote .who{margin-top:28px;color:var(--mist);font-size:.92rem;font-weight:300}
+
+  .final{text-align:center;border-radius:28px;padding:80px 30px;margin-top:30px;position:relative;overflow:hidden;
+    border:1px solid var(--hair);background:linear-gradient(160deg,rgba(31,81,69,.14),rgba(216,182,118,.06))}
+  .final h2{font-family:'Cormorant Garamond',serif;font-weight:600;font-size:clamp(2.3rem,5.5vw,4rem);letter-spacing:-.01em;margin-bottom:18px}
+  .final h2 .it{font-style:italic;font-weight:500}
+  .final p{color:var(--mist);max-width:520px;margin:0 auto 34px;font-weight:300}
+
+  footer{border-top:1px solid rgba(216,182,118,.1);margin-top:96px;padding:36px 0;text-align:center;color:var(--mist-2);font-size:.84rem;font-weight:300;position:relative;z-index:3}
+
+  .rv{opacity:0;transform:translateY(30px);transition:opacity .9s ease,transform .9s cubic-bezier(.2,.7,.2,1)}
+  .rv.in{opacity:1;transform:none}
+
+  @media(max-width:860px){.g3,.g2{grid-template-columns:1fr}.stats{grid-template-columns:repeat(2,1fr)}.navpill a{display:none}}
+</style>
+</head>
+<body>
+  <div class="amb"></div>
+  <div class="bgstage"><div class="bgring" id="bgring"></div></div>
+
+  <nav>
+    <div class="navpill">
+      <div class="brand"><span class="gem"></span>Cliptica</div>
+      <a href="#features">Features</a>
+      <a href="#how">Atelier</a>
+      <a href="#pricing">Pricing</a>
+      <a href="#" class="btn btn-ghost">Log in</a>
+      <a href="#" class="btn btn-gold">Start free</a>
+    </div>
+  </nav>
+
+  <div class="wrap">
+    <div class="stage">
+      <div class="scene" id="scene">
+        <span class="eyebrow rv">New · AI Auto Editor, one gesture</span>
+        <h1 class="rv">A week of paid clips<br>from <span class="it">one paste.</span></h1>
+        <p class="lede rv">Cliptica finds the moments that earn, cuts them like a senior editor, and reframes them to vertical — ready to post — while a campaign ledger keeps score of every payout.</p>
+
+        <div class="prism-wrap rv">
+          <div class="prism">
+            <div class="face f1"></div><div class="face f2"></div><div class="face f3"></div>
+            <div class="face f4"></div><div class="face f5"></div><div class="face f6"></div>
+            <div class="prism-core"></div>
+          </div>
+        </div>
+
+        <div class="cta rv">
+          <a href="#" class="btn btn-gold" style="padding:15px 32px;font-size:1rem">Start free — 40 credits</a>
+          <a href="#" class="btn btn-ghost" style="border:1px solid var(--hair);border-radius:100px;padding:15px 32px;font-size:1rem">See it on your video</a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="ticker"><div class="track" id="track">
+    <span>Beast Mode</span><span>Kinetic</span><span>Clean</span><span>TikTok Native</span><span>Minimal</span><span>Bold Outline</span><span>Highlight</span><span>Karaoke</span><span>Neon</span><span>Gradient</span>
+  </div></div>
+
+  <div class="wrap">
+    <section id="features">
+      <div class="sec-head rv">
+        <div class="k">The Atelier</div>
+        <h2>Built like an <span class="it">editorial team</span>, priced like software</h2>
+        <p>Real captures from the product — not concept art.</p>
+      </div>
+      <div class="grid g3">
+        <div class="card rv" data-tilt><span class="num">01</span><div class="ix">✶</div><h3>AI Auto Editor</h3><p>One paste → finished clips. Cinematic color, animated motion graphics, B-roll, sound design, word-perfect captions, speaker-locked reframe.</p></div>
+        <div class="card rv" data-tilt><span class="num">02</span><div class="ix">◇</div><h3>Moments worth posting</h3><p>Cliptica reviews the whole video, ranks every potential moment, and surfaces just the ones worth your time — each with a score.</p></div>
+        <div class="card rv" data-tilt><span class="num">03</span><div class="ix">▦</div><h3>Full timeline editor</h3><p>Every clip arrives dressed. When you want control, it's a real inspector — 15 caption styles, face-tracked reframe, free re-renders.</p></div>
+        <div class="card rv" data-tilt><span class="num">04</span><div class="ix">$</div><h3>Campaign ledger</h3><p>Link every post to its campaign, log views and payouts, watch effective $/1K by program. Pending → approved → paid.</p></div>
+        <div class="card rv" data-tilt><span class="num">05</span><div class="ix">⏱</div><h3>20× faster</h3><p>Same four clips: 8 hours by hand vs 20 minutes with Cliptica. Paste → AI finds, cuts, reframes, captions, scores.</p></div>
+        <div class="card rv" data-tilt><span class="num">06</span><div class="ix">↗</div><h3>Built for the economy</h3><p>Content Rewards pays $40K+/day across ~1M videos/month. Short-form ad spend: $111B → $145.8B by 2028. Throughput wins.</p></div>
+      </div>
+    </section>
+
+    <section id="how">
+      <div class="sec-head rv">
+        <div class="k">Four movements</div>
+        <h2>From a long video to a <span class="it">paid clip</span></h2>
+        <p>No scrubbing, no manual reframing, no spreadsheet of links.</p>
+      </div>
+      <div class="grid g2">
+        <div class="step rv"><div class="n">01</div><div><h4>Drop in the long video</h4><p>Upload or paste a link. Add clipping instructions and the AI clips toward them.</p></div></div>
+        <div class="step rv"><div class="n">02</div><div><h4>Only the moments worth posting</h4><p>Every potential clip ranked, surfaced with a viral score and explanation.</p></div></div>
+        <div class="step rv"><div class="n">03</div><div><h4>Every clip leaves edited</h4><p>Face-tracked 9:16, animated captions, headline, music bed, SFX, zoom punch-ins.</p></div></div>
+        <div class="step rv"><div class="n">04</div><div><h4>The ledger keeps the books</h4><p>Link posts to campaigns, log views and payouts, watch effective $/1K live.</p></div></div>
+      </div>
+    </section>
+
+    <section>
+      <div class="stats">
+        <div class="stat rv"><div class="v" data-count="8">0</div><div class="l">hours returned / upload</div></div>
+        <div class="stat rv"><div class="v" data-count="20">0</div><div class="l">× faster throughput</div></div>
+        <div class="stat rv"><div class="v" data-count="15">0</div><div class="l">caption styles</div></div>
+        <div class="stat rv"><div class="v" data-count="40">0</div><div class="l">free credits</div></div>
+      </div>
+    </section>
+
+    <section id="pricing">
+      <div class="sec-head rv">
+        <div class="k">Pricing</div>
+        <h2>One campaign payout covers <span class="it">a year</span> of it</h2>
+        <p>1 credit ≈ 1 minute of source footage. Free starts with 40 credits, no card.</p>
+      </div>
+      <div class="grid g3">
+        <div class="price rv">
+          <div class="name">Free</div>
+          <div class="amt">$0<small> / forever</small></div>
+          <ul><li>40 credits to start</li><li>All 15 caption styles</li><li>720p exports with mark</li><li>Up to 3 videos / day</li></ul>
+          <a href="#" class="btn btn-ghost" style="border:1px solid var(--hair);background:transparent;color:var(--pearl)">Start free</a>
+        </div>
+        <div class="price feat rv">
+          <span class="badge-pop">Most loved</span>
+          <div class="name">Clipper</div>
+          <div class="amt">$19<small> / mo</small></div>
+          <ul><li>300 credits / month</li><li>No watermark · 1080p 60fps</li><li>Campaign hub + earnings ledger</li><li>Motion graphics, music & SFX</li></ul>
+          <a href="#" class="btn">Get Clipper</a>
+        </div>
+        <div class="price rv">
+          <div class="name">Studio</div>
+          <div class="amt">$49<small> / mo</small></div>
+          <ul><li>1,200 credits / month</li><li>Priority rendering queue</li><li>Auto-Pilot watchlists</li><li>Brand presets & style packs</li></ul>
+          <a href="#" class="btn btn-ghost" style="border:1px solid var(--hair);background:transparent;color:var(--pearl)">Get Studio</a>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="quote rv">
+        <blockquote>"You're done with CapCut — done with all of it. You drop a link, your clips come out, and you do <b>everything in one place.</b>"</blockquote>
+        <div class="who">Beta tester 001 · 220K TikTok · clipping since 2020</div>
+      </div>
+    </section>
+
+    <section>
+      <div class="final rv">
+        <h2>Paste a link. <span class="it">Start getting paid.</span></h2>
+        <p>Start free with 40 credits and no credit card. Upgrade when you outgrow the 20-minute limit.</p>
+        <a href="#" class="btn btn-gold" style="padding:15px 34px;font-size:1rem">Start free — 40 credits</a>
+      </div>
+    </section>
+
+    <footer>© 2026 Cliptica · Built like an editorial team, priced like software.</footer>
+  </div>
+
+<script>
+  // BACKGROUND 3D ring of clip cards
+  (function(){
+    const ring=document.getElementById('bgring');
+    const styles=['BEAST MODE','KINETIC','CLEAN','TIKTOK NATIVE','MINIMAL','BOLD OUTLINE','HIGHLIGHT','KARAOKE','NEON','GRADIENT','RETRO','GLAM'];
+    const N=14, R=460;
+    for(let i=0;i<N;i++){
+      const c=document.createElement('div');c.className='clipcard';
+      const ang=(360/N)*i, y=(Math.sin(i)*40);
+      c.style.transform=`rotateY(${ang}deg) translateZ(${R}px) translateY(${y}px)`;
+      c.innerHTML=`<div class="thumb"></div><div class="score">${(62+((i*37)%37)).toFixed(0)}%</div><div class="play"></div><div class="cap">${styles[i%styles.length]}</div>`;
+      ring.appendChild(c);
+    }
+  })();
+
+  // fade background ring as user scrolls past hero
+  const bgstage=document.querySelector('.bgstage');
+  addEventListener('scroll',()=>{
+    const o=Math.max(0,1-scrollY/innerHeight*1.1);
+    bgstage.style.opacity=o;
+  },{passive:true});
+
+  // 3D parallax scene on mouse move
+  const scene=document.getElementById('scene');
+  let tx=0,ty=0,cx=0,cy=0;
+  addEventListener('pointermove',e=>{
+    const r=innerWidth/2, s=innerHeight/2;
+    tx=(e.clientX-r)/r; ty=(e.clientY-s)/s;
+  });
+  (function loop(){cx+=(tx-cx)*.06;cy+=(ty-cy)*.06;
+    scene.style.transform=`rotateY(${cx*8}deg) rotateX(${-cy*6}deg) translateZ(${cx*20}px)`;
+    requestAnimationFrame(loop)})();
+
+  // 3D card tilt
+  document.querySelectorAll('[data-tilt]').forEach(el=>{
+    el.addEventListener('pointermove',e=>{
+      const r=el.getBoundingClientRect();
+      const rx=(.5-(e.clientY-r.top)/r.height)*10, ry=((e.clientX-r.left)/r.width-.5)*10;
+      el.style.transform=`rotateX(${rx}deg) rotateY(${ry}deg) translateZ(18px)`;
+    });
+    el.addEventListener('pointerleave',()=>el.style.transform='');
+  });
+
+  // reveal
+  const io=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting)e.target.classList.add('in')}),{threshold:.12});
+  document.querySelectorAll('.rv').forEach(el=>io.observe(el));
+
+  // count up
+  const cu=new IntersectionObserver(es=>es.forEach(e=>{
+    if(!e.isIntersecting)return;const el=e.target,v=+el.dataset.count,t0=performance.now();
+    (function tick(t){const p=Math.min((t-t0)/1200,1);el.textContent=Math.round(v*(1-Math.pow(1-p,3)));if(p<1)requestAnimationFrame(tick)})(t0);
+    cu.unobserve(el);
+  }),{threshold:.5});
+  document.querySelectorAll('[data-count]').forEach(el=>cu.observe(el));
+
+  // seamless ticker
+  const tr=document.getElementById('track');tr.innerHTML+=tr.innerHTML;
+</script>
+</body>
+</html>

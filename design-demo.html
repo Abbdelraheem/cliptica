@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cliptica - Design Demo</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous">
+    
+    <!-- Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;800&family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    
+    <!-- CSS Design System from Cliptica -->
+    <style>
+        /* --- SCI-FI DESIGN VARIABLES --- */
+        :root {
+            --bg-deep: #0a0a0f;
+            --bg-elevated: #12121a;
+            --bg-surface: #1a1a24;
+            --fg-primary: #e8e8f0;
+            --fg-secondary: #7a7a9a;
+            --fg-muted: #555577;
+            
+            --primary: #0fffcc;
+            --primary-glow: rgba(15, 255, 204, 0.4);
+            --primary-outline: rgba(15, 255, 204, 0.8);
+            
+            --secondary: #ff0f80;
+            --secondary-glow: rgba(255, 15, 128, 0.4);
+            --secondary-outline: rgba(255, 15, 128, 0.8);
+            
+            --accent: #ffd93d;
+            --accent-glow: rgba(255, 217, 61, 0.4);
+            
+            --danger: #ff4d4d;
+            --danger-glow: rgba(255, 77, 77, 0.4);
+            
+            --success: #39ff14;
+            --success-glow: rgba(57, 255, 20, 0.4);
+            
+            --neon-blue: #00d4ff;
+            --neon-purple: #9b59b6;
+            --neon-cyan: #27fffe;
+            --neon-orange: #ff6b35;
+            
+            --glass-bg: rgba(17, 17, 32, 0.6);
+            --glass-border: rgba(255, 255, 255, 0.1);
+            
+            --card-bg: rgba(18, 18, 28, 0.8);
+            --card-border: rgba(255, 255, 255, 0.08);
+            
+            --radius: 12px;
+            --radius-sm: 8px;
+            
+            /* Typography */
+            --font-display: 'Orbitron', sans-serif;
+            --font-body: 'Inter', system-ui, sans-serif;
+            --font-mono: 'JetBrains Mono', monospace;
+            
+            --font-weight-light: 300;
+            --font-weight-normal: 400;
+            --font-weight-medium: 500;
+            --font-weight-bold: 700;
+            --font-weight-extrabold: 800;
+            
+            --tracking-tight: -0.05em;
+            --tracking-wider: 0.1em;
+            
+            /* Transitions */
+            --transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
+            --transition-medium: 300ms cubic-bezier(0.4, 0, 0.2, 1);
+            
+            /* Animations */
+            @keyframes neon-pulse {
+                0%, 100% { box-shadow: 0 0 20px var(--primary-glow); }
+                50% { box-shadow: 0 0 30px var(--primary-glow), 0 0 60px var(--primary-glow); }
+            }
+            
+            @keyframes border-blink {
+                0%, 100% { border-color: var(--primary-outline); }
+                50% { border-color: var(--primary); }
+            }
+        }
+        
+        /* Reduced motion */
+        @media (prefers-reduced-motion: reduce) {
+            :root {
+                --transition-fast: 0ms;
+                --transition-medium: 0ms;
+            }
+            .no-animation * {
+                animation: none !important;
+                transition: none !important;
+            }
+        }
+        
+        /* --- BACKGROUND --- */
+        body {
+            font-family: var(--font-body);
+            background: var(--bg-deep);
+            color: var(--fg-primary);
+            min-height: 100vh;
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        /* Subtle background pattern */
+        body::before {
+            content: "";
+            position: fixed;
+            inset: 0;
+            background-image: 
+                linear-gradient(rgba(15, 255, 204, 0.03) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(15, 255, 204, 0.03) 1px, transparent 1px);
+            background-size: 60px 60px;
+            pointer-events: none;
+            z-index: 0;
+        }
+        
+        /* --- TYPOGRAPHY --- */
+        .display-1 { font-size: clamp(2.5rem, 5vw, 4rem); font-weight: 800; letter-spacing: -0.05em; }
+        .display-2 { font-size: clamp(2rem, 4vw, 3rem); font-weight: 700; letter-spacing: -0.03em; }
+        .display-3 { font-size: clamp(1.75rem, 3vw, 2.5rem); font-weight: 600; letter-spacing: -0.02em; }
+        .body-text { font-size: clamp(0.875rem, 1.5vw, 1rem); line-height: 1.6; }
+        
+        /* Orbitron fallbacks */
+        .orbitron { font-family: 'Orbitron', sans-serif; }
+        .inter { font-family: 'Inter', system-ui, sans-serif; }
+        .mono { font-family: 'JetBrains Mono', monospace; }
+        
+        /* --- BUTTONS --- */
+        .btn {
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-family: 'Orbitron', sans-serif;
+            font-weight: 700;
+            font-size: 0.875rem;
+            letter-spacing: 0.05em;
+            cursor: pointer;
+            transition: all 150ms cubic-bezier(0.4, 0, 0.2, 1);
+            border: none;
+            outline: none;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .btn::before {
+            content: "";
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            opacity: 0;
+            transition: opacity 150ms;
+            z-index: -1;
+        }
+        
+        .btn:hover::before { opacity: 1; }
+        
+        .btn:focus-visible {
+            outline: 2px solid var(--primary);
+            outline-offset: 4px;
+        }
+        
+        .btn-primary {
+            background: var(--primary);
+            color: #0a0a0f;
+            box-shadow: 0 0 20px var(--primary-glow);
+        }
+        
+        .btn-primary:hover {
+            transform: translateY(-2px) scale(1.02);
+            box-shadow: 0 0 30px var(--primary-glow), 0 10px 20px rgba(15, 255, 204, 0.3);
+        }
+        
+        .btn-secondary {
+            background: var(--bg-surface);
+            color: var(--fg-primary);
+            border: 1px solid var(--glass-border);
+        }
+        
+        .btn-secondary:hover {
+            border-color: var(--primary);
+            color: var(--primary);
+            background: var(--primary-glow);
+        }
+        
+        .btn-ghost {
+            background: transparent;
+            color: var(--fg-secondary);
+        }
+        
+        .btn-ghost:hover { color: var(--primary); }
+        
+        .btn-danger {
+            background: var(--danger);
+            color: #fff;
+            box-shadow: 0 0 20px var(--danger-glow);
+        }
+        
+        .btn-success {
+            background: var(--success);
+            color: #0a0a0f;
+            box-shadow: 0 0 20px var(--success-glow);
+        }
+        
+        /* --- CARDS --- */
+        .card {
+            background: var(--card-bg);
+            border: 1px solid var(--card-border);
+            border-radius: 12px;
+            backdrop-filter: blur(10px);
+            transition: all 200ms ease;
+        }
+        
+        .card:hover { background: rgba(18, 18, 28, 0.9); box-shadow: 0 0 20px var(--primary-glow); }
+        
+        /* --- BADGES --- */
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            padding: 4px 12px;
+            border-radius: 9999px;
+            font-size: 0.7rem;
+            font-weight: 700;
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+        }
+        
+        .badge-primary { 
+            background: rgba(15, 255, 204, 0.1); 
+            color: var(--primary);
+            border: 1px solid var(--primary-outline);
+        }
+        
+        .badge-secondary { 
+            background: rgba(255, 15, 128, 0.1); 
+            color: var(--secondary); 
+            border: 1px solid var(--secondary-outline); 
+        }
+        
+        /* --- BACKGROUND PATTERN --- */
+        .bg-pattern {
+            background-image: 
+                linear-gradient(rgba(15, 255, 204, 0.03) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(15, 255, 204, 0.03) 1px, transparent 1px);
+            background-size: 60px 60px;
+        }
+    </style>
+</head>
+<body class="bg-pattern min-h-screen flex flex-col items-center py-12">
+
+    <!-- Header -->
+    <header class="mb-12 w-full max-w-2xl text-center">
+        <h1 class="display-1 orbitron mb-4">Cliptica</h1>
+        <p class="body-text text-fg/60 max-w-lg mx-auto">AI Video Clipping Platform</p>
+    </header>
+
+    <!-- Main Content -->
+    <main class="w-full max-w-3xl space-y-8">
+        
+        <!-- Hero Section -->
+        <section class="card p-8">
+            <h2 class="display-2 orbitron mb-6">AI Video Clipping</h2>
+            <p class="body-text text-fg/60 mb-6">
+                Turn one long video into short, ready-to-post clips with AI-powered editing.
+            </p>
+            
+            <div class="grid grid-cols-2 gap-4">
+                <button class="btn btn-primary w-full">Start Free (40 credits)</button>
+                <button class="btn btn-secondary w-full">Watch Demo</button>
+            </div>
+        </section>
+
+        <!-- Features Grid -->
+        <section class="grid grid-cols-2 md:grid-cols-3 gap-4">
+            <article class="card p-6">
+                <h3 class="orbitron text-primary mb-3">AI Auto Editor</h3>
+                <p class="body-text text-fg/60">
+                    One paste → finished clips with cinematic color grading, motion graphics, and auto-reframe.
+                </p>
+            </article>
+            <article class="card p-6">
+                <h3 class="orbitron text-secondary mb-3">Smart Scoring</h3>
+                <p class="body-text text-fg/60">
+                    Every potential moment ranked by hook strength, story arc, and payoff potential.
+                </p>
+            </article>
+            <article class="card p-6">
+                <h3 class="orbitron text-accent mb-3">Full Editor</h3>
+                <p class="body-text text-fg/60">
+                    Face-tracked 9:16 reframe, 15 caption styles, and free re-renders.
+                </p>
+            </article>
+        </section>
+
+        <!-- Stats -->
+        <section class="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
+            <div>
+                <div class="display-3 orbitron text-primary" style="font-size: 3rem;">8</div>
+                <div class="text-fg/60 text-sm">hr saved/month</div>
+            </div>
+            <div>
+                <div class="display-3 orbitron text-secondary" style="font-size: 3rem;">20</div>
+                <div class="text-fg/60 text-sm">× faster</div>
+            </div>
+            <div>
+                <div class="display-3 orbitron text-accent" style="font-size: 3rem;">15</div>
+                <div class="text-fg/60 text-sm">caption styles</div>
+            </div>
+            <div>
+                <div class="display-3 orbitron text-primary" style="font-size: 3rem;">40</div>
+                <div class="text-fg/60 text-sm">free credits</div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Footer -->
+    <footer class="mt-12 text-fg/60 text-sm orbitron">
+        © 2026 Cliptica. All rights reserved.
+    </footer>
+
+</body>
+</html>

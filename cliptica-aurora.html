@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Cliptica — Liquid Obsidian</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Space+Grotesk:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+<style>
+  :root{
+    --obsidian:#050507;
+    --ink:#0b0b10;
+    --ivory:#f4f1ea;
+    --mist:rgba(244,241,234,.56);
+    --mist-2:rgba(244,241,234,.34);
+    --hair:rgba(244,241,234,.12);
+    --hair-2:rgba(244,241,234,.06);
+    --violet:#7c5cff;
+    --teal:#36e0c8;
+    --amber:#ffb86b;
+    --rose:#ff7eb6;
+  }
+
+  *{margin:0;padding:0;box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{
+    background:var(--obsidian);
+    color:var(--ivory);
+    font-family:'Space Grotesk',system-ui,sans-serif;
+    overflow-x:hidden;
+    -webkit-font-smoothing:antialiased;
+    position:relative;
+    min-height:100vh;
+  }
+
+  /* ---------- AURORA MESH ---------- */
+  .aurora{position:fixed;inset:-20% -20% -20% -20%;z-index:0;pointer-events:none;filter:blur(80px) saturate(140%);opacity:.9}
+  .aurora span{position:absolute;display:block;border-radius:50%;mix-blend-mode:screen}
+  .a1{width:46vw;height:46vw;left:8%;top:6%;background:radial-gradient(circle at 30% 30%,var(--violet),transparent 60%);animation:drift1 26s ease-in-out infinite}
+  .a2{width:40vw;height:40vw;right:6%;top:18%;background:radial-gradient(circle at 60% 40%,var(--teal),transparent 62%);animation:drift2 32s ease-in-out infinite}
+  .a3{width:38vw;height:38vw;left:30%;bottom:2%;background:radial-gradient(circle at 50% 50%,var(--amber),transparent 64%);animation:drift3 38s ease-in-out infinite}
+  .a4{width:30vw;height:30vw;right:24%;bottom:8%;background:radial-gradient(circle at 50% 50%,var(--rose),transparent 66%);animation:drift1 30s ease-in-out infinite reverse}
+  @keyframes drift1{0%,100%{transform:translate(0,0) scale(1)}50%{transform:translate(6vw,4vh) scale(1.15)}}
+  @keyframes drift2{0%,100%{transform:translate(0,0) scale(1)}50%{transform:translate(-5vw,6vh) scale(1.1)}}
+  @keyframes drift3{0%,100%{transform:translate(0,0) scale(1)}50%{transform:translate(4vw,-5vh) scale(1.2)}}
+
+  /* ---------- GRAIN ---------- */
+  .grain{position:fixed;inset:0;z-index:1;pointer-events:none;opacity:.05;mix-blend-mode:overlay;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");}
+
+  /* ---------- CURSOR ORB ---------- */
+  .orb{position:fixed;width:420px;height:420px;border-radius:50%;z-index:2;pointer-events:none;
+    background:radial-gradient(circle,rgba(124,92,255,.18),transparent 70%);
+    transform:translate(-50%,-50%);transition:opacity .4s;opacity:0;left:0;top:0;filter:blur(20px)}
+
+  /* ---------- LAYOUT ---------- */
+  .wrap{position:relative;z-index:3;max-width:1180px;margin:0 auto;padding:0 24px}
+
+  /* ---------- NAV ---------- */
+  nav{position:fixed;top:18px;left:0;right:0;z-index:50;display:flex;justify-content:center;padding:0 24px}
+  .navpill{display:flex;align-items:center;gap:28px;padding:10px 14px 10px 22px;border-radius:100px;
+    background:rgba(11,11,16,.55);backdrop-filter:blur(18px) saturate(160%);-webkit-backdrop-filter:blur(18px) saturate(160%);
+    border:1px solid var(--hair);box-shadow:0 8px 40px rgba(0,0,0,.4)}
+  .brand{font-weight:700;letter-spacing:.02em;font-size:1.05rem;display:flex;align-items:center;gap:9px}
+  .brand .dot{width:9px;height:9px;border-radius:50%;background:linear-gradient(135deg,var(--teal),var(--violet));box-shadow:0 0 14px var(--teal)}
+  .navpill a{color:var(--mist);text-decoration:none;font-size:.9rem;font-weight:400;transition:color .25s}
+  .navpill a:hover{color:var(--ivory)}
+  .btn{font-family:inherit;cursor:pointer;border:none;border-radius:100px;font-weight:500;font-size:.9rem;transition:transform .25s,box-shadow .25s}
+  .btn-ghost{background:transparent;color:var(--ivory);padding:9px 18px}
+  .btn-ghost:hover{color:var(--teal)}
+  .btn-solid{background:var(--ivory);color:var(--obsidian);padding:9px 20px}
+  .btn-solid:hover{transform:translateY(-2px);box-shadow:0 10px 30px rgba(244,241,234,.18)}
+
+  /* ---------- HERO ---------- */
+  header{padding:170px 0 90px;text-align:center}
+  .eyebrow{display:inline-flex;align-items:center;gap:10px;font-size:.78rem;letter-spacing:.22em;text-transform:uppercase;
+    color:var(--mist);border:1px solid var(--hair);padding:8px 16px;border-radius:100px;background:rgba(11,11,16,.4);backdrop-filter:blur(8px)}
+  .eyebrow .pulse{width:7px;height:7px;border-radius:50%;background:var(--teal);box-shadow:0 0 10px var(--teal);animation:beat 2s infinite}
+  @keyframes beat{0%,100%{opacity:1}50%{opacity:.35}}
+
+  h1{font-weight:300;font-size:clamp(2.7rem,7vw,5.6rem);line-height:1.02;letter-spacing:-.02em;margin:30px 0 22px}
+  h1 em{font-family:'Instrument Serif',serif;font-style:italic;font-weight:400;
+    background:linear-gradient(100deg,var(--teal),var(--violet) 45%,var(--amber) 90%);-webkit-background-clip:text;background-clip:text;color:transparent}
+  .lede{max-width:620px;margin:0 auto;color:var(--mist);font-size:clamp(1rem,1.4vw,1.18rem);line-height:1.65}
+  .cta{display:flex;gap:14px;justify-content:center;margin-top:38px;flex-wrap:wrap}
+  .cta .btn-lg{font-size:1rem;padding:15px 30px}
+
+  /* floating glass chips */
+  .chips{display:flex;gap:14px;justify-content:center;margin-top:54px;flex-wrap:wrap}
+  .chip{display:flex;align-items:center;gap:10px;padding:11px 17px;border-radius:14px;
+    background:rgba(11,11,16,.5);backdrop-filter:blur(16px);border:1px solid var(--hair);
+    font-size:.86rem;color:var(--mist);box-shadow:0 6px 26px rgba(0,0,0,.35)}
+  .chip b{color:var(--ivory);font-weight:600}
+  .chip .g{width:8px;height:8px;border-radius:50%;background:linear-gradient(135deg,var(--amber),var(--violet))}
+
+  /* ---------- TICKER ---------- */
+  .ticker{margin:90px 0 10px;overflow:hidden;border-top:1px solid var(--hair-2);border-bottom:1px solid var(--hair-2);padding:18px 0;
+    -webkit-mask-image:linear-gradient(90deg,transparent,#000 12%,#000 88%,transparent)}
+  .track{display:flex;gap:46px;white-space:nowrap;width:max-content;animation:scrollx 28s linear infinite}
+  .track span{font-family:'Instrument Serif',serif;font-style:italic;font-size:1.5rem;color:var(--mist-2)}
+  .track span::after{content:"✦";margin-left:46px;color:var(--violet);font-style:normal}
+  @keyframes scrollx{to{transform:translateX(-50%)}}
+
+  /* ---------- SECTION ---------- */
+  section{padding:90px 0;position:relative;z-index:3}
+  .sec-head{text-align:center;max-width:640px;margin:0 auto 54px}
+  .sec-head .k{font-size:.76rem;letter-spacing:.24em;text-transform:uppercase;color:var(--teal)}
+  .sec-head h2{font-weight:300;font-size:clamp(2rem,4.5vw,3.2rem);letter-spacing:-.02em;margin:14px 0 14px;line-height:1.08}
+  .sec-head h2 em{font-family:'Instrument Serif',serif;font-style:italic;font-weight:400;color:var(--ivory)}
+  .sec-head p{color:var(--mist);font-size:1.02rem}
+
+  /* ---------- GLASS CARDS ---------- */
+  .grid{display:grid;gap:20px}
+  .g3{grid-template-columns:repeat(3,1fr)}
+  .g2{grid-template-columns:repeat(2,1fr)}
+  .glass{position:relative;border-radius:20px;padding:30px;overflow:hidden;
+    background:linear-gradient(160deg,rgba(244,241,234,.05),rgba(244,241,234,.015));
+    border:1px solid var(--hair);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
+    transition:transform .4s cubic-bezier(.2,.7,.2,1),border-color .4s;transform-style:preserve-3d}
+  .glass::before{content:"";position:absolute;inset:0;border-radius:20px;padding:1px;pointer-events:none;
+    background:radial-gradient(220px circle at var(--mx,50%) var(--my,50%),rgba(244,241,234,.25),transparent 60%);
+    -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask-composite:exclude;opacity:0;transition:opacity .4s}
+  .glass:hover{transform:translateY(-6px);border-color:var(--hair)}
+  .glass:hover::before{opacity:1}
+  .glass .ix{width:46px;height:46px;border-radius:13px;display:flex;align-items:center;justify-content:center;margin-bottom:18px;
+    background:linear-gradient(135deg,rgba(124,92,255,.25),rgba(54,224,200,.18));border:1px solid var(--hair)}
+  .glass h3{font-weight:500;font-size:1.2rem;margin-bottom:10px}
+  .glass p{color:var(--mist);font-size:.94rem;line-height:1.6}
+  .glass .tag{position:absolute;top:18px;right:18px;font-size:.68rem;letter-spacing:.14em;text-transform:uppercase;color:var(--mist-2);border:1px solid var(--hair);padding:4px 10px;border-radius:100px}
+
+  /* ---------- STEPS ---------- */
+  .step{display:flex;gap:22px;align-items:flex-start;padding:26px;border-radius:18px;border:1px solid var(--hair-2);background:rgba(11,11,16,.35)}
+  .step .n{font-family:'Instrument Serif',serif;font-style:italic;font-size:2.6rem;color:var(--teal);min-width:64px;line-height:1}
+  .step h4{font-weight:500;font-size:1.15rem;margin-bottom:7px}
+  .step p{color:var(--mist);font-size:.92rem;line-height:1.55}
+
+  /* ---------- STATS ---------- */
+  .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:20px;text-align:center}
+  .stat .v{font-weight:300;font-size:clamp(2.4rem,5vw,3.8rem);letter-spacing:-.02em;
+    background:linear-gradient(120deg,var(--ivory),var(--teal));-webkit-background-clip:text;background-clip:text;color:transparent}
+  .stat .l{color:var(--mist);font-size:.86rem;margin-top:4px;letter-spacing:.02em}
+
+  /* ---------- PRICING ---------- */
+  .price{position:relative;border-radius:22px;padding:34px 30px;border:1px solid var(--hair);
+    background:linear-gradient(165deg,rgba(244,241,234,.045),rgba(244,241,234,.01));backdrop-filter:blur(14px);overflow:hidden}
+  .price.feat{border-color:transparent}
+  .price.feat::after{content:"";position:absolute;inset:0;border-radius:22px;padding:1.5px;pointer-events:none;
+    background:linear-gradient(130deg,var(--violet),var(--teal),var(--amber),var(--violet));background-size:300% 300%;
+    -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask-composite:exclude;
+    animation:flow 6s linear infinite}
+  @keyframes flow{to{background-position:300% 0}}
+  .price .name{font-size:.82rem;letter-spacing:.2em;text-transform:uppercase;color:var(--mist)}
+  .price .amt{font-weight:300;font-size:3rem;margin:14px 0 4px;letter-spacing:-.02em}
+  .price .amt small{font-size:1rem;color:var(--mist);font-weight:400}
+  .price ul{list-style:none;margin:22px 0 26px;display:grid;gap:11px}
+  .price li{color:var(--mist);font-size:.92rem;display:flex;gap:10px;align-items:flex-start}
+  .price li::before{content:"→";color:var(--teal)}
+  .price .btn{width:100%;padding:13px}
+  .price.feat .btn{background:linear-gradient(120deg,var(--teal),var(--violet));color:var(--obsidian)}
+  .badge-pop{position:absolute;top:18px;right:18px;font-size:.66rem;letter-spacing:.14em;text-transform:uppercase;
+    background:var(--ivory);color:var(--obsidian);padding:4px 11px;border-radius:100px;font-weight:600}
+
+  /* ---------- QUOTE ---------- */
+  .quote{max-width:840px;margin:0 auto;text-align:center}
+  .quote blockquote{font-family:'Instrument Serif',serif;font-style:italic;font-size:clamp(1.6rem,3.6vw,2.6rem);line-height:1.32;font-weight:400}
+  .quote blockquote b{font-style:normal;font-family:'Space Grotesk';font-weight:500;background:linear-gradient(100deg,var(--teal),var(--amber));-webkit-background-clip:text;background-clip:text;color:transparent}
+  .quote .who{margin-top:26px;color:var(--mist);font-size:.92rem;letter-spacing:.02em}
+
+  /* ---------- FOOTER CTA ---------- */
+  .final{text-align:center;border-radius:28px;padding:74px 30px;margin-top:30px;position:relative;overflow:hidden;
+    border:1px solid var(--hair);background:linear-gradient(160deg,rgba(124,92,255,.10),rgba(54,224,200,.05))}
+  .final h2{font-weight:300;font-size:clamp(2.1rem,5vw,3.6rem);letter-spacing:-.02em;margin-bottom:18px}
+  .final h2 em{font-family:'Instrument Serif',serif;font-style:italic;font-weight:400}
+  .final p{color:var(--mist);max-width:520px;margin:0 auto 32px}
+
+  footer{border-top:1px solid var(--hair-2);margin-top:90px;padding:34px 0;text-align:center;color:var(--mist-2);font-size:.84rem;position:relative;z-index:3}
+
+  /* reveal */
+  .rv{opacity:0;transform:translateY(26px);transition:opacity .8s ease,transform .8s cubic-bezier(.2,.7,.2,1)}
+  .rv.in{opacity:1;transform:none}
+
+  @media(max-width:860px){.g3,.g2{grid-template-columns:1fr}.stats{grid-template-columns:repeat(2,1fr)}.navpill a{display:none}}
+</style>
+</head>
+<body>
+  <div class="aurora"><span class="a1"></span><span class="a2"></span><span class="a3"></span><span class="a4"></span></div>
+  <div class="grain"></div>
+  <div class="orb" id="orb"></div>
+
+  <nav>
+    <div class="navpill">
+      <div class="brand"><span class="dot"></span>Cliptica</div>
+      <a href="#features">Features</a>
+      <a href="#how">How it works</a>
+      <a href="#pricing">Pricing</a>
+      <a href="#" class="btn btn-ghost">Log in</a>
+      <a href="#" class="btn btn-solid">Start free</a>
+    </div>
+  </nav>
+
+  <div class="wrap">
+    <header>
+      <span class="eyebrow rv"><span class="pulse"></span>New · AI Auto Editor, one click</span>
+      <h1 class="rv">A week of paid clips<br>from <em>one paste.</em></h1>
+      <p class="lede rv">Cliptica finds the moments that earn, cuts them like a senior editor, and reframes them to vertical — ready to post — while a campaign ledger keeps score of every payout. You post. You collect.</p>
+      <div class="cta rv">
+        <a href="#" class="btn btn-solid btn-lg">Start free — 40 credits</a>
+        <a href="#" class="btn btn-ghost btn-lg" style="border:1px solid var(--hair);border-radius:100px;padding:15px 30px">See it on your video</a>
+      </div>
+      <div class="chips rv">
+        <div class="chip"><span class="g"></span><b>15</b> caption styles</div>
+        <div class="chip"><span class="g"></span><b>22</b> motion templates</div>
+        <div class="chip"><span class="g"></span><b>9:16</b> auto reframe</div>
+        <div class="chip"><span class="g"></span><b>1</b> paste → folder of clips</div>
+      </div>
+    </header>
+  </div>
+
+  <div class="ticker">
+    <div class="track" id="track">
+      <span>Beast Mode</span><span>Kinetic</span><span>Clean</span><span>TikTok Native</span><span>Minimal</span><span>Bold Outline</span><span>Highlight</span><span>Karaoke</span><span>Neon</span><span>Gradient</span>
+    </div>
+  </div>
+
+  <div class="wrap">
+    <section id="features">
+      <div class="sec-head rv">
+        <div class="k">The machine</div>
+        <h2>Built like an <em>editorial team</em>, priced like software</h2>
+        <p>Real captures from the product — not concept art.</p>
+      </div>
+      <div class="grid g3">
+        <div class="glass rv" data-tilt>
+          <span class="tag">5 credits</span>
+          <div class="ix">✶</div>
+          <h3>AI Auto Editor</h3>
+          <p>One paste → finished clips. Cinematic color, animated motion graphics, B-roll, sound design, word-perfect captions, speaker-locked reframe.</p>
+        </div>
+        <div class="glass rv" data-tilt>
+          <div class="ix">◇</div>
+          <h3>Moments worth posting</h3>
+          <p>Cliptica reviews the whole video, ranks every potential moment, and surfaces just the ones worth your time — each with a score.</p>
+        </div>
+        <div class="glass rv" data-tilt>
+          <div class="ix">▦</div>
+          <h3>Full timeline editor</h3>
+          <p>Every clip arrives dressed. When you want control, it's a real inspector — 15 caption styles, face-tracked reframe, free re-renders.</p>
+        </div>
+        <div class="glass rv" data-tilt>
+          <div class="ix">$</div>
+          <h3>Campaign ledger</h3>
+          <p>Link every post to its campaign, log views and payouts, watch effective $/1K by program. Pending → approved → paid.</p>
+        </div>
+        <div class="glass rv" data-tilt>
+          <div class="ix">⏱</div>
+          <h3>20× faster</h3>
+          <p>Same four clips: 8 hours by hand vs 20 minutes with Cliptica. Paste → AI finds, cuts, reframes, captions, scores.</p>
+        </div>
+        <div class="glass rv" data-tilt>
+          <div class="ix">↗</div>
+          <h3>Built for the economy</h3>
+          <p>Content Rewards pays $40K+/day across ~1M videos/month. Short-form ad spend: $111B → $145.8B by 2028. Throughput wins.</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="how">
+      <div class="sec-head rv">
+        <div class="k">Four steps</div>
+        <h2>From a long video to a <em>paid clip</em></h2>
+        <p>No scrubbing, no manual reframing, no spreadsheet of links.</p>
+      </div>
+      <div class="grid g2">
+        <div class="step rv"><div class="n">01</div><div><h4>Drop in the long video</h4><p>Upload or paste a link. Add clipping instructions and the AI clips toward them.</p></div></div>
+        <div class="step rv"><div class="n">02</div><div><h4>Only the moments worth posting</h4><p>Every potential clip ranked, surfaced with a viral score and explanation.</p></div></div>
+        <div class="step rv"><div class="n">03</div><div><h4>Every clip leaves edited</h4><p>Face-tracked 9:16, animated captions, headline, music bed, SFX, zoom punch-ins.</p></div></div>
+        <div class="step rv"><div class="n">04</div><div><h4>The ledger keeps the books</h4><p>Link posts to campaigns, log views and payouts, watch effective $/1K live.</p></div></div>
+      </div>
+    </section>
+
+    <section>
+      <div class="stats">
+        <div class="stat rv"><div class="v" data-count="8">0</div><div class="l">hours returned / upload</div></div>
+        <div class="stat rv"><div class="v" data-count="20">0</div><div class="l">× faster throughput</div></div>
+        <div class="stat rv"><div class="v" data-count="15">0</div><div class="l">caption styles</div></div>
+        <div class="stat rv"><div class="v" data-count="40">0</div><div class="l">free credits</div></div>
+      </div>
+    </section>
+
+    <section id="pricing">
+      <div class="sec-head rv">
+        <div class="k">Pricing</div>
+        <h2>One campaign payout covers <em>a year</em> of it</h2>
+        <p>1 credit ≈ 1 minute of source footage. Free starts with 40 credits, no card.</p>
+      </div>
+      <div class="grid g3">
+        <div class="price rv">
+          <div class="name">Free</div>
+          <div class="amt">$0<small> / forever</small></div>
+          <ul>
+            <li>40 credits to start</li>
+            <li>All 15 caption styles</li>
+            <li>720p exports with mark</li>
+            <li>Up to 3 videos / day</li>
+          </ul>
+          <a href="#" class="btn btn-ghost" style="border:1px solid var(--hair);background:transparent;color:var(--ivory)">Start free</a>
+        </div>
+        <div class="price feat rv">
+          <span class="badge-pop">Most popular</span>
+          <div class="name">Clipper</div>
+          <div class="amt">$19<small> / mo</small></div>
+          <ul>
+            <li>300 credits / month</li>
+            <li>No watermark · 1080p 60fps</li>
+            <li>Campaign hub + earnings ledger</li>
+            <li>Motion graphics, music & SFX</li>
+          </ul>
+          <a href="#" class="btn">Get Clipper</a>
+        </div>
+        <div class="price rv">
+          <div class="name">Studio</div>
+          <div class="amt">$49<small> / mo</small></div>
+          <ul>
+            <li>1,200 credits / month</li>
+            <li>Priority rendering queue</li>
+            <li>Auto-Pilot watchlists</li>
+            <li>Brand presets & style packs</li>
+          </ul>
+          <a href="#" class="btn btn-ghost" style="border:1px solid var(--hair);background:transparent;color:var(--ivory)">Get Studio</a>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="quote rv">
+        <blockquote>"You're done with CapCut — done with all of it. You drop a link, your clips come out, and you do <b>everything in one place.</b>"</blockquote>
+        <div class="who">Beta tester 001 · 220K TikTok · clipping since 2020</div>
+      </div>
+    </section>
+
+    <section>
+      <div class="final rv">
+        <h2>Paste a link. <em>Start getting paid.</em></h2>
+        <p>Start free with 40 credits and no credit card. Upgrade when you outgrow the 20-minute limit.</p>
+        <a href="#" class="btn btn-solid btn-lg">Start free — 40 credits</a>
+      </div>
+    </section>
+
+    <footer>© 2026 Cliptica · Built like an editorial team, priced like software.</footer>
+  </div>
+
+<script>
+  // cursor orb
+  const orb=document.getElementById('orb');
+  let tx=0,ty=0,cx=0,cy=0;
+  addEventListener('pointermove',e=>{tx=e.clientX;ty=e.clientY;orb.style.opacity=1});
+  addEventListener('pointerleave',()=>orb.style.opacity=0);
+  (function loop(){cx+=(tx-cx)*.12;cy+=(ty-cy)*.12;orb.style.left=cx+'px';orb.style.top=cy+'px';requestAnimationFrame(loop)})();
+
+  // glass spotlight + tilt
+  document.querySelectorAll('[data-tilt]').forEach(el=>{
+    el.addEventListener('pointermove',e=>{
+      const r=el.getBoundingClientRect();
+      el.style.setProperty('--mx',((e.clientX-r.left)/r.width*100)+'%');
+      el.style.setProperty('--my',((e.clientY-r.top)/r.height*100)+'%');
+      const rx=(.5-(e.clientY-r.top)/r.height)*6, ry=((e.clientX-r.left)/r.width-.5)*6;
+      el.style.transform=`translateY(-6px) rotateX(${rx}deg) rotateY(${ry}deg)`;
+    });
+    el.addEventListener('pointerleave',()=>{el.style.transform=''});
+  });
+
+  // reveal on scroll
+  const io=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting)e.target.classList.add('in')}),{threshold:.12});
+  document.querySelectorAll('.rv').forEach(el=>io.observe(el));
+
+  // count up
+  const cu=new IntersectionObserver(es=>es.forEach(e=>{
+    if(!e.isIntersecting)return;
+    const el=e.target,v=+el.dataset.count,t0=performance.now();
+    (function tick(t){const p=Math.min((t-t0)/1200,1);el.textContent=Math.round(v*(1-Math.pow(1-p,3)));if(p<1)requestAnimationFrame(tick)})(t0);
+    cu.unobserve(el);
+  }),{threshold:.5});
+  document.querySelectorAll('[data-count]').forEach(el=>cu.observe(el));
+
+  // duplicate ticker for seamless loop
+  const tr=document.getElementById('track');
+  tr.innerHTML+=tr.innerHTML;
+</script>
+</body>
+</html>
