@@ -1,0 +1,13 @@
+[Unit]
+Description=Nology Caddy reverse proxy (auto-HTTPS)
+After=network.target
+
+[Service]
+User=root
+EnvironmentFile=-/opt/nology/.env.production
+ExecStart=/usr/local/bin/caddy run --config /etc/caddy/Caddyfile --adapter caddyfile
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
