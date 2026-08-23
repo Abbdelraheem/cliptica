@@ -107,7 +107,7 @@ export default function BillingPage() {
 
       <p className="mt-8 text-center text-sm font-light text-mist">
         Need invoice history or a custom tier?{' '}
-        <a href="mailto:billing@clipforge.app" className="text-gold underline underline-offset-4">Contact billing</a>
+        <a href="mailto:billing@NOLOGY.app" className="text-gold underline underline-offset-4">Contact billing</a>
       </p>
     </div>
   )

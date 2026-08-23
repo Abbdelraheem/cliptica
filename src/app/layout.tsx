@@ -16,28 +16,28 @@ const inter = Inter({
 
 export const metadata: Metadata = {
   title: {
-    default: 'ClipForge — Turn Content Into Reach. Turn Reach Into Revenue.',
-    template: '%s | ClipForge',
+    default: 'NOLOGY — One video in. A week of clips out.',
+    template: '%s | NOLOGY',
   },
   description:
-    'Clip. Publish. Track. Earn. The all-in-one platform for creators, editors and brands building the next generation of short-form content.',
-  keywords: ['clipping marketplace', 'creator economy', 'short form video', 'campaign rewards', 'clip editing', 'leaderboard'],
-  authors: [{ name: 'ClipForge' }],
-  creator: 'ClipForge',
-  publisher: 'ClipForge',
+    'Paste a YouTube link and get ready-to-post vertical clips. AI finds the viral moments, crops with face-tracking, burns word-perfect captions, and scores every clip.',
+  keywords: ['ai clipping', 'video to shorts', 'youtube clips', 'viral moments', 'auto captions', '9:16 crop', 'short form video'],
+  authors: [{ name: 'NOLOGY' }],
+  creator: 'NOLOGY',
+  publisher: 'NOLOGY',
   robots: 'index, follow',
   openGraph: {
     type: 'website',
     locale: 'en_US',
-    url: 'https://clipforge.app',
-    siteName: 'ClipForge',
-    title: 'ClipForge — Turn Content Into Reach. Turn Reach Into Revenue.',
-    description: 'The all-in-one platform for creators, editors and brands building the next generation of short-form content.',
+    url: 'https://getnology.com',
+    siteName: 'NOLOGY',
+    title: 'NOLOGY — One video in. A week of clips out.',
+    description: 'AI that finds the viral moments in your videos and turns them into ready-to-post shorts.',
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'ClipForge — Turn Content Into Reach.',
-    description: 'Clip. Publish. Track. Earn.',
+    title: 'NOLOGY — One video in. A week of clips out.',
+    description: 'AI clipping engine for creators.',
   },
   icons: {
     icon: '/favicon.ico',

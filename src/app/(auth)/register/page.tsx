@@ -52,9 +52,9 @@ export default function RegisterPage() {
       <div className="relative z-[2] grid w-full max-w-4xl gap-10 md:grid-cols-[1fr_1.1fr] md:items-center">
         {/* Left pitch */}
         <div className="hidden md:block">
-          <p className="text-xs uppercase tracking-[0.3em] text-champagne">Start earning today</p>
+          <p className="text-xs uppercase tracking-[0.3em] text-champagne">Start clipping free</p>
           <h2 className="display-lg mt-4">
-            A week of paid clips from <span className="italic-accent gold-text">one paste.</span>
+            A week of clips from <span className="italic-accent gold-text">one paste.</span>
           </h2>
           <ul className="mt-8 space-y-3.5">
             {['40 free credits — no card required', 'All 15 caption styles unlocked', 'Campaign ledger from day one'].map(
@@ -72,7 +72,7 @@ export default function RegisterPage() {
 
         {/* Form card */}
         <div className="rounded-3xl border border-hair bg-gradient-to-b from-pearl/[0.05] to-pearl/[0.01] p-9 backdrop-blur-xl">
-          <Link href="/" className="mb-8 flex justify-center md:hidden" aria-label="ClipForge home">
+          <Link href="/" className="mb-8 flex justify-center md:hidden" aria-label="NOLOGY home">
             <Wordmark size={26} />
           </Link>
 

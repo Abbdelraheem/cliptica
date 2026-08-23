@@ -5,11 +5,10 @@ import Link from 'next/link'
 import { Wordmark } from '@/components/logo'
 
 const NAV_LINKS = [
-  ['Home', '/'],
-  ['Campaigns', '/#marketplace'],
-  ['Creators', '/#creators'],
-  ['Leaderboard', '/#leaderboard'],
   ['How It Works', '/#how'],
+  ['Features', '/#features'],
+  ['Pricing', '/#pricing'],
+  ['FAQ', '/#faq'],
 ] as const
 
 export function MarketingLayout({ children }: { children: ReactNode }) {
@@ -45,7 +44,7 @@ export function MarketingLayout({ children }: { children: ReactNode }) {
               : 'border-hair bg-[#0a0a0a]/55 shadow-[0_10px_50px_rgba(0,0,0,0.35)]'
           }`}
         >
-          <Link href="/" aria-label="ClipForge home" className="shrink-0">
+          <Link href="/" aria-label="NOLOGY home" className="shrink-0">
             <Wordmark />
           </Link>
 
@@ -54,7 +53,7 @@ export function MarketingLayout({ children }: { children: ReactNode }) {
               <a
                 key={label}
                 href={href}
-                className={`text-sm transition-colors duration-300 hover:text-white ${scrolled ? 'text-mist' : 'text-mist'}`}
+                className="text-sm text-mist transition-colors duration-300 hover:text-white"
               >
                 {label}
               </a>
@@ -69,7 +68,7 @@ export function MarketingLayout({ children }: { children: ReactNode }) {
               Log In
             </Link>
             <Link href="/register" className="btn-lux btn-primary !rounded-xl !px-5 !py-2.5 !text-sm">
-              Start Creating
+              Start Free
             </Link>
           </div>
         </div>
@@ -84,10 +83,11 @@ export function MarketingLayout({ children }: { children: ReactNode }) {
             <div className="space-y-4">
               <Wordmark />
               <p className="max-w-xs text-sm leading-relaxed text-mist">
-                Turn Content Into Reach. Turn Reach Into Revenue.
+                One link in. A week of clips out. AI that finds the moments, cuts them vertical,
+                and captions them for you.
               </p>
               <div className="flex gap-3 pt-2">
-                {['X', 'Instagram', 'YouTube', 'Discord'].map((s) => (
+                {['X', 'Instagram', 'YouTube', 'TikTok'].map((s) => (
                   <a
                     key={s}
                     href="#"
@@ -101,29 +101,28 @@ export function MarketingLayout({ children }: { children: ReactNode }) {
             </div>
             {[
               {
-                title: 'Platform',
+                title: 'Product',
                 links: [
-                  ['Campaigns', '/#marketplace'],
-                  ['Creators', '/#creators'],
-                  ['Leaderboard', '/#leaderboard'],
-                  ['Analytics', '/#features'],
+                  ['How It Works', '/#how'],
+                  ['Features', '/#features'],
+                  ['Pricing', '/#pricing'],
+                  ['Dashboard', '/dashboard'],
                 ],
               },
               {
                 title: 'Resources',
                 links: [
-                  ['How It Works', '/#how'],
+                  ['FAQ', '/#faq'],
                   ['Help Center', '#'],
-                  ['FAQ', '#'],
-                  ['Blog', '#'],
+                  ['Caption Styles', '/#features'],
+                  ['Changelog', '#'],
                 ],
               },
               {
                 title: 'Company',
                 links: [
                   ['About', '#'],
-                  ['Contact', '#'],
-                  ['Careers', '#'],
+                  ['Contact', 'mailto:support@getnology.com'],
                   ['Terms', '#'],
                   ['Privacy', '#'],
                 ],
@@ -146,7 +145,7 @@ export function MarketingLayout({ children }: { children: ReactNode }) {
             ))}
           </div>
           <div className="mt-14 border-t border-hair/40 pt-8 text-sm text-mist-2">
-            © {new Date().getFullYear()} ClipForge. All rights reserved.
+            © {new Date().getFullYear()} NOLOGY. All rights reserved.
           </div>
         </div>
       </footer>
