@@ -1,21 +1,35 @@
 import type { NextConfig } from 'next'
 import path from 'path'
 
+// STATIC_EXPORT=1 → build a static site for GitHub Pages
+const isStaticExport = process.env.STATIC_EXPORT === '1'
+
 const nextConfig: NextConfig = {
   reactStrictMode: true,
   outputFileTracingRoot: path.join(__dirname),
   eslint: {
     ignoreDuringBuilds: true,
   },
-  images: {
-    remotePatterns: [
-      {
-        protocol: 'https',
-        hostname: '**',
-      },
-    ],
-    formats: ['image/avif', 'image/webp'],
-  },
+  ...(isStaticExport
+    ? {
+        output: 'export' as const,
+        trailingSlash: true,
+        basePath: '/cliptica',
+        assetPrefix: '/cliptica/',
+        images: { unoptimized: true },
+      }
+    : {}),
+  ...(!isStaticExport && {
+    images: {
+      remotePatterns: [
+        {
+          protocol: 'https',
+          hostname: '**',
+        },
+      ],
+      formats: ['image/avif', 'image/webp'],
+    },
+  }),
   experimental: {
     serverActions: {
       bodySizeLimit: '2gb',
