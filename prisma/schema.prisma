@@ -64,7 +64,22 @@ model User {
   payouts       Payout[]
   postingDays   PostingDay[]
   apiKeys       ApiKey[]
+  devices       Device[]
   creditTransactions CreditTransaction[]
+}
+
+/// One physical browser/device can ever be linked to exactly ONE account.
+model Device {
+  id              String   @id @default(cuid())
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  /// SHA-256 of the client-computed device fingerprint (canvas + hardware traits)
+  fingerprintHash String   @unique
+  /// Persistent random ID kept in localStorage — secondary abuse signal
+  localId         String?
+  userAgent       String?
+  createdAt       DateTime @default(now())
+  lastSeenAt      DateTime @updatedAt
 }
 
 model Account {

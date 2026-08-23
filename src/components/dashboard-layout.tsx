@@ -1,8 +1,9 @@
 'use client'
 
-import { ReactNode, useState } from 'react'
+import { ReactNode, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
+import { signOut } from 'next-auth/react'
 import {
   LayoutDashboard,
   FolderOpen,
@@ -15,6 +16,7 @@ import {
   X,
 } from 'lucide-react'
 import { Wordmark } from '@/components/logo'
+import { getDeviceId } from '@/lib/fingerprint'
 
 const NAV_ITEMS = [
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
@@ -28,6 +30,33 @@ const NAV_ITEMS = [
 export function DashboardLayout({ children }: { children: ReactNode }) {
   const pathname = usePathname()
   const [mobileOpen, setMobileOpen] = useState(false)
+  const deviceChecked = useRef(false)
+
+  // One-account-per-device enforcement — runs on every dashboard entry.
+  // Catches OAuth (Google/GitHub) accounts that bypassed the form flows.
+  useEffect(() => {
+    if (deviceChecked.current) return
+    deviceChecked.current = true
+    let cancelled = false
+    ;(async () => {
+      try {
+        const deviceId = await getDeviceId()
+        const res = await fetch('/api/device/check', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ deviceId }),
+        })
+        if (!cancelled && res.status === 403) {
+          await signOut({ callbackUrl: '/login?error=DeviceConflict' })
+        }
+      } catch {
+        /* offline preview / static export — skip silently */
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   const isActive = (href: string) =>
     pathname === href || pathname.startsWith(href + '/')

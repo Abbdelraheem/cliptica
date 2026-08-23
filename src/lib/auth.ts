@@ -6,6 +6,7 @@ import GitHubProvider from 'next-auth/providers/github'
 import { prisma } from '@/lib/prisma'
 import { compare } from 'bcryptjs'
 import { z } from 'zod'
+import { assertDeviceAvailable, bindDevice } from '@/lib/device'
 
 /** Convenience helper so API routes can `await auth()` */
 export async function auth() {
@@ -15,6 +16,7 @@ export async function auth() {
 const loginSchema = z.object({
   email: z.string().email(),
   password: z.string().min(8),
+  deviceId: z.string().max(256).optional(),
 })
 
 export const authOptions: NextAuthOptions = {
@@ -69,18 +71,33 @@ export const authOptions: NextAuthOptions = {
       credentials: {
         email: { label: 'Email', type: 'email' },
         password: { label: 'Password', type: 'password' },
+        deviceId: { label: 'Device ID', type: 'text' },
       },
       async authorize(credentials) {
         const validated = loginSchema.safeParse(credentials)
         if (!validated.success) return null
 
-        const { email, password } = validated.data
+        const { email, password, deviceId } = validated.data
         const user = await prisma.user.findUnique({ where: { email } })
 
         if (!user || !user.passwordHash) return null
 
         const isValid = await compare(password, user.passwordHash)
         if (!isValid) return null
+
+        // One account per device — server-side enforcement.
+        if (deviceId) {
+          try {
+            await assertDeviceAvailable(deviceId, user.id)
+          } catch {
+            return null
+          }
+          try {
+            await bindDevice(deviceId, user.id)
+          } catch {
+            /* binding is best-effort here; conflict above is the gate */
+          }
+        }
 
         return {
           id: user.id,

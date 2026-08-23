@@ -1,11 +1,12 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { signIn } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
-import { Loader2, Check } from 'lucide-react'
+import { Loader2, Check, ShieldAlert } from 'lucide-react'
 import { Wordmark } from '@/components/logo'
+import { getDeviceId } from '@/lib/fingerprint'
 
 export default function RegisterPage() {
   const router = useRouter()
@@ -14,6 +15,11 @@ export default function RegisterPage() {
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const [deviceId, setDeviceId] = useState('')
+
+  useEffect(() => {
+    getDeviceId().then(setDeviceId)
+  }, [])
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -23,15 +29,21 @@ export default function RegisterPage() {
       const res = await fetch('/api/auth/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, email, password }),
+        body: JSON.stringify({ name, email, password, deviceId }),
       })
       if (!res.ok) {
         const data = await res.json().catch(() => null)
-        setError(data?.error ?? 'Something went wrong. Try again.')
+        setError(
+          data?.error === 'DEVICE_LIMIT'
+            ? (data?.message ?? 'This device already has a Nology account. One account per device.')
+            : (data?.error === 'Email already registered'
+                ? 'This email is already registered.'
+                : (data?.error ?? 'Something went wrong. Try again.'))
+        )
         setLoading(false)
         return
       }
-      const login = await signIn('credentials', { email, password, redirect: false })
+      const login = await signIn('credentials', { email, password, deviceId, redirect: false })
       setLoading(false)
       if (login?.error) {
         router.push('/login')
@@ -120,7 +132,8 @@ export default function RegisterPage() {
             </div>
 
             {error && (
-              <p className="rounded-lg border border-red-400/30 bg-red-400/10 px-4 py-2.5 text-sm text-red-300">
+              <p className="flex items-start gap-2 rounded-lg border border-red-400/30 bg-red-400/10 px-4 py-2.5 text-sm text-red-300">
+                <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0" />
                 {error}
               </p>
             )}

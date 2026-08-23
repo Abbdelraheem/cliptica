@@ -1,11 +1,12 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { signIn } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
-import { Loader2 } from 'lucide-react'
+import { Loader2, ShieldAlert } from 'lucide-react'
 import { Wordmark } from '@/components/logo'
+import { getDeviceId } from '@/lib/fingerprint'
 
 export default function LoginPage() {
   const router = useRouter()
@@ -13,19 +14,57 @@ export default function LoginPage() {
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const [deviceId, setDeviceId] = useState('')
+
+  useEffect(() => {
+    getDeviceId().then(setDeviceId)
+    const err = new URLSearchParams(window.location.search).get('error')
+    if (err === 'DeviceConflict') {
+      setError(
+        'This device is already linked to another account. One account per device is allowed.'
+      )
+    }
+  }, [])
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setError('')
     setLoading(true)
-    const res = await signIn('credentials', { email, password, redirect: false })
-    setLoading(false)
-    if (res?.error) {
-      setError('Invalid email or password.')
-      return
+    try {
+      // Pre-check: precise message when this device belongs to another account.
+      const check = await fetch('/api/device/check', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ deviceId, email }),
+      })
+      if (check.status === 403) {
+        const data = await check.json().catch(() => null)
+        setError(data?.message ?? 'This device already has another Nology account.')
+        return
+      }
+
+      const res = await signIn('credentials', {
+        email,
+        password,
+        deviceId,
+        redirect: false,
+      })
+      if (res?.error) {
+        setError('Invalid email or password.')
+        return
+      }
+      router.push('/dashboard')
+      router.refresh()
+    } catch {
+      setError('Something went wrong. Please try again.')
+    } finally {
+      setLoading(false)
     }
-    router.push('/dashboard')
-    router.refresh()
+  }
+
+  function oauth(provider: 'google' | 'github') {
+    // Device enforcement for OAuth happens on first dashboard load.
+    signIn(provider, { callbackUrl: '/dashboard' })
   }
 
   return (
@@ -72,7 +111,8 @@ export default function LoginPage() {
             </div>
 
             {error && (
-              <p className="rounded-lg border border-red-400/30 bg-red-400/10 px-4 py-2.5 text-sm text-red-300">
+              <p className="flex items-start gap-2 rounded-lg border border-red-400/30 bg-red-400/10 px-4 py-2.5 text-sm text-red-300">
+                <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0" />
                 {error}
               </p>
             )}
@@ -90,13 +130,13 @@ export default function LoginPage() {
 
           <div className="grid grid-cols-2 gap-3">
             <button
-              onClick={() => signIn('google', { callbackUrl: '/dashboard' })}
+              onClick={() => oauth('google')}
               className="btn-lux btn-outline !py-3 !text-sm"
             >
               Google
             </button>
             <button
-              onClick={() => signIn('github', { callbackUrl: '/dashboard' })}
+              onClick={() => oauth('github')}
               className="btn-lux btn-outline !py-3 !text-sm"
             >
               GitHub
