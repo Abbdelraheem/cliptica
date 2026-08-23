@@ -31,7 +31,7 @@ export function DashboardSidebar() {
             <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-purple-600 to-pink-600 flex items-center justify-center">
               <Sparkles className="h-5 w-5 text-white" />
             </div>
-            <span className="font-bold text-xl text-foreground">Cliptica</span>
+            <span className="font-bold text-xl text-foreground">ClipForge</span>
           </Link>
         </div>
 

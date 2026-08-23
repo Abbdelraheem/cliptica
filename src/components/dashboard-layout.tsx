@@ -10,11 +10,11 @@ import {
   BarChart3,
   CreditCard,
   Settings,
-  Scissors,
   LogOut,
   Menu,
   X,
 } from 'lucide-react'
+import { Wordmark } from '@/components/logo'
 
 const NAV_ITEMS = [
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
@@ -40,10 +40,7 @@ export function DashboardLayout({ children }: { children: ReactNode }) {
       {/* Mobile top bar */}
       <div className="fixed top-0 left-0 right-0 z-40 flex items-center justify-between border-b border-hair/50 bg-onyx-2/90 px-4 py-3 backdrop-blur-xl lg:hidden">
         <Link href="/dashboard" className="flex items-center gap-2.5">
-          <span className="flex h-8 w-8 rotate-45 items-center justify-center rounded-[6px] bg-gradient-to-br from-gold to-emerald-deep shadow-[0_0_14px_rgba(216,182,118,0.5)]">
-            <Scissors className="h-4 w-4 -rotate-45 text-onyx" />
-          </span>
-          <span className="font-display text-xl font-semibold tracking-wide">Cliptica</span>
+          <Wordmark size={26} />
         </Link>
         <button
           onClick={() => setMobileOpen((o) => !o)}
@@ -60,11 +57,10 @@ export function DashboardLayout({ children }: { children: ReactNode }) {
           mobileOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
-        <div className="hidden items-center gap-2.5 border-b border-hair/50 px-5 py-5 lg:flex">
-          <span className="flex h-9 w-9 rotate-45 items-center justify-center rounded-[7px] bg-gradient-to-br from-gold to-emerald-deep shadow-[0_0_16px_rgba(216,182,118,0.5)]">
-            <Scissors className="h-4.5 w-4.5 -rotate-45 text-onyx" />
-          </span>
-          <span className="font-display text-2xl font-semibold tracking-wide">Cliptica</span>
+        <div className="hidden items-center border-b border-hair/50 px-5 py-5 lg:flex">
+          <Link href="/dashboard" aria-label="ClipForge dashboard">
+            <Wordmark size={30} />
+          </Link>
         </div>
 
         <nav className="flex-1 space-y-1 overflow-y-auto p-3 pt-20 lg:pt-3" aria-label="Dashboard navigation">

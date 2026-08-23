@@ -1,11 +1,19 @@
 'use client'
 
-import { ReactNode, useEffect, useRef } from 'react'
+import { ReactNode, useEffect, useState } from 'react'
 import Link from 'next/link'
-import { Scissors } from 'lucide-react'
+import { Wordmark } from '@/components/logo'
+
+const NAV_LINKS = [
+  ['Home', '/'],
+  ['Campaigns', '/#marketplace'],
+  ['Creators', '/#creators'],
+  ['Leaderboard', '/#leaderboard'],
+  ['How It Works', '/#how'],
+] as const
 
 export function MarketingLayout({ children }: { children: ReactNode }) {
-  const navRef = useRef<HTMLElement>(null)
+  const [scrolled, setScrolled] = useState(false)
 
   useEffect(() => {
     const els = document.querySelectorAll('.rv')
@@ -14,33 +22,39 @@ export function MarketingLayout({ children }: { children: ReactNode }) {
       { threshold: 0.12 }
     )
     els.forEach((el) => io.observe(el))
-    return () => io.disconnect()
+
+    const onScroll = () => setScrolled(window.scrollY > 40)
+    onScroll()
+    window.addEventListener('scroll', onScroll, { passive: true })
+    return () => {
+      io.disconnect()
+      window.removeEventListener('scroll', onScroll)
+    }
   }, [])
 
   return (
     <div className="relative min-h-screen bg-onyx text-pearl">
       <div className="amb" aria-hidden="true" />
 
-      {/* Nav */}
-      <header ref={navRef} className="fixed inset-x-0 top-0 z-50 flex justify-center px-4 pt-5">
-        <div className="flex items-center gap-8 rounded-full border border-hair bg-onyx-2/60 py-2.5 pl-6 pr-3 shadow-[0_10px_50px_rgba(0,0,0,0.5)] backdrop-blur-xl">
-          <Link href="/" className="flex items-center gap-2.5" aria-label="Cliptica home">
-            <span className="flex h-7 w-7 rotate-45 items-center justify-center rounded-[6px] bg-gradient-to-br from-gold to-emerald-deep shadow-[0_0_14px_rgba(216,182,118,0.5)]">
-              <Scissors className="h-3.5 w-3.5 -rotate-45 text-onyx" />
-            </span>
-            <span className="font-display text-xl font-semibold tracking-wide">Cliptica</span>
+      {/* Floating nav */}
+      <header className="fixed inset-x-0 top-0 z-50 flex justify-center px-4 pt-4">
+        <div
+          className={`flex w-full max-w-5xl items-center justify-between rounded-2xl border py-2.5 pl-5 pr-2.5 backdrop-blur-xl transition-all duration-300 ${
+            scrolled
+              ? 'border-hair bg-[#0a0a0a]/90 shadow-[0_10px_50px_rgba(0,0,0,0.6)]'
+              : 'border-hair bg-[#0a0a0a]/55 shadow-[0_10px_50px_rgba(0,0,0,0.35)]'
+          }`}
+        >
+          <Link href="/" aria-label="ClipForge home" className="shrink-0">
+            <Wordmark />
           </Link>
 
-          <nav className="hidden items-center gap-6 md:flex" aria-label="Main navigation">
-            {[
-              ['Features', '/#features'],
-              ['Atelier', '/#how'],
-              ['Pricing', '/#pricing'],
-            ].map(([label, href]) => (
+          <nav className="hidden items-center gap-7 lg:flex" aria-label="Main navigation">
+            {NAV_LINKS.map(([label, href]) => (
               <a
                 key={label}
                 href={href}
-                className="text-sm text-mist transition-colors duration-300 hover:text-gold"
+                className={`text-sm transition-colors duration-300 hover:text-white ${scrolled ? 'text-mist' : 'text-mist'}`}
               >
                 {label}
               </a>
@@ -50,12 +64,12 @@ export function MarketingLayout({ children }: { children: ReactNode }) {
           <div className="flex items-center gap-1.5">
             <Link
               href="/login"
-              className="rounded-full px-4 py-2 text-sm text-pearl transition-colors duration-300 hover:text-gold"
+              className="hidden rounded-xl px-4 py-2 text-sm text-mist transition-colors duration-300 hover:text-white sm:block"
             >
-              Log in
+              Log In
             </Link>
-            <Link href="/register" className="btn-lux btn-gold !px-5 !py-2.5 !text-sm">
-              Start free
+            <Link href="/register" className="btn-lux btn-primary !rounded-xl !px-5 !py-2.5 !text-sm">
+              Start Creating
             </Link>
           </div>
         </div>
@@ -64,51 +78,65 @@ export function MarketingLayout({ children }: { children: ReactNode }) {
       <main className="relative z-[2]">{children}</main>
 
       {/* Footer */}
-      <footer className="relative z-[2] mt-24 border-t border-hair/50 py-12">
-        <div className="mx-auto max-w-6xl px-6">
-          <div className="grid gap-10 md:grid-cols-4">
+      <footer className="relative z-[2] mt-24 border-t border-hair/60 bg-[#070707]">
+        <div className="mx-auto max-w-6xl px-6 py-16">
+          <div className="grid gap-12 md:grid-cols-[1.4fr_1fr_1fr_1fr]">
             <div className="space-y-4">
-              <Link href="/" className="flex items-center gap-2.5" aria-label="Cliptica home">
-                <span className="flex h-7 w-7 rotate-45 items-center justify-center rounded-[6px] bg-gradient-to-br from-gold to-emerald-deep">
-                  <Scissors className="h-3.5 w-3.5 -rotate-45 text-onyx" />
-                </span>
-                <span className="font-display text-xl font-semibold tracking-wide">Cliptica</span>
-              </Link>
-              <p className="max-w-xs text-sm font-light leading-relaxed text-mist">
-                Built like an editorial team, priced like software.
+              <Wordmark />
+              <p className="max-w-xs text-sm leading-relaxed text-mist">
+                Turn Content Into Reach. Turn Reach Into Revenue.
               </p>
+              <div className="flex gap-3 pt-2">
+                {['X', 'Instagram', 'YouTube', 'Discord'].map((s) => (
+                  <a
+                    key={s}
+                    href="#"
+                    aria-label={s}
+                    className="flex h-9 w-9 items-center justify-center rounded-lg border border-hair bg-surface text-xs font-semibold text-mist transition-all duration-300 hover:border-champagne/50 hover:text-white"
+                  >
+                    {s === 'X' ? '𝕏' : s[0]}
+                  </a>
+                ))}
+              </div>
             </div>
             {[
               {
-                title: 'Product',
+                title: 'Platform',
                 links: [
-                  ['Features', '/#features'],
-                  ['Pricing', '/#pricing'],
-                  ['Testimonials', '/#testimonials'],
+                  ['Campaigns', '/#marketplace'],
+                  ['Creators', '/#creators'],
+                  ['Leaderboard', '/#leaderboard'],
+                  ['Analytics', '/#features'],
+                ],
+              },
+              {
+                title: 'Resources',
+                links: [
+                  ['How It Works', '/#how'],
+                  ['Help Center', '#'],
+                  ['FAQ', '#'],
+                  ['Blog', '#'],
                 ],
               },
               {
                 title: 'Company',
                 links: [
-                  ['About', '/about'],
-                  ['Blog', '/blog'],
-                  ['Careers', '/careers'],
-                ],
-              },
-              {
-                title: 'Legal',
-                links: [
-                  ['Privacy', '/privacy'],
-                  ['Terms', '/terms'],
+                  ['About', '#'],
+                  ['Contact', '#'],
+                  ['Careers', '#'],
+                  ['Terms', '#'],
+                  ['Privacy', '#'],
                 ],
               },
             ].map((col) => (
-              <nav key={col.title} className="space-y-3">
-                <h4 className="text-xs uppercase tracking-[0.24em] text-champagne">{col.title}</h4>
-                <ul className="space-y-2 text-sm font-light text-mist">
+              <nav key={col.title} className="space-y-3" aria-label={col.title}>
+                <h4 className="text-xs font-semibold uppercase tracking-[0.22em] text-champagne">
+                  {col.title}
+                </h4>
+                <ul className="space-y-2.5 text-sm text-mist">
                   {col.links.map(([label, href]) => (
                     <li key={label}>
-                      <Link href={href} className="transition-colors hover:text-gold">
+                      <Link href={href} className="transition-colors hover:text-white">
                         {label}
                       </Link>
                     </li>
@@ -117,8 +145,8 @@ export function MarketingLayout({ children }: { children: ReactNode }) {
               </nav>
             ))}
           </div>
-          <div className="mt-10 border-t border-hair/30 pt-8 text-center text-sm font-light text-mist-2">
-            © {new Date().getFullYear()} Cliptica · Built like an editorial team, priced like software.
+          <div className="mt-14 border-t border-hair/40 pt-8 text-sm text-mist-2">
+            © {new Date().getFullYear()} ClipForge. All rights reserved.
           </div>
         </div>
       </footer>

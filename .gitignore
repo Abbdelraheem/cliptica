@@ -60,3 +60,5 @@ worker/node_modules/
 # Uploads
 /public/uploads/
 *.log
+.vercel
+.env*

@@ -4,7 +4,8 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { signIn } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
-import { Scissors, Loader2, Check } from 'lucide-react'
+import { Loader2, Check } from 'lucide-react'
+import { Wordmark } from '@/components/logo'
 
 export default function RegisterPage() {
   const router = useRouter()
@@ -51,7 +52,7 @@ export default function RegisterPage() {
       <div className="relative z-[2] grid w-full max-w-4xl gap-10 md:grid-cols-[1fr_1.1fr] md:items-center">
         {/* Left pitch */}
         <div className="hidden md:block">
-          <p className="text-xs uppercase tracking-[0.3em] text-champagne">Join the atelier</p>
+          <p className="text-xs uppercase tracking-[0.3em] text-champagne">Start earning today</p>
           <h2 className="display-lg mt-4">
             A week of paid clips from <span className="italic-accent gold-text">one paste.</span>
           </h2>
@@ -71,11 +72,8 @@ export default function RegisterPage() {
 
         {/* Form card */}
         <div className="rounded-3xl border border-hair bg-gradient-to-b from-pearl/[0.05] to-pearl/[0.01] p-9 backdrop-blur-xl">
-          <Link href="/" className="mb-8 flex items-center justify-center gap-2.5 md:hidden" aria-label="Cliptica home">
-            <span className="flex h-7 w-7 rotate-45 items-center justify-center rounded-[6px] bg-gradient-to-br from-gold to-emerald-deep">
-              <Scissors className="h-3.5 w-3.5 -rotate-45 text-onyx" />
-            </span>
-            <span className="font-display text-xl font-semibold">Cliptica</span>
+          <Link href="/" className="mb-8 flex justify-center md:hidden" aria-label="ClipForge home">
+            <Wordmark size={26} />
           </Link>
 
           <h1 className="display-md">Create your account</h1>

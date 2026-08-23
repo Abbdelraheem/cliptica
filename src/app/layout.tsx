@@ -1,53 +1,43 @@
 import type { Metadata, Viewport } from 'next'
-import { Cormorant_Garamond, Jost } from 'next/font/google'
+import { Manrope, Inter } from 'next/font/google'
 import './globals.css'
 import { Providers } from './providers'
 
-const cormorant = Cormorant_Garamond({
+const manrope = Manrope({
   variable: '--font-display',
-  weight: ['400', '500', '600', '700'],
-  style: ['normal', 'italic'],
+  weight: ['500', '600', '700', '800'],
   subsets: ['latin'],
 })
 
-const jost = Jost({
+const inter = Inter({
   variable: '--font-body',
-  weight: ['300', '400', '500', '600'],
   subsets: ['latin'],
 })
 
 export const metadata: Metadata = {
   title: {
-    default: 'Cliptica — AI Video Clipping Platform',
-    template: '%s | Cliptica',
+    default: 'ClipForge — Turn Content Into Reach. Turn Reach Into Revenue.',
+    template: '%s | ClipForge',
   },
-  description: 'AI video clipping: turn one long video into short, ready-to-post clips. Paste a link, get finished clips with captions, motion graphics, and auto-reframe.',
-  keywords: ['video clipping', 'AI video editing', 'short form video', 'content repurposing', 'viral clips'],
-  authors: [{ name: 'Cliptica' }],
-  creator: 'Cliptica',
-  publisher: 'Cliptica',
+  description:
+    'Clip. Publish. Track. Earn. The all-in-one platform for creators, editors and brands building the next generation of short-form content.',
+  keywords: ['clipping marketplace', 'creator economy', 'short form video', 'campaign rewards', 'clip editing', 'leaderboard'],
+  authors: [{ name: 'ClipForge' }],
+  creator: 'ClipForge',
+  publisher: 'ClipForge',
   robots: 'index, follow',
   openGraph: {
     type: 'website',
     locale: 'en_US',
-    url: 'https://cliptica.com',
-    siteName: 'Cliptica',
-    title: 'Cliptica — AI Video Clipping Platform',
-    description: 'AI video clipping: turn one long video into short, ready-to-post clips.',
-    images: [
-      {
-        url: '/og-image.png',
-        width: 1200,
-        height: 630,
-        alt: 'Cliptica Dashboard',
-      },
-    ],
+    url: 'https://clipforge.app',
+    siteName: 'ClipForge',
+    title: 'ClipForge — Turn Content Into Reach. Turn Reach Into Revenue.',
+    description: 'The all-in-one platform for creators, editors and brands building the next generation of short-form content.',
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'Cliptica — AI Video Clipping Platform',
-    description: 'AI video clipping: turn one long video into short, ready-to-post clips.',
-    images: ['/og-image.png'],
+    title: 'ClipForge — Turn Content Into Reach.',
+    description: 'Clip. Publish. Track. Earn.',
   },
   icons: {
     icon: '/favicon.ico',
@@ -58,7 +48,7 @@ export const metadata: Metadata = {
 }
 
 export const viewport: Viewport = {
-  themeColor: '#070608',
+  themeColor: '#050505',
   width: 'device-width',
   initialScale: 1,
   maximumScale: 5,
@@ -70,7 +60,7 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="en" className={`${cormorant.variable} ${jost.variable} h-full antialiased`}>
+    <html lang="en" className={`${manrope.variable} ${inter.variable} h-full antialiased`}>
       <head>
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />

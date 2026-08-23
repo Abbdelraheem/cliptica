@@ -4,7 +4,8 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { signIn } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
-import { Scissors, Loader2 } from 'lucide-react'
+import { Loader2 } from 'lucide-react'
+import { Wordmark } from '@/components/logo'
 
 export default function LoginPage() {
   const router = useRouter()
@@ -32,16 +33,13 @@ export default function LoginPage() {
       <div className="amb" aria-hidden="true" />
 
       <div className="relative z-[2] w-full max-w-md">
-        <Link href="/" className="mb-10 flex items-center justify-center gap-2.5" aria-label="Cliptica home">
-          <span className="flex h-8 w-8 rotate-45 items-center justify-center rounded-[7px] bg-gradient-to-br from-gold to-emerald-deep shadow-[0_0_16px_rgba(216,182,118,0.5)]">
-            <Scissors className="h-4 w-4 -rotate-45 text-onyx" />
-          </span>
-          <span className="font-display text-2xl font-semibold tracking-wide">Cliptica</span>
+        <Link href="/" className="mb-10 flex justify-center" aria-label="ClipForge home">
+          <Wordmark size={30} />
         </Link>
 
         <div className="rounded-3xl border border-hair bg-gradient-to-b from-pearl/[0.05] to-pearl/[0.01] p-9 backdrop-blur-xl">
           <p className="text-xs uppercase tracking-[0.3em] text-champagne">Welcome back</p>
-          <h1 className="display-md mt-3">Log in to the atelier</h1>
+          <h1 className="display-md mt-3">Welcome back, creator</h1>
 
           <form onSubmit={handleSubmit} className="mt-8 space-y-4">
             <div>
@@ -103,7 +101,7 @@ export default function LoginPage() {
           </div>
 
           <p className="mt-7 text-center text-sm font-light text-mist">
-            New to Cliptica?{' '}
+            New to ClipForge?{' '}
             <Link href="/register" className="text-gold underline underline-offset-4 hover:text-champagne">
               Create an account
             </Link>

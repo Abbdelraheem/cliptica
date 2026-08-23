@@ -1,37 +1,37 @@
 @import "tailwindcss";
 
 /* ============================================================
-   CLIPTICA — LUXURY 3D DESIGN SYSTEM
-   Onyx · Emerald · Champagne · Pearl
-   Cormorant Garamond (display) · Jost (body)
+   CLIPFORGE — CREATOR ECONOMY DESIGN SYSTEM
+   Near-black · Charcoal · Forge Orange (#FF5A1F)
+   Manrope (display) · Inter (body)
    ============================================================ */
 
 :root {
   /* Surfaces */
-  --onyx: #070608;
-  --onyx-2: #0e0c10;
-  --surface: rgba(243, 237, 225, 0.05);
-  --surface-2: rgba(243, 237, 225, 0.02);
+  --onyx: #050505;
+  --onyx-2: #0a0a0a;
+  --surface: rgba(255, 255, 255, 0.04);
+  --surface-2: rgba(255, 255, 255, 0.02);
 
   /* Ink */
-  --pearl: #f3ede1;
-  --mist: rgba(243, 237, 225, 0.55);
-  --mist-2: rgba(243, 237, 225, 0.32);
+  --pearl: #ffffff;
+  --mist: rgba(255, 255, 255, 0.6);
+  --mist-2: rgba(255, 255, 255, 0.38);
 
-  /* Metals */
-  --champagne: #d9b676;
-  --gold: #e8c987;
-  --gold-2: #b8924f;
-  --emerald: #1f5145;
-  --emerald-soft: rgba(31, 81, 69, 0.35);
+  /* Forge accent */
+  --champagne: #ff7a3d;
+  --gold: #ff5a1f;
+  --gold-2: #e8430a;
+  --emerald: #7c2d12;
+  --emerald-soft: rgba(255, 90, 31, 0.25);
 
   /* Hairlines */
-  --hair: rgba(216, 182, 118, 0.22);
-  --hair-soft: rgba(216, 182, 118, 0.1);
+  --hair: rgba(255, 255, 255, 0.08);
+  --hair-soft: rgba(255, 255, 255, 0.05);
 
   /* Typography */
-  --font-display: "Cormorant Garamond", Georgia, serif;
-  --font-body: "Jost", "Helvetica Neue", Arial, sans-serif;
+  --font-display: "Manrope", "Inter", system-ui, sans-serif;
+  --font-body: "Inter", system-ui, sans-serif;
 
   /* Radii */
   --radius-sm: 10px;
@@ -71,20 +71,20 @@ body {
 }
 
 ::selection {
-  background: rgba(216, 182, 118, 0.35);
-  color: var(--pearl);
+  background: rgba(255, 90, 31, 0.35);
+  color: #fff;
 }
 
-/* ---------- Ambient aurora backdrop ---------- */
+/* ---------- Ambient forge glow backdrop ---------- */
 .amb {
   position: fixed;
   inset: 0;
   z-index: 0;
   pointer-events: none;
   background:
-    radial-gradient(55vw 55vw at 80% 8%, rgba(31, 81, 69, 0.2), transparent 62%),
-    radial-gradient(45vw 45vw at 10% 88%, rgba(216, 182, 118, 0.08), transparent 62%),
-    radial-gradient(70vw 70vw at 50% 50%, rgba(14, 12, 16, 0.4), transparent 72%);
+    radial-gradient(55vw 55vw at 80% 8%, rgba(255, 90, 31, 0.13), transparent 62%),
+    radial-gradient(45vw 45vw at 10% 88%, rgba(255, 122, 61, 0.07), transparent 62%),
+    radial-gradient(70vw 70vw at 50% 50%, rgba(17, 17, 17, 0.4), transparent 72%);
   filter: blur(48px);
 }
 
@@ -95,7 +95,7 @@ body {
   inset: -50%;
   z-index: 1;
   pointer-events: none;
-  opacity: 0.05;
+  opacity: 0.04;
   background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
   animation: grain-shift 9s steps(6) infinite;
 }
@@ -112,48 +112,50 @@ body {
 
 .display-xl {
   font-family: var(--font-display);
-  font-weight: 600;
-  font-size: clamp(3rem, 8.5vw, 7rem);
-  line-height: 0.96;
-  letter-spacing: -0.01em;
+  font-weight: 800;
+  font-size: clamp(2.8rem, 7vw, 5.5rem);
+  line-height: 1.02;
+  letter-spacing: -0.03em;
 }
 .display-lg {
   font-family: var(--font-display);
-  font-weight: 600;
-  font-size: clamp(2.2rem, 5vw, 3.6rem);
-  line-height: 1.05;
-  letter-spacing: -0.01em;
+  font-weight: 800;
+  font-size: clamp(2rem, 4.6vw, 3.4rem);
+  line-height: 1.08;
+  letter-spacing: -0.025em;
 }
 .display-md {
   font-family: var(--font-display);
-  font-weight: 600;
-  font-size: clamp(1.6rem, 3vw, 2.2rem);
-  line-height: 1.12;
+  font-weight: 700;
+  font-size: clamp(1.5rem, 2.8vw, 2.1rem);
+  line-height: 1.15;
+  letter-spacing: -0.02em;
 }
 
 .gold-text {
-  background: linear-gradient(100deg, var(--gold), var(--champagne) 45%, var(--gold-2));
+  background: linear-gradient(100deg, #ff7a3d, #ff5a1f 45%, #ffb27a);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
 }
 .italic-accent {
-  font-style: italic;
-  font-weight: 500;
+  font-style: normal;
+  font-weight: 800;
 }
 
 .eyebrow {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  font-size: 0.74rem;
-  letter-spacing: 0.34em;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.22em;
   text-transform: uppercase;
   color: var(--champagne);
   border: 1px solid var(--hair);
-  padding: 9px 18px;
+  padding: 8px 16px;
   border-radius: 999px;
-  background: rgba(14, 12, 16, 0.4);
+  background: rgba(10, 10, 10, 0.5);
   backdrop-filter: blur(8px);
 }
 
@@ -173,29 +175,33 @@ body {
   transition: all 0.3s var(--ease-lux);
   white-space: nowrap;
 }
+.btn-primary,
 .btn-gold {
   background: linear-gradient(120deg, var(--gold), var(--gold-2));
-  color: var(--onyx);
+  color: #fff;
+  box-shadow: 0 0 24px rgba(255, 90, 31, 0.25);
 }
+.btn-primary:hover,
 .btn-gold:hover {
-  box-shadow: 0 10px 34px rgba(216, 182, 118, 0.4);
-  transform: translateY(-2px);
+  box-shadow: 0 10px 34px rgba(255, 90, 31, 0.45);
+  transform: translateY(-2px) scale(1.01);
 }
 .btn-outline {
-  background: transparent;
+  background: rgba(255, 255, 255, 0.04);
   color: var(--pearl);
   border: 1px solid var(--hair);
+  backdrop-filter: blur(10px);
 }
 .btn-outline:hover {
-  border-color: var(--champagne);
-  color: var(--gold);
+  border-color: rgba(255, 122, 61, 0.55);
+  color: var(--champagne);
 }
 .btn-ghost {
   background: transparent;
   color: var(--mist);
 }
 .btn-ghost:hover {
-  color: var(--gold);
+  color: var(--champagne);
 }
 
 /* ---------- Glass cards ---------- */
@@ -205,13 +211,15 @@ body {
   padding: 32px;
   overflow: hidden;
   transform-style: preserve-3d;
-  background: linear-gradient(165deg, rgba(243, 237, 225, 0.05), rgba(243, 237, 225, 0.012));
+  background: linear-gradient(165deg, rgba(255, 255, 255, 0.045), rgba(255, 255, 255, 0.012));
   border: 1px solid var(--hair);
-  backdrop-filter: blur(14px);
-  transition: transform 0.35s var(--ease-lux), border-color 0.35s;
+  backdrop-filter: blur(20px);
+  transition: transform 0.35s var(--ease-lux), border-color 0.35s, box-shadow 0.35s;
 }
 .glass-card:hover {
-  border-color: var(--champagne);
+  border-color: rgba(255, 122, 61, 0.45);
+  transform: translateY(-4px);
+  box-shadow: 0 14px 44px rgba(0, 0, 0, 0.45), 0 0 32px rgba(255, 90, 31, 0.08);
 }
 
 .card-num {
@@ -219,9 +227,9 @@ body {
   top: 22px;
   right: 26px;
   font-family: var(--font-display);
-  font-style: italic;
-  font-size: 3rem;
-  color: rgba(216, 182, 118, 0.2);
+  font-weight: 800;
+  font-size: 2.6rem;
+  color: rgba(255, 90, 31, 0.22);
   line-height: 1;
 }
 
@@ -233,20 +241,21 @@ body {
   align-items: center;
   justify-content: center;
   margin-bottom: 20px;
-  background: linear-gradient(135deg, rgba(216, 182, 118, 0.28), rgba(31, 81, 69, 0.2));
-  border: 1px solid var(--hair);
-  color: var(--gold);
+  background: linear-gradient(135deg, rgba(255, 90, 31, 0.28), rgba(255, 122, 61, 0.1));
+  border: 1px solid rgba(255, 122, 61, 0.3);
+  color: var(--champagne);
   transform: translateZ(40px);
+  box-shadow: 0 0 20px rgba(255, 90, 31, 0.15);
 }
 
-/* ---------- Pricing card with animated gradient ring ---------- */
+/* ---------- Pricing / featured card with animated ring ---------- */
 .price-ring {
   position: relative;
   border-radius: 22px;
   padding: 36px 32px;
   border: 1px solid var(--hair);
-  background: linear-gradient(165deg, rgba(243, 237, 225, 0.05), rgba(243, 237, 225, 0.01));
-  backdrop-filter: blur(14px);
+  background: linear-gradient(165deg, rgba(255, 255, 255, 0.045), rgba(255, 255, 255, 0.01));
+  backdrop-filter: blur(20px);
 }
 .price-ring.feat {
   border-color: transparent;
@@ -258,7 +267,7 @@ body {
   border-radius: 22px;
   padding: 1.5px;
   pointer-events: none;
-  background: linear-gradient(130deg, var(--gold), var(--champagne), var(--emerald), var(--gold));
+  background: linear-gradient(130deg, #ff5a1f, #ff7a3d, #ffb27a, #ff5a1f);
   background-size: 300% 300%;
   -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
   -webkit-mask-composite: xor;
@@ -287,14 +296,15 @@ body {
 }
 .ticker-track span {
   font-family: var(--font-display);
-  font-style: italic;
-  font-size: 1.6rem;
+  font-weight: 700;
+  font-size: 1.3rem;
+  letter-spacing: 0.06em;
   color: var(--mist-2);
 }
 .ticker-track span::after {
-  content: "❖";
+  content: "✦";
   margin-left: 54px;
-  color: var(--champagne);
+  color: var(--gold);
   font-style: normal;
 }
 @keyframes scrollx {
@@ -312,7 +322,7 @@ body {
   transform: none;
 }
 
-/* ---------- Blinking cursor (typewriter) ---------- */
+/* ---------- Blinking cursor ---------- */
 @keyframes blink {
   0%, 100% { opacity: 1; }
   50% { opacity: 0; }
@@ -325,7 +335,7 @@ body {
 .input-lux {
   width: 100%;
   padding: 13px 18px;
-  background: rgba(14, 12, 16, 0.5);
+  background: rgba(10, 10, 10, 0.6);
   border: 1px solid var(--hair-soft);
   border-radius: var(--radius-sm);
   color: var(--pearl);
@@ -335,8 +345,8 @@ body {
 }
 .input-lux:focus {
   outline: none;
-  border-color: var(--champagne);
-  box-shadow: 0 0 0 3px rgba(216, 182, 118, 0.15);
+  border-color: rgba(255, 90, 31, 0.65);
+  box-shadow: 0 0 0 3px rgba(255, 90, 31, 0.15);
 }
 .input-lux::placeholder {
   color: var(--mist-2);
@@ -345,9 +355,10 @@ body {
 /* ---------- Stat counters ---------- */
 .stat-value {
   font-family: var(--font-display);
-  font-weight: 600;
-  font-size: clamp(2.6rem, 6vw, 4.4rem);
-  background: linear-gradient(120deg, var(--pearl), var(--gold));
+  font-weight: 800;
+  font-size: clamp(2.4rem, 5.5vw, 4rem);
+  letter-spacing: -0.03em;
+  background: linear-gradient(120deg, #fff, #ff9a5c);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
@@ -357,11 +368,11 @@ body {
 ::-webkit-scrollbar { width: 10px; height: 10px; }
 ::-webkit-scrollbar-track { background: var(--onyx); }
 ::-webkit-scrollbar-thumb {
-  background: rgba(216, 182, 118, 0.25);
+  background: rgba(255, 90, 31, 0.3);
   border-radius: 999px;
   border: 2px solid var(--onyx);
 }
-::-webkit-scrollbar-thumb:hover { background: rgba(216, 182, 118, 0.45); }
+::-webkit-scrollbar-thumb:hover { background: rgba(255, 90, 31, 0.55); }
 
 @media (prefers-reduced-motion: reduce) {
   .rv, .ticker-track, .grain::after, .price-ring.feat::after {
