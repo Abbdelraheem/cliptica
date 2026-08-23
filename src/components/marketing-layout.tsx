@@ -50,13 +50,13 @@ export function MarketingLayout({ children }: { children: ReactNode }) {
 
           <nav className="hidden items-center gap-7 lg:flex" aria-label="Main navigation">
             {NAV_LINKS.map(([label, href]) => (
-              <a
+              <Link
                 key={label}
                 href={href}
                 className="text-sm text-mist transition-colors duration-300 hover:text-white"
               >
                 {label}
-              </a>
+              </Link>
             ))}
           </nav>
 

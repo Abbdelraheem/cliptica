@@ -40,6 +40,9 @@ export default function LoginPage() {
         <div className="rounded-3xl border border-hair bg-gradient-to-b from-pearl/[0.05] to-pearl/[0.01] p-9 backdrop-blur-xl">
           <p className="text-xs uppercase tracking-[0.3em] text-champagne">Welcome back</p>
           <h1 className="display-md mt-3">Welcome back, creator</h1>
+          <p className="mt-2 rounded-lg border border-hair bg-surface px-4 py-2.5 text-xs leading-relaxed text-mist-2">
+            Preview build — accounts activate once the backend goes live.
+          </p>
 
           <form onSubmit={handleSubmit} className="mt-8 space-y-4">
             <div>

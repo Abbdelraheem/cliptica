@@ -77,6 +77,9 @@ export default function RegisterPage() {
           </Link>
 
           <h1 className="display-md">Create your account</h1>
+          <p className="mt-2 rounded-lg border border-hair bg-surface px-4 py-2.5 text-xs leading-relaxed text-mist-2">
+            Preview build — accounts activate once the backend goes live.
+          </p>
 
           <form onSubmit={handleSubmit} className="mt-7 space-y-4">
             <div>
