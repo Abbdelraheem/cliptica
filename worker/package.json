@@ -8,8 +8,7 @@
     "start": "node worker.mjs"
   },
   "dependencies": {
-    "@prisma/client": "^6.5.0",
-    "dotenv": "^16.4.0"
+    "@prisma/client": "^6.5.0"
   },
   "devDependencies": {
     "@types/node": "^20.11.0"
