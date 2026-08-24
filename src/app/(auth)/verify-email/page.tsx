@@ -15,6 +15,7 @@ function VerifyEmailInner() {
   )
   const [email, setEmail] = useState('')
   const [resent, setResent] = useState(false)
+  const [resendError, setResendError] = useState('')
   const [loading, setLoading] = useState(false)
 
   useEffect(() => {
@@ -40,16 +41,21 @@ function VerifyEmailInner() {
 
   async function handleResend(e: React.FormEvent) {
     e.preventDefault()
+    setResendError('')
     setLoading(true)
     try {
-      await fetch('/api/auth/resend-verification', {
+      const res = await fetch('/api/auth/resend-verification', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email }),
       })
+      if (!res.ok) {
+        setResendError('Something went wrong. Please try again.')
+        return
+      }
       setResent(true)
     } catch {
-      /* generic — nothing to surface */
+      setResendError('Something went wrong. Please try again.')
     } finally {
       setLoading(false)
     }
@@ -108,6 +114,12 @@ function VerifyEmailInner() {
               If that account needs verification, a new link has been sent.
             </p>
           ) : null}
+
+          {resendError && (
+            <p className="rounded-lg border border-red-400/30 bg-red-400/10 px-4 py-2.5 text-sm text-red-300">
+              {resendError}
+            </p>
+          )}
 
           <button type="submit" disabled={loading || resent} className="btn-lux btn-gold w-full disabled:opacity-60">
             {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : resent ? 'Link sent' : 'Resend verification link'}

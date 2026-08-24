@@ -3,7 +3,7 @@
 import { ReactNode, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { signOut } from 'next-auth/react'
+import { useSession, signOut } from 'next-auth/react'
 import {
   LayoutDashboard,
   FolderOpen,
@@ -29,6 +29,7 @@ const NAV_ITEMS = [
 
 export function DashboardLayout({ children }: { children: ReactNode }) {
   const pathname = usePathname()
+  const { data: session } = useSession()
   const [mobileOpen, setMobileOpen] = useState(false)
   const deviceChecked = useRef(false)
 
@@ -122,9 +123,14 @@ export function DashboardLayout({ children }: { children: ReactNode }) {
         <div className="border-t border-hair/50 p-3">
           <div className="mb-3 rounded-xl border border-hair/50 bg-surface p-3">
             <p className="text-xs uppercase tracking-widest text-mist-2">Credits</p>
-            <p className="font-display text-2xl font-semibold text-gold">240</p>
+            <p className="font-display text-2xl font-semibold text-gold">
+              {session?.user?.credits ?? 0}
+            </p>
             <div className="mt-2 h-1 overflow-hidden rounded-full bg-pearl/10">
-              <div className="h-full w-3/5 rounded-full bg-gradient-to-r from-gold to-champagne" />
+              <div
+                className="h-full rounded-full bg-gradient-to-r from-gold to-champagne transition-all"
+                style={{ width: `${Math.min(100, ((session?.user?.credits ?? 0) / 1200) * 100)}%` }}
+              />
             </div>
           </div>
           <button className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-mist transition-colors hover:bg-surface hover:text-pearl">

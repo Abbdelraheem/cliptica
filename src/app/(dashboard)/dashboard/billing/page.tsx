@@ -1,7 +1,8 @@
 'use client'
 
 import { useState } from 'react'
-import { Check } from 'lucide-react'
+import { useSession } from 'next-auth/react'
+import { Check, Loader2 } from 'lucide-react'
 
 const PLANS = [
   {
@@ -31,9 +32,12 @@ const PLANS = [
 ]
 
 export default function BillingPage() {
+  const { data: session } = useSession()
   const [loading, setLoading] = useState<string | null>(null)
+  const [error, setError] = useState('')
 
   async function upgrade(plan: string) {
+    setError('')
     setLoading(plan)
     try {
       const res = await fetch('/api/billing/checkout', {
@@ -41,9 +45,15 @@ export default function BillingPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ plan }),
       })
+      if (!res.ok) {
+        setError('Could not start checkout. Please try again.')
+        setLoading(null)
+        return
+      }
       const data = await res.json()
       if (data?.url) window.location.href = data.url
-    } finally {
+    } catch {
+      setError('Something went wrong. Please try again.')
       setLoading(null)
     }
   }
@@ -57,15 +67,24 @@ export default function BillingPage() {
       <div className="glass-card mt-10 flex flex-wrap items-center justify-between gap-6 !p-8">
         <div>
           <p className="text-sm font-light text-mist">Credits remaining</p>
-          <p className="stat-value mt-1">240</p>
+          <p className="stat-value mt-1">{session?.user?.credits ?? 0}</p>
           <div className="mt-3 h-1.5 w-56 overflow-hidden rounded-full bg-pearl/10">
-            <div className="h-full w-3/5 rounded-full bg-gradient-to-r from-gold to-champagne" />
+            <div
+              className="h-full rounded-full bg-gradient-to-r from-gold to-champagne transition-all"
+              style={{ width: `${Math.min(100, ((session?.user?.credits ?? 0) / 1200) * 100)}%` }}
+            />
           </div>
         </div>
         <p className="max-w-xs text-sm font-light leading-relaxed text-mist">
           1 credit ≈ 1 minute of source footage. Unused monthly credits roll over for 30 days.
         </p>
       </div>
+
+      {error && (
+        <p className="mt-6 rounded-lg border border-red-400/30 bg-red-400/10 px-4 py-2.5 text-sm text-red-300">
+          {error}
+        </p>
+      )}
 
       {/* Plans */}
       <div className="mt-12 grid gap-6 md:grid-cols-3">

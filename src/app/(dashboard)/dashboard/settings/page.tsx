@@ -9,6 +9,7 @@ export default function SettingsPage() {
   const [name, setName] = useState(session?.user?.name ?? '')
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
+  const [profileError, setProfileError] = useState('')
 
   // Admin-only AI motion graphics kill switch
   const isAdmin = session?.user?.role === 'ADMIN'
@@ -40,15 +41,22 @@ export default function SettingsPage() {
 
   async function handleProfile(e: React.FormEvent) {
     e.preventDefault()
+    setProfileError('')
     setSaving(true)
     try {
-      await fetch('/api/auth/me', {
+      const res = await fetch('/api/auth/me', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name }),
       })
+      if (!res.ok) {
+        setProfileError('Failed to update profile. Please try again.')
+        return
+      }
       setSaved(true)
       setTimeout(() => setSaved(false), 2500)
+    } catch {
+      setProfileError('Something went wrong. Please try again.')
     } finally {
       setSaving(false)
     }
@@ -85,6 +93,11 @@ export default function SettingsPage() {
             />
             <p className="mt-1.5 text-xs font-light text-mist-2">Email changes require contacting support.</p>
           </div>
+          {profileError && (
+            <p className="rounded-lg border border-red-400/30 bg-red-400/10 px-4 py-2.5 text-sm text-red-300">
+              {profileError}
+            </p>
+          )}
           <button type="submit" disabled={saving} className="btn-lux btn-gold disabled:opacity-60">
             {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : saved ? 'Saved ✓' : 'Save changes'}
           </button>
