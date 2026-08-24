@@ -2,7 +2,6 @@ import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { randomUUID } from 'crypto'
 import { auth } from '@/lib/auth'
-import { prisma } from '@/lib/prisma'
 import { r2PresignPut } from '@/lib/r2'
 
 const ALLOWED = ['video/mp4', 'video/quicktime', 'video/x-matroska', 'video/webm']

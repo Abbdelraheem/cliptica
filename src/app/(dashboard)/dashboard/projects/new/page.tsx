@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import {
   Link2, Upload, Loader2, Sparkles, ScanFace, Frame,
-  Columns2, RectangleHorizontal, Shuffle, CloudUpload, CheckCircle2,
+  RectangleHorizontal, Shuffle, CloudUpload, CheckCircle2,
   Clapperboard,
 } from 'lucide-react'
 

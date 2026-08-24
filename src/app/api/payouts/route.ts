@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma'
 import { NextResponse } from 'next/server'
 import { apiMutationLimiter, enforceRateLimit } from '@/lib/rate-limit'
 import { z } from 'zod'
+import type { Prisma } from '@prisma/client'
 
 /** Hard ceiling per payout request (USD). */
 export const MAX_PAYOUT_AMOUNT = 10_000
@@ -27,13 +28,14 @@ export async function GET(request: Request) {
     }
 
     const { searchParams } = new URL(request.url)
-    const status = searchParams.get('status')
+    const statusParam = searchParams.get('status')
+    const status = z.enum(['PENDING', 'APPROVED', 'PAID']).safeParse(statusParam)
     const campaignId = searchParams.get('campaignId')
     const page = parseInt(searchParams.get('page') || '1')
     const limit = parseInt(searchParams.get('limit') || '50')
 
-    const where: any = { userId: session.user.id }
-    if (status) where.status = status
+    const where: Prisma.PayoutWhereInput = { userId: session.user.id }
+    if (status.success) where.status = status.data
     if (campaignId) where.campaignId = campaignId
 
     const [payouts, total] = await Promise.all([

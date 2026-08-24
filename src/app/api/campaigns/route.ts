@@ -13,7 +13,7 @@ const campaignSchema = z.object({
   deadline: z.string().datetime().optional(),
 })
 
-export async function GET(request: Request) {
+export async function GET() {
   try {
     const session = await auth()
     if (!session?.user?.id) {

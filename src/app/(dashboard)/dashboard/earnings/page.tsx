@@ -1,7 +1,7 @@
 'use client'
 
 import { useQuery } from '@tanstack/react-query'
-import { TrendingUp, DollarSign, Clock, Download, Loader2, AlertTriangle } from 'lucide-react'
+import { TrendingUp, DollarSign, Clock, Download, AlertTriangle } from 'lucide-react'
 
 type Payout = {
   id: string

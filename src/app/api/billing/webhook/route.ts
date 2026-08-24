@@ -114,8 +114,6 @@ async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
 
   if (!planKey) return
 
-  const plan = PLANS[planKey]
-
   await prisma.user.update({
     where: { id: userId },
     data: {

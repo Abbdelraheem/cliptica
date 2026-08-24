@@ -1,6 +1,6 @@
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { stripe, PLANS, getPlanFromPriceId } from '@/lib/stripe'
+import { stripe, PLANS } from '@/lib/stripe'
 import { NextResponse } from 'next/server'
 
 export async function GET(request: Request) {
@@ -24,7 +24,7 @@ export async function GET(request: Request) {
     }
 
     // Get or create Stripe customer
-    let user = await prisma.user.findUnique({
+    const user = await prisma.user.findUnique({
       where: { id: session.user.id },
       select: { stripeCustomerId: true, email: true, name: true },
     })

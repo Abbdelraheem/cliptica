@@ -7,9 +7,6 @@ const isStaticExport = process.env.STATIC_EXPORT === '1'
 const nextConfig: NextConfig = {
   reactStrictMode: true,
   outputFileTracingRoot: path.join(__dirname),
-  eslint: {
-    ignoreDuringBuilds: true,
-  },
   ...(isStaticExport
     ? {
         output: 'export' as const,

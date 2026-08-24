@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { assertDeviceAvailable, bindDevice, DeviceConflictError } from '@/lib/device'
+import { assertDeviceAvailable, bindDevice } from '@/lib/device'
 
 const bodySchema = z.object({
   deviceId: z.string().min(8).max(256),

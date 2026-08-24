@@ -13,7 +13,13 @@ export interface ButtonProps
 
 const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
   ({ className, variant = 'primary', size = 'default', asChild = false, loading, children, disabled, ...props }, ref) => {
-    const Comp = asChild ? React.forwardRef((props: any) => <a {...props} />) : 'button'
+    const Comp: React.ElementType = asChild
+      ? React.forwardRef<HTMLAnchorElement, React.AnchorHTMLAttributes<HTMLAnchorElement>>(
+          function AnchorLink(anchorProps, anchorRef) {
+            return <a ref={anchorRef} {...anchorProps} />
+          }
+        )
+      : 'button'
     const baseClasses = 'inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-full font-medium transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--champagne)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--onyx)] disabled:pointer-events-none disabled:opacity-50 active:scale-[0.98]'
     
     const variantClasses = {
