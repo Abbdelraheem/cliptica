@@ -182,8 +182,6 @@ model Clip {
   captionData   Json?       // word-level timing
   motionGraphics Json?      // applied templates
   reframeData   Json?       // face tracking data
-  musicTrack    String?
-  sfxTracks     Json?
   exportUrl     String?
   exportedAt    DateTime?
   createdAt     DateTime    @default(now())
