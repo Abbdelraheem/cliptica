@@ -132,10 +132,13 @@ model Project {
   userId      String
   title       String
   sourceUrl   String?
-  sourceFile  String?
+  sourceFile  String?       // R2 object key when uploaded directly
   duration    Int           // seconds
   status      ProjectStatus @default(PENDING)
   instructions String?      @db.Text
+  clipFrom    Int           @default(0) // start clipping at N seconds
+  framing     String        @default("smart") // smart|face|center|blur|letter|variety
+  language    String        @default("auto")
   creditsUsed Int           @default(0)
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt

@@ -59,6 +59,16 @@ async function download(url, dir) {
   return findFile(dir, /^source\./)
 }
 
+/** Uploaded files live in R2 — pull them with the same AWS creds. */
+async function downloadFromR2(key, dir) {
+  const out = path.join(dir, 'source.mp4')
+  await sh('aws', ['s3', 'cp', `s3://${CFG.r2Bucket}/${key}`, out, '--endpoint-url', CFG.r2Endpoint], {
+    env: { ...process.env, AWS_ACCESS_KEY_ID: CFG.r2Key, AWS_SECRET_ACCESS_KEY: CFG.r2Secret, AWS_DEFAULT_REGION: 'auto' },
+    timeout: 1000 * 60 * 20,
+  })
+  return out
+}
+
 async function findFile(dir, re) {
   const fs = await import('fs/promises')
   for (const f of await fs.readdir(dir)) if (re.test(f)) return path.join(dir, f)
@@ -80,13 +90,14 @@ async function extractAudio(file, dir) {
   return mp3
 }
 
-async function transcribeGroq(mp3) {
+async function transcribeGroq(mp3, language) {
   const form = new FormData()
   form.append('file', new Blob([await readFile(mp3)]), 'audio.mp3')
   form.append('model', 'whisper-large-v3-turbo')
   form.append('response_format', 'verbose_json')
   form.append('timestamp_granularities[]', 'segment')
   form.append('timestamp_granularities[]', 'word')
+  if (language && language !== 'auto') form.append('language', language) // force — fixes Arabic→English mixups
   const res = await fetch('https://api.groq.com/openai/v1/audio/transcriptions', {
     method: 'POST',
     headers: { Authorization: `Bearer ${CFG.groqKey}` },
@@ -120,13 +131,13 @@ json.dump({"language": info.language, "segments": out, "words": words}, open(sys
   return JSON.parse(await readFile(jsonPath, 'utf8'))
 }
 
-async function transcribe(file, dir) {
+async function transcribe(file, dir, language = 'auto') {
   try {
     if (CFG.groqKey) {
       const t0 = Date.now()
       const mp3 = await extractAudio(file, dir)
-      const r = await transcribeGroq(mp3)
-      console.log(`[worker] Groq transcription done in ${((Date.now() - t0) / 1000).toFixed(0)}s (${r.words.length} words)`)
+      const r = await transcribeGroq(mp3, language)
+      console.log(`[worker] Groq transcription done in ${((Date.now() - t0) / 1000).toFixed(0)}s (${r.words.length} words, lang=${language})`)
       return r
     }
   } catch (e) {
@@ -137,18 +148,21 @@ async function transcribe(file, dir) {
 
 /* ---------- scoring ---------- */
 
-async function llmScoreMoments(candidates) {
+async function llmScoreMoments(candidates, instructions) {
   const providers = []
   if (CFG.groqKey)
     providers.push({ name: 'groq', url: 'https://api.groq.com/openai/v1/chat/completions', key: CFG.groqKey, model: process.env.GROQ_SCORE_MODEL ?? 'llama-3.3-70b-versatile' })
   if (CFG.openaiKey)
     providers.push({ name: 'openai', url: 'https://api.openai.com/v1/chat/completions', key: CFG.openaiKey, model: 'gpt-4o-mini' })
 
-  const system =
+  let system =
     'You are a short-form virality expert ranking podcast/video moments for TikTok/Reels/Shorts. ' +
     'Return strict JSON {"moments":[{"index":<int>,"score":<0-100>,"title":"<=6 punchy words",' +
     '"reason":"one sentence why it performs","emoji":"one fitting emoji"}]}. ' +
     `Return exactly the ${CFG.clipsPerVideo} strongest moments, best first.`
+  if (instructions?.trim()) {
+    system += ` The uploader added these instructions — follow them strictly when picking and ranking: "${instructions.trim().slice(0, 500)}"`
+  }
 
   for (const p of providers) {
     try {
@@ -199,10 +213,10 @@ function heuristicScoreMoments(candidates) {
     .slice(0, CFG.clipsPerVideo)
 }
 
-async function scoreMoments(transcript, duration) {
+async function scoreMoments(transcript, duration, from = 0, instructions = null) {
   const win = CFG.clipLength
   const candidates = []
-  for (let s = 0; s + win < duration && candidates.length < 60; s += win / 2) {
+  for (let s = Math.max(0, from); s + win < duration && candidates.length < 60; s += win / 2) {
     const text = transcript.segments
       .filter((x) => x.start >= s - 2 && x.end <= s + win + 2)
       .map((x) => x.text).join(' ')
@@ -210,7 +224,7 @@ async function scoreMoments(transcript, duration) {
     if (text.split(/\s+/).length > 25) candidates.push({ start: Math.round(s), end: Math.round(s + win), text })
   }
   if (!candidates.length) return []
-  return (await llmScoreMoments(candidates)) ?? heuristicScoreMoments(candidates)
+  return (await llmScoreMoments(candidates, instructions)) ?? heuristicScoreMoments(candidates)
 }
 
 /* ---------- premium vision ---------- */
@@ -296,7 +310,7 @@ function buildPhraseAss(text, start, end) {
 
 /* ---------- render ---------- */
 
-async function renderClip(src, moment, dir, idx, transcript) {
+async function renderClip(src, moment, dir, idx, transcript, mode = 'smart') {
   const W = CFG.outW, H = CFG.outH
   const targetDur = moment.end - moment.start
 
@@ -304,9 +318,11 @@ async function renderClip(src, moment, dir, idx, transcript) {
   const assPath = path.join(dir, `cap${idx}.ass`)
   const karaoke = buildKaraokeAss(transcript.words ?? [], moment.start, moment.end, moment.emoji)
   await writeFile(assPath, karaoke ?? buildPhraseAss(moment.text, moment.start, moment.end))
+  const escAss = assPath.replace(/\\/g, '/').replace(/:/g, '\\:')
 
   // face-tracked crop commands
-  const faces = await faceTrack(src, moment, dir, idx)
+  const wantsFace = mode === 'smart' || mode === 'face'
+  const faces = wantsFace ? await faceTrack(src, moment, dir, idx) : null
   let cmdPath = null
   let cropW, cropH
   if (faces?.win) {
@@ -324,13 +340,34 @@ async function renderClip(src, moment, dir, idx, transcript) {
     )
   }
 
-  const preCrop = cmdPath
+  // framing filters (cliptica-style modes)
+  const centerCrop = `crop='min(ih*${H}/${W},iw)':ih`
+  const faceCrop = cmdPath
     ? `sendcmd=f='${cmdPath.replace(/\\/g, '/').replace(/:/g, '\\:')}',crop=${cropW}:${cropH}:x:y`
-    : `crop='min(ih*${H}/${W},iw)':ih`
+    : centerCrop
 
-  const buildArgs = (useFaceFilter) => [
+  let vfCore
+  switch (mode) {
+    case 'blur':
+      // original framing kept, bars filled with a soft blurred copy of the shot
+      vfCore = `split[a][b];[a]scale=${W}:${H}:force_original_aspect_ratio=increase,crop=${W}:${H},gblur=sigma=28[bgb];[b]scale=${W}:-2[fg];[bgb][fg]overlay=(W-w)/2:(H-h)/2`
+      break
+    case 'letter':
+      // full original frame on clean black — room for a big headline
+      vfCore = `scale=${W}:${H}:force_original_aspect_ratio=decrease,pad=${W}:${H}:(ow-iw)/2:(oh-ih)/2:black`
+      break
+    case 'center':
+      vfCore = centerCrop
+      break
+    case 'face':
+    case 'smart':
+    default:
+      vfCore = faceCrop
+  }
+
+  const buildArgs = (usePrimary) => [
     '-y', '-ss', String(moment.start), '-t', String(targetDur), '-i', src,
-    '-vf', `${useFaceFilter ? preCrop : `crop='min(ih*${H}/${W},iw)':ih`},scale=${W}:${H},subtitles=${assPath.replace(/\\/g, '/').replace(/:/g, '\\:')}`,
+    '-vf', `${usePrimary ? vfCore : centerCrop},scale=${W}:${H},subtitles=${escAss}`,
     '-af', 'loudnorm=I=-14:TP=-1.5:LRA=11',
     '-c:v', 'libx264', '-preset', 'superfast', '-crf', '22',
     '-c:a', 'aac', '-b:a', '192k', '-movflags', '+faststart',
@@ -364,15 +401,17 @@ async function probeSize(file) {
 }
 
 /** Render all clips with bounded parallelism. */
-async function renderAll(src, moments, dir, transcript) {
+async function renderAll(src, moments, dir, transcript, framing = 'smart') {
+  const VARIETY = ['face', 'blur', 'center']
   const results = new Array(moments.length)
   let next = 0
   async function lane() {
     for (;;) {
       const i = next++
       if (i >= moments.length) return
-      console.log(`[worker] rendering clip ${i + 1}/${moments.length}`)
-      results[i] = await renderClip(src, moments[i], dir, i, transcript)
+      const mode = framing === 'variety' ? VARIETY[i % VARIETY.length] : framing
+      console.log(`[worker] rendering clip ${i + 1}/${moments.length} [${mode}]`)
+      results[i] = await renderClip(src, moments[i], dir, i, transcript, mode)
     }
   }
   await Promise.all(Array.from({ length: Math.min(CFG.renderParallel, moments.length) }, lane))
@@ -393,29 +432,32 @@ async function uploadToR2(file, key, contentType = 'video/mp4') {
 
 async function processJob(job) {
   const project = await prisma.project.findUnique({ where: { id: job.projectId } })
-  if (!project?.sourceUrl) throw new Error('project has no sourceUrl')
+  if (!project || (!project.sourceUrl && !project.sourceFile)) throw new Error('project has no source')
 
   const setP = (p) => prisma.processingJob.update({ where: { id: job.id }, data: { progress: p } })
   await prisma.project.update({ where: { id: project.id }, data: { status: 'PROCESSING' } })
 
   const dir = await mkdtemp(path.join(tmpdir(), 'nology-'))
   try {
-    console.log(`[worker] ${job.id}: downloading`)
+    console.log(`[worker] ${job.id}: fetching source (${project.sourceFile ? 'upload' : 'youtube'})`)
     await setP(8)
-    const src = await download(project.sourceUrl, dir)
+    const src = project.sourceFile
+      ? await downloadFromR2(project.sourceFile, dir)
+      : await download(project.sourceUrl, dir)
 
     console.log('[worker] transcribing')
     await setP(30)
-    const transcript = await transcribe(src, dir)
+    const transcript = await transcribe(src, dir, project.language ?? 'auto')
 
     console.log('[worker] scoring moments')
     await setP(52)
-    const moments = await scoreMoments(transcript, await probeDuration(src))
+    const duration = await probeDuration(src)
+    const moments = await scoreMoments(transcript, duration, project.clipFrom ?? 0, project.instructions)
     if (!moments.length) throw new Error('no viable moments found')
 
-    console.log(`[worker] rendering ${moments.length} clips (premium=${CFG.premium})`)
+    console.log(`[worker] rendering ${moments.length} clips (premium=${CFG.premium}, framing=${project.framing})`)
     await setP(58)
-    const files = await renderAll(src, moments, dir, transcript)
+    const files = await renderAll(src, moments, dir, transcript, project.framing ?? 'smart')
 
     for (let i = 0; i < moments.length; i++) {
       const m = moments[i]
