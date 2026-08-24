@@ -2,6 +2,7 @@
 
 import { useEffect } from 'react'
 import { RotateCcw, TriangleAlert } from 'lucide-react'
+import { reportError } from '@/lib/monitoring'
 
 export default function GlobalError({
   error,
@@ -12,6 +13,7 @@ export default function GlobalError({
 }) {
   useEffect(() => {
     console.error('Unhandled application error:', error)
+    reportError(error, { digest: error.digest })
   }, [error])
 
   return (
