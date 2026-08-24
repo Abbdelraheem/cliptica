@@ -2,9 +2,13 @@ import { createHash, randomBytes } from 'crypto'
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'
 
-export function generateResetToken() {
+export function generateVerificationToken() {
   const token = randomBytes(32).toString('hex')
   return { token, tokenHash: hashToken(token) }
+}
+
+export function generateResetToken() {
+  return generateVerificationToken()
 }
 
 export function hashToken(token: string) {

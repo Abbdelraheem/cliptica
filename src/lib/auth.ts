@@ -92,6 +92,10 @@ export const authOptions: NextAuthOptions = {
         const isValid = await compare(password, user.passwordHash)
         if (!isValid) return null
 
+        // Unverified accounts can't sign in — the login page surfaces a
+        // precise message via /api/auth/verification-status.
+        if (!user.emailVerified) return null
+
         // One account per device — server-side enforcement.
         if (deviceId) {
           try {

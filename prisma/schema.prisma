@@ -56,17 +56,18 @@ model User {
   createdAt            DateTime  @default(now())
   updatedAt            DateTime  @updatedAt
 
-  accounts            Account[]
-  sessions            Session[]
-  projects            Project[]
-  clips               Clip[]
-  campaigns           Campaign[]
-  payouts             Payout[]
-  postingDays         PostingDay[]
-  apiKeys             ApiKey[]
-  devices             Device[]
-  creditTransactions  CreditTransaction[]
-  passwordResetTokens PasswordResetToken[]
+  accounts                Account[]
+  sessions                Session[]
+  projects                Project[]
+  clips                   Clip[]
+  campaigns               Campaign[]
+  payouts                 Payout[]
+  postingDays             PostingDay[]
+  apiKeys                 ApiKey[]
+  devices                 Device[]
+  creditTransactions      CreditTransaction[]
+  passwordResetTokens     PasswordResetToken[]
+  emailVerificationTokens EmailVerificationToken[]
 }
 
 /// One physical browser/device can ever be linked to exactly ONE account.
@@ -287,6 +288,19 @@ model ProcessedWebhookEvent {
 }
 
 model PasswordResetToken {
+  id        String    @id @default(cuid())
+  userId    String
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model EmailVerificationToken {
   id        String    @id @default(cuid())
   userId    String
   tokenHash String    @unique

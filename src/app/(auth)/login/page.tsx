@@ -43,6 +43,20 @@ export default function LoginPage() {
         return
       }
 
+      // Precise message for accounts that haven't confirmed their email yet.
+      const verification = await fetch('/api/auth/verification-status', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+      })
+      if (verification.ok) {
+        const { needsVerification } = await verification.json().catch(() => ({ needsVerification: false }))
+        if (needsVerification) {
+          setError('Please verify your email first. Check your inbox for the confirmation link, or resend it from the verify page.')
+          return
+        }
+      }
+
       const res = await signIn('credentials', {
         email,
         password,
