@@ -36,15 +36,25 @@ const nextConfig: NextConfig = {
     },
   },
   async headers() {
+    // No wildcard: credentials + '*' is an invalid (unsafe) combination.
+    // When NEXT_PUBLIC_APP_URL is unset we emit no ACAO header at all,
+    // which keeps same-origin calls working and blocks cross-origin reads.
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL
+    const corsHeaders: { key: string; value: string }[] = [
+      { key: 'Access-Control-Allow-Methods', value: 'GET,DELETE,PATCH,POST,PUT' },
+      { key: 'Access-Control-Allow-Headers', value: 'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version' },
+    ]
+    if (appUrl) {
+      corsHeaders.unshift(
+        { key: 'Access-Control-Allow-Credentials', value: 'true' },
+        { key: 'Vary', value: 'Origin' },
+      )
+      corsHeaders.push({ key: 'Access-Control-Allow-Origin', value: appUrl })
+    }
     return [
       {
         source: '/api/:path*',
-        headers: [
-          { key: 'Access-Control-Allow-Credentials', value: 'true' },
-          { key: 'Access-Control-Allow-Origin', value: '*' },
-          { key: 'Access-Control-Allow-Methods', value: 'GET,DELETE,PATCH,POST,PUT' },
-          { key: 'Access-Control-Allow-Headers', value: 'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version' },
-        ],
+        headers: corsHeaders,
       },
     ]
   },
