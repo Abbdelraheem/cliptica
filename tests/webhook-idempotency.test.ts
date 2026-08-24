@@ -1,7 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-const { findUnique, create, userUpdate, creditTransactionCreate, constructEvent } = vi.hoisted(() => ({
-  findUnique: vi.fn(),
+const { create, userUpdate, creditTransactionCreate, constructEvent } = vi.hoisted(() => ({
   create: vi.fn(),
   userUpdate: vi.fn(),
   creditTransactionCreate: vi.fn(),
@@ -10,7 +9,7 @@ const { findUnique, create, userUpdate, creditTransactionCreate, constructEvent 
 
 vi.mock('@/lib/prisma', () => ({
   prisma: {
-    processedWebhookEvent: { findUnique, create },
+    processedWebhookEvent: { create },
     user: { update: userUpdate },
     creditTransaction: { create: creditTransactionCreate },
   },
@@ -25,6 +24,10 @@ vi.mock('@/lib/stripe', () => ({
 vi.mock('next/headers', () => ({
   headers: async () => new Headers({ 'stripe-signature': 'sig_test' }),
 }))
+
+function p2002Error() {
+  return Object.assign(new Error('Unique constraint failed'), { code: 'P2002' })
+}
 
 import { POST } from '@/app/api/billing/webhook/route'
 
@@ -53,12 +56,12 @@ function makeRequest() {
   })
 }
 
-describe('Stripe webhook idempotency', () => {
+describe('Stripe webhook idempotency (atomic insert-first)', () => {
   beforeEach(() => {
-    findUnique.mockReset()
     create.mockReset()
     userUpdate.mockReset()
     creditTransactionCreate.mockReset()
+    constructEvent.mockReset()
     create.mockResolvedValue({})
     userUpdate.mockResolvedValue({})
     creditTransactionCreate.mockResolvedValue({})
@@ -70,28 +73,37 @@ describe('Stripe webhook idempotency', () => {
     })
     const { status } = await jsonRes(await POST(makeRequest()))
     expect(status).toBe(400)
-    expect(findUnique).not.toHaveBeenCalled()
+    expect(create).not.toHaveBeenCalled()
   })
 
-  it('short-circuits duplicate events without re-processing them', async () => {
-    const evt = makeEvent('evt_dup')
-    constructEvent.mockReturnValue(evt)
-    findUnique.mockResolvedValue({ id: 'c1', stripeEventId: 'evt_dup' })
+  it('short-circuits duplicates via P2002 without any side effects', async () => {
+    constructEvent.mockReturnValue(makeEvent('evt_dup'))
+    create.mockRejectedValue(p2002Error())
 
     const { status, body } = await jsonRes(await POST(makeRequest()))
 
     expect(status).toBe(200)
     expect(body).toEqual({ received: true, duplicate: true })
-    // Nothing was charged and nothing new recorded.
+    // The event was never processed — no credits granted, no plan change.
     expect(userUpdate).not.toHaveBeenCalled()
     expect(creditTransactionCreate).not.toHaveBeenCalled()
-    expect(create).not.toHaveBeenCalled()
   })
 
-  it('processes a fresh event exactly once and records its stripeEventId', async () => {
-    const evt = makeEvent('evt_new')
-    constructEvent.mockReturnValue(evt)
-    findUnique.mockResolvedValue(null)
+  it('records the event BEFORE processing so concurrent retries lose the race', async () => {
+    constructEvent.mockReturnValue(makeEvent('evt_race'))
+
+    await jsonRes(await POST(makeRequest()))
+
+    expect(create).toHaveBeenCalledWith({ data: { stripeEventId: 'evt_race' } })
+    // Insert must happen first: its call order precedes every side effect.
+    expect(create.mock.invocationCallOrder[0]).toBeLessThan(userUpdate.mock.invocationCallOrder[0])
+    expect(create.mock.invocationCallOrder[0]).toBeLessThan(
+      creditTransactionCreate.mock.invocationCallOrder[0]
+    )
+  })
+
+  it('processes a fresh event exactly once on success', async () => {
+    constructEvent.mockReturnValue(makeEvent('evt_new'))
 
     const { status, body } = await jsonRes(await POST(makeRequest()))
 
@@ -99,15 +111,16 @@ describe('Stripe webhook idempotency', () => {
     expect(body).toEqual({ received: true })
     expect(userUpdate).toHaveBeenCalledTimes(1)
     expect(creditTransactionCreate).toHaveBeenCalledTimes(1)
-    expect(create).toHaveBeenCalledWith({ data: { stripeEventId: 'evt_new' } })
   })
 
-  it('checks the event id against the unique stripeEventId column', async () => {
-    constructEvent.mockReturnValue(makeEvent('evt_lookup'))
-    findUnique.mockResolvedValue(null)
+  it('propagates non-P2002 insert errors as a 500 (not treated as duplicate)', async () => {
+    constructEvent.mockReturnValue(makeEvent('evt_dbdown'))
+    create.mockRejectedValue(new Error('connection refused'))
 
-    await POST(makeRequest())
+    const { status, body } = await jsonRes(await POST(makeRequest()))
 
-    expect(findUnique).toHaveBeenCalledWith({ where: { stripeEventId: 'evt_lookup' } })
+    expect(status).toBe(500)
+    expect(body).toEqual({ error: 'Webhook handler failed' })
+    expect(userUpdate).not.toHaveBeenCalled()
   })
 })

@@ -21,11 +21,18 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Webhook signature verification failed' }, { status: 400 })
     }
 
-    const alreadyProcessed = await prisma.processedWebhookEvent.findUnique({
-      where: { stripeEventId: event.id },
-    })
-    if (alreadyProcessed) {
-      return NextResponse.json({ received: true, duplicate: true })
+    // Atomic idempotency lock: recording the event FIRST means a concurrent
+    // retry of the same event fails on the unique constraint (P2002) and is
+    // rejected before any side effects (credits, plan changes) run twice.
+    try {
+      await prisma.processedWebhookEvent.create({
+        data: { stripeEventId: event.id },
+      })
+    } catch (err) {
+      if ((err as { code?: string })?.code === 'P2002') {
+        return NextResponse.json({ received: true, duplicate: true })
+      }
+      throw err
     }
 
     switch (event.type) {
@@ -60,10 +67,6 @@ export async function POST(request: Request) {
         break
       }
     }
-
-    await prisma.processedWebhookEvent.create({
-      data: { stripeEventId: event.id },
-    })
 
     return NextResponse.json({ received: true })
   } catch (error) {
