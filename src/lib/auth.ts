@@ -29,11 +29,58 @@ export const authOptions: NextAuthOptions = {
     strategy: 'jwt',
   },
   callbacks: {
+    async signIn({ user }) {
+      // OAuth providers have no adapter here — provision/link the local
+      // account ourselves on first sign-in. Credentials logins already
+      // resolved a database user inside authorize().
+      if (!user.email) return false
+
+      const existing = await prisma.user.findUnique({
+        where: { email: user.email.toLowerCase() },
+        select: { id: true, emailVerified: true, passwordHash: true },
+      })
+
+      if (!existing) {
+        const created = await prisma.user.create({
+          data: {
+            email: user.email.toLowerCase(),
+            name: user.name ?? null,
+            avatar: user.image ?? null,
+            emailVerified: new Date(),
+            credits: 40,
+            role: 'FREE',
+          },
+        })
+        await prisma.creditTransaction.create({
+          data: {
+            userId: created.id,
+            amount: 40,
+            type: 'bonus',
+            description: 'Starting credits for new account',
+          },
+        })
+        return true
+      }
+
+      // An unverified credentials account cannot be entered through OAuth —
+      // that would silently bypass the email-verification gate.
+      if (existing.passwordHash && !existing.emailVerified) return false
+
+      return true
+    },
     async jwt({ token, user, trigger, session }) {
-      if (user) {
-        token.id = user.id
-        token.role = (user as unknown as { role?: string }).role ?? 'FREE'
-        token.credits = (user as unknown as { credits?: number }).credits ?? 0
+      if (user?.email) {
+        // Always resolve identity from OUR database (covers both credentials
+        // and OAuth, whose profile ids are provider-specific, not ours).
+        const dbUser = await prisma.user.findUnique({
+          where: { email: user.email.toLowerCase() },
+          select: { id: true, role: true, credits: true },
+        })
+        if (dbUser) {
+          token.id = dbUser.id
+          token.role = dbUser.role
+          token.credits = dbUser.credits
+        }
       }
       if (trigger === 'update' && session) {
         token.credits = (session as { credits?: number }).credits ?? (token.credits as number)

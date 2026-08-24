@@ -1,194 +1,93 @@
 # Cliptica — AI Video Clipping Platform
 
-A production-ready platform that turns long videos into ready-to-post short clips with AI-powered editing, captions, motion graphics, and campaign earnings tracking.
+Turns long videos (YouTube link or upload) into ready-to-post 9:16 short clips:
+transcription → LLM moment ranking → face-tracked reframing → karaoke captions → FFmpeg render → Cloudflare R2.
 
-## Features
+## How It Actually Works
 
-### 🎬 AI Auto Editor
-- One-click full edit: cinematic color grading, animated motion graphics, B-roll cutaways, sound design
-- Word-perfect captions with 15 styles previewed live
-- Speaker-locked 9:16 reframe with face tracking
-- Story-paced cuts, zoom punch-ins, automatic B-roll
+```
+Browser ──► Next.js app (Vercel/VPS) ──► Postgres (Neon) + R2 presigned uploads
+                    │ ProcessingJob(queued)
+                    ▼
+   Worker process (`worker/worker.mjs`, run via PM2 — see deploy/)
+       1. yt-dlp download (SSRF-guarded: public http/https only, private-IP DNS blocked)
+       2. ffprobe duration → plan length check (fail-fast before any AI spend)
+       3. Groq Whisper word-level transcript
+       4. LLM moment scoring (Groq Llama → OpenAI fallback → heuristics)
+          — a heuristic/LLM engagement score with hook/retention/share sub-scores,
+            not an ML predictive model
+       5. InsightFace dominant-speaker tracking + FFmpeg 9:16 render,
+          karaoke ASS captions, optional admin-only AI motion graphics
+       6. QC probe → thumbnails → upload clips to R2
+       7. Credits charged atomically (1/min source, +2 motion; never below zero)
+```
 
-### 📊 Smart Clipping
-- AI reviews entire video, ranks every potential moment
-- Viral scores with hook/retention/share breakdown
-- Brief-aware clipping targeting specific moments
-- Only the clips worth posting reach your grid
+**Queue**: the `ProcessingJob` table itself, claimed by an atomic conditional
+update (safe for multiple worker instances), with stale-job requeue after
+`STALE_JOB_MINUTES`. There is intentionally **no Redis/BullMQ dependency**.
 
-### 💰 Campaign Ledger
-- Track Whop Content Rewards, brand deals, own channels
-- P&L chart with pending/approved/paid stacking
-- Calendar heatmap for posting cadence
-- CSV export for accounting
+## Feature Reality
 
-### ⚡ 20× Faster Throughput
-- 8 hours by hand → 20 minutes with Cliptica
-- Paste link → AI finds, cuts, reframes, captions, scores
-- Review & post in one sitting
+| Feature | Status |
+|---|---|
+| Email/password auth + email verification + password reset | ✅ real |
+| Google/GitHub OAuth (account provisioned on first sign-in) | ✅ real (needs provider keys) |
+| One-account-per-device enforcement | ✅ real |
+| URL import / file upload (presigned R2 PUT, 500MB cap, type allowlist) | ✅ real |
+| Transcription, clip selection, viral-style scoring, captions, reframe | ✅ real |
+| Cinematic color grading / sound design / auto B-roll | ❌ **not implemented** |
+| Stripe subscriptions + idempotent webhook credit grants | ✅ real (needs price IDs) |
+| Credit ledger (auditable transactions, floor-at-zero) | ✅ real |
+| Campaign ledger, earnings tracking, CSV export, payout records | ✅ real (payout approval is manual/offline) |
+| Posting calendar heatmap | ✅ basic (PostingDay counts) |
 
-## Tech Stack
+Plans: Free 40 credits once · Clipper $19 → 300/mo · Studio $49 → 1,200/mo.
+1 credit ≈ 1 minute of source video. Daily project caps and per-plan max
+source length are enforced server-side.
 
-- **Framework**: Next.js 15 (App Router)
-- **Language**: TypeScript
-- **Styling**: Tailwind CSS v4
-- **Database**: PostgreSQL with Prisma ORM
-- **Auth**: NextAuth.js v5 (Credentials + OAuth)
-- **Payments**: Stripe (Subscriptions + Webhooks)
-- **State**: TanStack Query + Zustand
-- **UI**: Radix UI + Custom Components
-- **Video**: Remotion + FFmpeg (Worker)
+## Stack
+
+Next.js 15 (App Router) · TypeScript · Tailwind v4 · Prisma + PostgreSQL ·
+NextAuth v4 (JWT sessions) · TanStack Query · Stripe · Groq/OpenAI · FFmpeg +
+yt-dlp + InsightFace in the worker · Cloudflare R2 · Upstash rate limiting
+(optional, no-ops when unset) · Sentry-compatible error tracking (optional).
 
 ## Getting Started
 
-### Prerequisites
-- Node.js 20+
-- PostgreSQL 15+
-- Stripe account (for billing)
-
-### Installation
-
 ```bash
-# Clone and install
-cd cliptica
 npm install
-
-# Set up environment
-cp .env.example .env
-# Edit .env with your credentials
-
-# Set up database
-npx prisma migrate dev
-npx prisma generate
-
-# Start development server
-npm run dev
-```
-
-### Environment Variables
-
-```env
-# Database
-DATABASE_URL="postgresql://user:pass@localhost:5432/cliptica"
-
-# NextAuth
-NEXTAUTH_URL="http://localhost:3000"
-NEXTAUTH_SECRET="your-secret-key"
-
-# OAuth
-GOOGLE_CLIENT_ID=""
-GOOGLE_CLIENT_SECRET=""
-
-# Stripe
-STRIPE_SECRET_KEY="sk_test_..."
-STRIPE_PUBLISHABLE_KEY="pk_test_..."
-STRIPE_WEBHOOK_SECRET="whsec_..."
-STRIPE_PRICE_CLIPPER_MONTHLY="price_..."
-STRIPE_PRICE_STUDIO_MONTHLY="price_..."
-
-# Video Processing
-VIDEO_WORKER_URL="https://your-worker.modal.run"
-VIDEO_WORKER_API_KEY="..."
-```
-
-## Project Structure
-
-```
-src/
-├── app/
-│   ├── (auth)/           # Login, Register pages
-│   ├── (dashboard)/      # Protected dashboard routes
-│   │   ├── dashboard/    # Main dashboard
-│   │   ├── projects/     # Project management
-│   │   ├── campaigns/    # Campaign tracking
-│   │   ├── earnings/     # P&L, payouts, calendar
-│   │   ├── billing/      # Subscription management
-│   │   └── settings/     # User settings
-│   ├── (marketing)/      # Landing page
-│   └── api/              # API routes
-├── components/
-│   ├── ui/               # Base UI components
-│   ├── dashboard-*.tsx   # Dashboard layout components
-│   └── marketing-*.tsx   # Marketing layout components
-├── lib/
-│   ├── auth.ts           # NextAuth configuration
-│   ├── prisma.ts         # Prisma client
-│   ├── stripe.ts         # Stripe configuration
-│   └── utils.ts          # Utility functions
-└── types/                # TypeScript types
-```
-
-## Database Schema
-
-Key models:
-- **User**: Auth, credits, subscription, role
-- **Project**: Video uploads, processing status
-- **Clip**: Generated clips with viral scores
-- **Campaign**: Whop/brand/own channel tracking
-- **Payout**: Pending/approved/paid earnings
-- **CreditTransaction**: Credit ledger
-
-## Video Processing Pipeline
-
-The platform uses a hybrid approach:
-1. **Client**: Fast preview, trim, caption editing
-2. **Serverless Workers**: Heavy FFmpeg rendering, AI processing
-3. **Queue**: Redis/BullMQ for job management
-
-Worker endpoints (deploy separately):
-- `POST /api/worker/transcribe` - Whisper transcription
-- `POST /api/worker/analyze` - Moment detection/scoring
-- `POST /api/worker/render` - Remotion + FFmpeg render
-
-## Deployment
-
-### Vercel (Frontend)
-```bash
-npm run build
-vercel deploy
-```
-
-### Worker Infrastructure
-- **Modal/RunPod/Replicate** for GPU workers
-- **Redis** for queue (Upstash/Vercel KV)
-- **S3/R2** for video storage (UploadThing)
-
-## Pricing
-
-| Plan | Credits/mo | Max Video | Resolution | Price |
-|------|-----------|-----------|------------|-------|
-| Free | 40 (one-time) | 20 min | 720p + watermark | $0 |
-| Clipper | 300 | 90 min | 1080p 60fps | $19/mo |
-| Studio | 1,200 | 180 min | 1080p 60fps + priority | $49/mo |
-
-1 credit ≈ 1 minute of source footage. AI auto-edit = 5 credits flat.
-
-## Development
-
-```bash
-# Run dev server
+cp .env.example .env      # fill DATABASE_URL at minimum
+npx prisma migrate deploy # or: npx prisma db push for first boot
 npm run dev
 
-# Run linting
-npm run lint
-
-# Type check
+# tests / checks
+npm run test        # vitest unit suite
 npm run typecheck
+npm run lint
+npm run build
 
-# Database commands
-npx prisma studio
-npx prisma migrate dev
-npx prisma db push
+# production worker (on a box with ffmpeg, yt-dlp, aws cli, python+insightface)
+cd worker && npm install && npx prisma generate
+pm2 start ../deploy/ecosystem.config.cjs
+
+# promote an account to ADMIN (enables AI motion graphics controls)
+npm run db:admin -- you@example.com
 ```
 
-## Contributing
+Required binaries on the worker host: `ffmpeg`, `ffprobe`, `/usr/local/bin/yt-dlp`,
+`aws` (R2 sync), Python env for the premium face-tracking step (`worker/premium/faces.py`).
 
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Run tests and linting
-5. Submit a PR
+## Deployment Shape
 
-## License
+- **Web/API**: one Next.js deployment (Node runtime — APIs do not work on the
+  static GitHub Pages export; that export is marketing/preview only).
+- **Worker**: long-lived process on a CPU box (Oracle ARM free tier is enough
+  to start). Not serverless — renders take minutes.
+- **DB**: managed Postgres (Neon). **Storage**: private R2 bucket.
+- Migrations: single baseline under `prisma/migrations/`; apply with
+  `prisma migrate deploy`.
 
-MIT License - see LICENSE file for details.
+Security posture: ownership scoping on every query, Zod validation everywhere,
+rate-limited auth + mutations, atomic webhook idempotency (unique event id),
+atomic job claiming, SSRF guard on imports, security headers, no client-trusted
+financial fields.

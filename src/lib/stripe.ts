@@ -81,3 +81,10 @@ export function getPlanFromPriceId(priceId: string): PlanKey | null {
   }
   return null
 }
+
+/** Maps a DB UserRole to its plan definition (ADMIN enjoys Studio limits). */
+export function planForRole(role: string): PlanDef | null {
+  const map: Record<string, PlanKey> = { FREE: 'free', CLIPPER: 'clipper', STUDIO: 'studio', ADMIN: 'studio' }
+  const key = map[role.toUpperCase()]
+  return key ? PLANS[key] : null
+}

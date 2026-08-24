@@ -4,6 +4,7 @@ import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { apiMutationLimiter, enforceRateLimit } from '@/lib/rate-limit'
 import { parseClipFrom } from '@/lib/validation'
+import { planForRole } from '@/lib/stripe'
 
 const MIN_CREDITS_REQUIRED = Number(process.env.MIN_CREDITS_REQUIRED ?? 10)
 
@@ -73,6 +74,22 @@ export async function POST(request: Request) {
         { error: 'Insufficient credits', required: MIN_CREDITS_REQUIRED, available: user.credits },
         { status: 402 }
       )
+    }
+
+    // Per-plan daily cap — keeps one account from monopolising the worker.
+    const plan = planForRole(user.role)
+    if (plan) {
+      const startOfDay = new Date()
+      startOfDay.setHours(0, 0, 0, 0)
+      const todaysCount = await prisma.project.count({
+        where: { userId: session.user.id, createdAt: { gte: startOfDay } },
+      })
+      if (todaysCount >= plan.maxDailyVideos) {
+        return NextResponse.json(
+          { error: 'Daily project limit reached', limit: plan.maxDailyVideos },
+          { status: 429 }
+        )
+      }
     }
 
     const title =

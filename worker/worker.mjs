@@ -16,7 +16,7 @@ import { promisify } from 'util'
 import { mkdtemp, rm, writeFile, readFile } from 'fs/promises'
 import { tmpdir } from 'os'
 import path from 'path'
-import { calcCredits } from './credits.mjs'
+import { calcCredits, exceedsPlanMinutes, planMaxMinutes } from './credits.mjs'
 import { assertPublicHttpUrl } from './ssrf.mjs'
 
 const run = promisify(execFile)
@@ -550,13 +550,23 @@ async function processJob(job) {
       ? await downloadFromR2(project.sourceFile, dir)
       : await download(project.sourceUrl, dir)
 
+    // Probe BEFORE transcribing — a too-long source must fail fast and
+    // cheaply instead of paying for transcription of an out-of-plan video.
+    const duration = await probeDuration(src)
+    const owner = await prisma.user.findUnique({ where: { id: project.userId }, select: { role: true } })
+    const maxMin = planMaxMinutes(owner?.role)
+    if (exceedsPlanMinutes(duration / 60, owner?.role)) {
+      throw new Error(
+        `Source is ${Math.round(duration / 60)} min — exceeds the ${maxMin} min limit for the ${owner?.role ?? 'FREE'} plan`
+      )
+    }
+
     console.log('[worker] transcribing')
     await setP(30)
     const transcript = await transcribe(src, dir, project.language ?? 'auto')
 
     console.log('[worker] scoring moments')
     await setP(52)
-    const duration = await probeDuration(src)
     const moments = await scoreMoments(transcript, duration, project.clipFrom ?? 0, project.instructions)
     if (!moments.length) throw new Error('no viable moments found')
 

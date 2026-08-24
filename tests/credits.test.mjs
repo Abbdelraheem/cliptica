@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { calcCredits } from '../worker/credits.mjs'
+import { calcCredits, planMaxMinutes, exceedsPlanMinutes } from '../worker/credits.mjs'
 
 describe('calcCredits', () => {
   it('charges minimum 1 credit for very short videos', () => {
@@ -27,5 +27,26 @@ describe('calcCredits', () => {
 
   it('matches the documented 10-minute no-fx price', () => {
     expect(calcCredits(600, false)).toBe(10)
+  })
+})
+
+describe('plan length limits', () => {
+  it('exposes the documented per-plan caps', () => {
+    expect(planMaxMinutes('FREE')).toBe(20)
+    expect(planMaxMinutes('CLIPPER')).toBe(90)
+    expect(planMaxMinutes('STUDIO')).toBe(180)
+    expect(planMaxMinutes('ADMIN')).toBe(180)
+  })
+
+  it('falls back to FREE for unknown roles', () => {
+    expect(planMaxMinutes(undefined)).toBe(20)
+    expect(planMaxMinutes('SOMETHING_ELSE')).toBe(20)
+  })
+
+  it('flags sources over the plan cap and allows boundary values', () => {
+    expect(exceedsPlanMinutes(20, 'FREE')).toBe(false)
+    expect(exceedsPlanMinutes(20.1, 'FREE')).toBe(true)
+    expect(exceedsPlanMinutes(90, 'CLIPPER')).toBe(false)
+    expect(exceedsPlanMinutes(181, 'STUDIO')).toBe(true)
   })
 })
