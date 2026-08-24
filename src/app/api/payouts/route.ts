@@ -2,6 +2,22 @@ import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { NextResponse } from 'next/server'
 import { apiMutationLimiter, enforceRateLimit } from '@/lib/rate-limit'
+import { z } from 'zod'
+
+/** Hard ceiling per payout request (USD). */
+export const MAX_PAYOUT_AMOUNT = 10_000
+
+const createPayoutSchema = z.object({
+  campaignId: z.string().min(1).max(128).nullable().optional(),
+  clipId: z.string().min(1).max(128).nullable().optional(),
+  amount: z
+    .number()
+    .positive()
+    .max(MAX_PAYOUT_AMOUNT, `Amount cannot exceed $${MAX_PAYOUT_AMOUNT.toLocaleString()} per payout`),
+  periodStart: z.coerce.date(),
+  periodEnd: z.coerce.date(),
+  notes: z.string().max(1000).optional(),
+})
 
 export async function GET(request: Request) {
   try {
@@ -55,10 +71,19 @@ export async function POST(request: Request) {
     if (limited) return limited
 
     const body = await request.json()
-    const { campaignId, clipId, amount, periodStart, periodEnd, notes } = body
+    const validated = createPayoutSchema.safeParse(body)
 
-    if (!amount || amount <= 0) {
-      return NextResponse.json({ error: 'Invalid amount' }, { status: 400 })
+    if (!validated.success) {
+      return NextResponse.json(
+        { error: 'Invalid input', details: validated.error.flatten() },
+        { status: 400 }
+      )
+    }
+
+    const { campaignId, clipId, amount, periodStart, periodEnd, notes } = validated.data
+
+    if (periodEnd < periodStart) {
+      return NextResponse.json({ error: 'Period end must be after period start' }, { status: 400 })
     }
 
     const payout = await prisma.payout.create({
@@ -68,8 +93,8 @@ export async function POST(request: Request) {
         clipId: clipId || null,
         amount,
         status: 'PENDING',
-        periodStart: new Date(periodStart),
-        periodEnd: new Date(periodEnd),
+        periodStart,
+        periodEnd,
         notes,
       },
     })
