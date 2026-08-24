@@ -6,8 +6,8 @@ import { apiMutationLimiter, enforceRateLimit } from '@/lib/rate-limit'
 
 const MIN_CREDITS_REQUIRED = Number(process.env.MIN_CREDITS_REQUIRED ?? 10)
 
-export const FRAMINGS = ['smart', 'face', 'center', 'blur', 'letter', 'variety'] as const
-export const LANGUAGES = ['auto', 'en', 'ar', 'es', 'fr', 'de', 'tr', 'hi', 'pt'] as const
+const FRAMINGS = ['smart', 'face', 'center', 'blur', 'letter', 'variety'] as const
+const LANGUAGES = ['auto', 'en', 'ar', 'es', 'fr', 'de', 'tr', 'hi', 'pt'] as const
 
 const createSchema = z.object({
   sourceType: z.enum(['url', 'file']),

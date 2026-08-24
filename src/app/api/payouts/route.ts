@@ -2,13 +2,9 @@ import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { NextResponse } from 'next/server'
 import { apiMutationLimiter, enforceRateLimit } from '@/lib/rate-limit'
-import { payoutCreateSchema, MAX_PAYOUT_AMOUNT } from '@/lib/validation'
+import { payoutCreateSchema } from '@/lib/validation'
 import { z } from 'zod'
 import type { Prisma } from '@prisma/client'
-
-export { MAX_PAYOUT_AMOUNT }
-
-const createPayoutSchema = payoutCreateSchema
 
 export async function GET(request: Request) {
   try {
@@ -63,7 +59,7 @@ export async function POST(request: Request) {
     if (limited) return limited
 
     const body = await request.json()
-    const validated = createPayoutSchema.safeParse(body)
+    const validated = payoutCreateSchema.safeParse(body)
 
     if (!validated.success) {
       return NextResponse.json(
