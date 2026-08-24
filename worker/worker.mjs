@@ -487,6 +487,23 @@ async function processJob(job) {
     }
 
     await prisma.project.update({ where: { id: project.id }, data: { status: 'COMPLETED' } })
+
+    // Charge real usage: 1 credit per minute of source video, on completion.
+    const creditsSpent = Math.max(1, Math.ceil(duration / 60))
+    await prisma.$transaction([
+      prisma.user.update({ where: { id: project.userId }, data: { credits: { decrement: creditsSpent } } }),
+      prisma.creditTransaction.create({
+        data: {
+          userId: project.userId,
+          amount: -creditsSpent,
+          type: 'usage',
+          description: `Clipping "${project.title}" (${Math.round(duration / 60)} min)`,
+          metadata: { projectId: project.id },
+        },
+      }),
+    ])
+    await prisma.project.update({ where: { id: project.id }, data: { creditsUsed: creditsSpent } })
+    console.log(`[worker] charged ${creditsSpent} credits for ${project.id}`)
   } finally {
     await rm(dir, { recursive: true, force: true }).catch(() => {})
   }
