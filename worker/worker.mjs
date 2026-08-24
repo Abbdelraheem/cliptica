@@ -308,9 +308,65 @@ function buildPhraseAss(text, start, end) {
   return ASS_STYLE(W, H) + events
 }
 
+/* ---------- AI motion graphics ---------- */
+
+async function llmMotionPackages(moments) {
+  const providers = []
+  if (CFG.groqKey)
+    providers.push({ name: 'groq', url: 'https://api.groq.com/openai/v1/chat/completions', key: CFG.groqKey, model: process.env.GROQ_SCORE_MODEL ?? 'llama-3.3-70b-versatile' })
+  if (CFG.openaiKey)
+    providers.push({ name: 'openai', url: 'https://api.openai.com/v1/chat/completions', key: CFG.openaiKey, model: 'gpt-4o-mini' })
+
+  const system =
+    'You are a motion-graphics director for vertical short-form videos (TikTok/Reels/Shorts). ' +
+    'For each moment design the opening title card: a scroll-stopping headline and one supporting kicker line. ' +
+    'Return strict JSON {"packs":[{"index":<int>,"headline":"<=24 chars, UPPERCASE, punchy hook",' +
+    '"kicker":"<=34 chars supporting line, sentence case"}]}.'
+
+  for (const p of providers) {
+    try {
+      const res = await fetch(p.url, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${p.key}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: p.model,
+          response_format: { type: 'json_object' },
+          temperature: 0.6,
+          messages: [
+            { role: 'system', content: system },
+            { role: 'user', content: JSON.stringify(moments.map((m, i) => ({ index: i, topic: m.title, text: m.text.slice(0, 280) }))) },
+          ],
+        }),
+      })
+      if (!res.ok) throw new Error(`${p.name} ${res.status}`)
+      const data = await res.json()
+      const parsed = JSON.parse(data.choices[0].message.content)
+      const packs = (parsed.packs ?? [])
+        .filter((pk) => Number.isInteger(pk.index) && moments[pk.index])
+        .map((pk) => ({
+          index: pk.index,
+          headline: String(pk.headline ?? '').toUpperCase().replace(/["'\\]/g, '').slice(0, 26),
+          kicker: String(pk.kicker ?? '').replace(/["'\\]/g, '').slice(0, 36),
+        }))
+      if (packs.length) return packs
+    } catch (e) {
+      console.error(`[worker] motion packs via ${p.name} failed:`, e.message)
+    }
+  }
+  return null
+}
+
+function heuristicMotionPack(moment) {
+  return {
+    index: moment.index ?? 0,
+    headline: (moment.title || 'Watch this').toUpperCase().replace(/["'\\]/g, '').slice(0, 26),
+    kicker: moment.emoji ? `${moment.emoji} must watch` : 'must watch',
+  }
+}
+
 /* ---------- render ---------- */
 
-async function renderClip(src, moment, dir, idx, transcript, mode = 'smart') {
+async function renderClip(src, moment, dir, idx, transcript, mode = 'smart', motion = null) {
   const W = CFG.outW, H = CFG.outH
   const targetDur = moment.end - moment.start
 
@@ -365,13 +421,59 @@ async function renderClip(src, moment, dir, idx, transcript, mode = 'smart') {
       vfCore = faceCrop
   }
 
-  const buildArgs = (usePrimary) => [
-    '-y', '-ss', String(moment.start), '-t', String(targetDur), '-i', src,
-    '-vf', `${usePrimary ? vfCore : centerCrop},scale=${W}:${H},subtitles=${escAss}`,
-    '-af', 'loudnorm=I=-14:TP=-1.5:LRA=11',
-    '-c:v', 'libx264', '-preset', 'superfast', '-crf', '22',
-    '-c:a', 'aac', '-b:a', '192k', '-movflags', '+faststart',
-  ]
+  const escPath = (p) => p.replace(/\\/g, '/').replace(/:/g, '\\:')
+  const font = process.env.MOTION_FONT ?? '/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf'
+  let motionLayer = null
+  if (motion?.headline) {
+    const headlineFile = path.join(dir, `head${idx}.txt`)
+    const kickerFile = path.join(dir, `kick${idx}.txt`)
+    await writeFile(headlineFile, motion.headline)
+    await writeFile(kickerFile, motion.kicker || '')
+    const D = targetDur.toFixed(2)
+    const fsBig = Math.round(H * 0.042)
+    const fsSmall = Math.round(H * 0.024)
+    const entranceY = `'${H}*0.068+${H}*0.05*(1-min(1\\,max(0\\,(t-0.15)/0.55)))'`
+    motionLayer =
+      `drawtext=fontfile='${font}':textfile='${escPath(headlineFile)}':fontsize=${fsBig}` +
+      `:fontcolor=white:borderw=${Math.max(3, Math.round(H / 480))}:bordercolor=black@0.6` +
+      `:shadowcolor=black@0.45:shadowx=4:shadowy=4` +
+      `:x=(w-text_w)/2:y=${entranceY}:alpha='clip((t-0.15)/0.5\\,0\\,1)'` +
+      `,drawtext=fontfile='${font}':textfile='${escPath(kickerFile)}':fontsize=${fsSmall}` +
+      `:fontcolor=white@0.92:borderw=${Math.max(2, Math.round(H / 700))}:bordercolor=black@0.5` +
+      `:x=(w-text_w)/2:y=${H * 0.128}:alpha='clip((t-0.5)/0.5\\,0\\,1)'` +
+      `,drawtext=fontfile='${font}':text='Follow for more':fontsize=${fsSmall}` +
+      `:fontcolor=white:borderw=${Math.max(2, Math.round(H / 700))}:bordercolor=black@0.55` +
+      `:x=(w-text_w)/2:y=h*0.82:alpha='if(lt(t\\,${D}-1.4)\\,0\\,clip((${D}-t)/0.9\\,0\\,1))'`
+  }
+
+  const buildArgs = (usePrimary) => {
+    const baseChain = `${usePrimary ? vfCore : centerCrop},scale=${W}:${H},subtitles=${escAss}`
+    if (!motionLayer) {
+      return [
+        '-y', '-ss', String(moment.start), '-t', String(targetDur), '-i', src,
+        '-vf', baseChain,
+        '-af', 'loudnorm=I=-14:TP=-1.5:LRA=11',
+        '-c:v', 'libx264', '-preset', 'superfast', '-crf', '22',
+        '-c:a', 'aac', '-b:a', '192k', '-movflags', '+faststart',
+      ]
+    }
+    // AI motion pass: title card + kicker + end CTA + animated progress bar
+    const D = targetDur.toFixed(2)
+    return [
+      '-y', '-ss', String(moment.start), '-t', String(targetDur), '-i', src,
+      '-f', 'lavfi', '-i', `color=c=white@0.20:s=${W}x10:r=30:d=${D}`,
+      '-f', 'lavfi', '-i', `color=c=0xFF7A3D:s=${W}x10:r=30:d=${D}`,
+      '-filter_complex',
+      `[0:v]${baseChain},${motionLayer}[base];` +
+        `[base][1:v]overlay=x=0:y=${H - 26}:eof_action=repeat[tr];` +
+        `[2:v]crop=w='iw*min(1\\,t/${D})':h=ih:x=0:y=0[fill];` +
+        `[tr][fill]overlay=x=0:y=${H - 26}:eof_action=repeat[vout]`,
+      '-map', '[vout]', '-map', '0:a?',
+      '-af', 'loudnorm=I=-14:TP=-1.5:LRA=11',
+      '-c:v', 'libx264', '-preset', 'superfast', '-crf', '22',
+      '-c:a', 'aac', '-b:a', '192k', '-movflags', '+faststart',
+    ]
+  }
 
   const outFile = path.join(dir, `clip${idx}.mp4`)
   await sh('ffmpeg', [...buildArgs(true), '-strict', '-2', outFile].map((a) => a), { timeout: 1000 * 60 * 20 })
@@ -388,7 +490,7 @@ async function renderClip(src, moment, dir, idx, transcript, mode = 'smart') {
   const thumbPath = path.join(dir, `thumb${idx}.jpg`)
   await sh('ffmpeg', ['-y', '-ss', String(thumbTs), '-i', outFile, '-frames:v', '1', '-q:v', '2', thumbPath])
 
-  return { file: outFile, thumb: thumbPath, cropMode: faces ? 'face-track' : 'center' }
+  return { file: outFile, thumb: thumbPath, cropMode: faces ? 'face-track' : 'center', motion: motion ? { mode: 'ai-motion', headline: motion.headline, kicker: motion.kicker } : null }
 }
 
 let srcProbeCache = null
@@ -401,7 +503,7 @@ async function probeSize(file) {
 }
 
 /** Render all clips with bounded parallelism. */
-async function renderAll(src, moments, dir, transcript, framing = 'smart') {
+async function renderAll(src, moments, dir, transcript, framing = 'smart', pkgs = null) {
   const VARIETY = ['face', 'blur', 'center']
   const results = new Array(moments.length)
   let next = 0
@@ -410,8 +512,8 @@ async function renderAll(src, moments, dir, transcript, framing = 'smart') {
       const i = next++
       if (i >= moments.length) return
       const mode = framing === 'variety' ? VARIETY[i % VARIETY.length] : framing
-      console.log(`[worker] rendering clip ${i + 1}/${moments.length} [${mode}]`)
-      results[i] = await renderClip(src, moments[i], dir, i, transcript, mode)
+      console.log(`[worker] rendering clip ${i + 1}/${moments.length} [${mode}${pkgs?.[i] ? ' +motion' : ''}]`)
+      results[i] = await renderClip(src, moments[i], dir, i, transcript, mode, pkgs?.[i] ?? null)
     }
   }
   await Promise.all(Array.from({ length: Math.min(CFG.renderParallel, moments.length) }, lane))
@@ -455,9 +557,19 @@ async function processJob(job) {
     const moments = await scoreMoments(transcript, duration, project.clipFrom ?? 0, project.instructions)
     if (!moments.length) throw new Error('no viable moments found')
 
-    console.log(`[worker] rendering ${moments.length} clips (premium=${CFG.premium}, framing=${project.framing})`)
+    // AI motion graphics packages (headline/kicker per clip) when enabled
+    const fx = !!project.motionFx
+    let pkgs = null
+    if (fx) {
+      console.log('[worker] designing AI motion packages')
+      await setP(56)
+      const llmPacks = await llmMotionPackages(moments).catch(() => null)
+      pkgs = moments.map((_, i) => llmPacks?.find((p) => p.index === i) ?? heuristicMotionPack({ ...moments[i], index: i }))
+    }
+
+    console.log(`[worker] rendering ${moments.length} clips (premium=${CFG.premium}, framing=${project.framing}${fx ? ' +motion' : ''})`)
     await setP(58)
-    const files = await renderAll(src, moments, dir, transcript, project.framing ?? 'smart')
+    const files = await renderAll(src, moments, dir, transcript, project.framing ?? 'smart', pkgs)
 
     for (let i = 0; i < moments.length; i++) {
       const m = moments[i]
@@ -480,7 +592,7 @@ async function processJob(job) {
           exportUrl: url,
           thumbnailUrl: thumbUrl,
           captionData: { mode: 'karaoke', emoji: m.emoji ?? '', words: winWords },
-          motionGraphics: { cropMode: files[i].cropMode },
+          motionGraphics: { ...(files[i].motion ?? { mode: 'none' }), cropMode: files[i].cropMode },
         },
       })
       await setP(62 + Math.round(((i + 1) / moments.length) * 36))
@@ -488,8 +600,8 @@ async function processJob(job) {
 
     await prisma.project.update({ where: { id: project.id }, data: { status: 'COMPLETED' } })
 
-    // Charge real usage: 1 credit per minute of source video, on completion.
-    const creditsSpent = Math.max(1, Math.ceil(duration / 60))
+    // Charge real usage on completion: 1 credit/min of source video, +2 flat when AI motion was applied.
+    const creditsSpent = Math.max(1, Math.ceil(duration / 60)) + (project.motionFx ? 2 : 0)
     await prisma.$transaction([
       prisma.user.update({ where: { id: project.userId }, data: { credits: { decrement: creditsSpent } } }),
       prisma.creditTransaction.create({
@@ -497,7 +609,7 @@ async function processJob(job) {
           userId: project.userId,
           amount: -creditsSpent,
           type: 'usage',
-          description: `Clipping "${project.title}" (${Math.round(duration / 60)} min)`,
+          description: `Clipping "${project.title}" (${Math.round(duration / 60)} min${project.motionFx ? ' · AI motion' : ''})`,
           metadata: { projectId: project.id },
         },
       }),

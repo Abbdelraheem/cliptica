@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { useCallback, useEffect, useState } from 'react'
 import {
   ArrowLeft, Loader2, AlertTriangle, Download, Sparkles,
-  Captions, ScanFace, Clock, Flame,
+  Captions, ScanFace, Clock, Flame, Clapperboard,
 } from 'lucide-react'
 
 type Clip = {
@@ -19,6 +19,7 @@ type Clip = {
   exportUrl: string | null
   thumbnailUrl: string | null
   captionData: { mode?: string; emoji?: string } | null
+  motionGraphics: { mode?: string; headline?: string; kicker?: string } | null
 }
 
 type Project = {
@@ -185,6 +186,11 @@ export default function ProjectDetail({ projectId }: { projectId: string }) {
                 <span className="absolute right-2.5 top-2.5 rounded-lg border border-gold/40 bg-black/70 px-2 py-0.5 font-display text-sm italic text-gold backdrop-blur">
                   {c.viralScore}%
                 </span>
+                {c.motionGraphics?.mode === 'ai-motion' && (
+                  <span className="absolute left-2.5 top-2.5 flex items-center gap-1 rounded-lg border border-champagne/40 bg-black/70 px-2 py-0.5 font-mono text-[10px] uppercase tracking-wider text-champagne backdrop-blur">
+                    <Clapperboard className="h-3 w-3" /> AI motion
+                  </span>
+                )}
               </div>
               <div className="p-4">
                 <h3 className="truncate text-sm font-medium">{c.title}</h3>

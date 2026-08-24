@@ -19,6 +19,7 @@ const createSchema = z.object({
   clipFrom: z.union([z.string().regex(/^\d{1,2}:\d{2}(:\d{2})?$/), z.number().int().min(0)]).optional(),
   framing: z.enum(FRAMINGS).default('smart'),
   language: z.enum(LANGUAGES).default('auto'),
+  motionFx: z.boolean().default(false),
 })
 
 function parseClipFrom(v?: string | number): number {
@@ -82,6 +83,7 @@ export async function POST(request: Request) {
         clipFrom: parseClipFrom(d.clipFrom),
         framing: d.framing,
         language: d.language,
+        motionFx: d.motionFx,
         status: 'PENDING',
       },
     })

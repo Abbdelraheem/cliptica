@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 import {
   Link2, Upload, Loader2, Sparkles, ScanFace, Frame,
   Columns2, RectangleHorizontal, Shuffle, CloudUpload, CheckCircle2,
+  Clapperboard,
 } from 'lucide-react'
 
 const FRAMINGS = [
@@ -43,6 +44,7 @@ export default function NewProjectPage() {
   const [clipFrom, setClipFrom] = useState('')
   const [framing, setFraming] = useState<(typeof FRAMINGS)[number]['id']>('smart')
   const [language, setLanguage] = useState('auto')
+  const [motionFx, setMotionFx] = useState(false)
   const [error, setError] = useState('')
   const [submitting, setSubmitting] = useState(false)
 
@@ -118,6 +120,7 @@ export default function NewProjectPage() {
           clipFrom: clipFrom || undefined,
           framing,
           language,
+          motionFx,
         }),
       })
       if (!res.ok) {
@@ -289,6 +292,43 @@ export default function NewProjectPage() {
           </div>
         </div>
 
+        {/* AI motion graphics toggle */}
+        <button
+          type="button"
+          onClick={() => setMotionFx((v) => !v)}
+          className={`flex w-full items-center gap-4 rounded-xl border p-4 text-left transition-all ${
+            motionFx ? 'border-champagne/60 bg-champagne/10' : 'border-hair/60 bg-black/20 hover:border-hair'
+          }`}
+        >
+          <span
+            className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${
+              motionFx ? 'bg-gradient-to-br from-gold to-champagne' : 'border border-hair'
+            }`}
+          >
+            <Clapperboard className={`h-5 w-5 ${motionFx ? 'text-black' : 'text-mist-2'}`} />
+          </span>
+          <span className="min-w-0 flex-1">
+            <p className={`flex flex-wrap items-center gap-x-2 text-sm font-semibold ${motionFx ? 'text-pearl' : 'text-mist'}`}>
+              AI Motion Graphics
+              <span className="rounded-full bg-gold/15 px-2 py-0.5 font-mono text-[10px] tracking-wide text-gold">+2 credits</span>
+            </p>
+            <p className="mt-0.5 text-xs leading-snug text-mist-2">
+              Kinetic headline card, animated progress bar &amp; end-card CTA — designed by AI per clip.
+            </p>
+          </span>
+          <span
+            className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${
+              motionFx ? 'bg-gradient-to-r from-gold to-champagne' : 'bg-white/15'
+            }`}
+          >
+            <span
+              className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-all ${
+                motionFx ? 'left-[22px]' : 'left-0.5'
+              }`}
+            />
+          </span>
+        </button>
+
         {/* Language */}
         <div>
           <label htmlFor="lang" className="mb-2 block text-sm font-light text-mist">Spoken language</label>
@@ -314,7 +354,9 @@ export default function NewProjectPage() {
         {/* Cost note */}
         <div className="flex items-center justify-between rounded-xl border border-hair/50 bg-onyx-2/60 px-5 py-4">
           <span className="text-sm font-light text-mist">Cost</span>
-          <span className="font-display text-lg italic text-gold">1 credit / minute · charged on completion</span>
+          <span className="font-display text-lg italic text-gold">
+            1 credit / minute{motionFx ? ' + 2 motion' : ''} · charged on completion
+          </span>
         </div>
 
         <button type="submit" disabled={submitting} className="btn-lux btn-gold w-full !py-4 disabled:opacity-60">

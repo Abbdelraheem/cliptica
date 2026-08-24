@@ -139,6 +139,7 @@ model Project {
   clipFrom    Int           @default(0) // start clipping at N seconds
   framing     String        @default("smart") // smart|face|center|blur|letter|variety
   language    String        @default("auto")
+  motionFx    Boolean       @default(false) // AI motion graphics (+2 credits)
   creditsUsed Int           @default(0)
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
