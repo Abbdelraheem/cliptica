@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server'
 import { hash } from 'bcryptjs'
 import { z } from 'zod'
 import { assertDeviceAvailable, bindDevice, DeviceConflictError } from '@/lib/device'
+import { enforceRequestRateLimit, registerLimiter } from '@/lib/rate-limit'
 
 const registerSchema = z.object({
   email: z.string().email(),
@@ -13,6 +14,9 @@ const registerSchema = z.object({
 
 export async function POST(request: Request) {
   try {
+    const limited = await enforceRequestRateLimit(registerLimiter, request, 'register')
+    if (limited) return limited
+
     const body = await request.json()
     const validated = registerSchema.safeParse(body)
 

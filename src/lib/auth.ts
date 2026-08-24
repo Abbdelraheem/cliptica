@@ -7,6 +7,7 @@ import { prisma } from '@/lib/prisma'
 import { compare } from 'bcryptjs'
 import { z } from 'zod'
 import { assertDeviceAvailable, bindDevice } from '@/lib/device'
+import { enforceRateLimit, loginEmailLimiter, loginIpLimiter, getClientIp } from '@/lib/rate-limit'
 
 /** Convenience helper so API routes can `await auth()` */
 export async function auth() {
@@ -73,11 +74,17 @@ export const authOptions: NextAuthOptions = {
         password: { label: 'Password', type: 'password' },
         deviceId: { label: 'Device ID', type: 'text' },
       },
-      async authorize(credentials) {
+      async authorize(credentials, request) {
         const validated = loginSchema.safeParse(credentials)
         if (!validated.success) return null
 
         const { email, password, deviceId } = validated.data
+        const ip = getClientIp(request)
+        const limited =
+          (await enforceRateLimit(loginIpLimiter, `login-ip:${ip}`)) ??
+          (await enforceRateLimit(loginEmailLimiter, `login-email:${email.toLowerCase()}`))
+        if (limited) return null
+
         const user = await prisma.user.findUnique({ where: { email } })
 
         if (!user || !user.passwordHash) return null

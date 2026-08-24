@@ -2,6 +2,7 @@ import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
+import { apiMutationLimiter, enforceRateLimit } from '@/lib/rate-limit'
 
 const MIN_CREDITS_REQUIRED = Number(process.env.MIN_CREDITS_REQUIRED ?? 10)
 
@@ -35,6 +36,9 @@ export async function POST(request: Request) {
     if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
+
+    const limited = await enforceRateLimit(apiMutationLimiter, `proj:${session.user.id}`)
+    if (limited) return limited
 
     const parsed = createSchema.safeParse(await request.json())
     if (!parsed.success) {

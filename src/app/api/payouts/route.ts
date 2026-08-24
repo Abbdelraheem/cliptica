@@ -1,6 +1,7 @@
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { NextResponse } from 'next/server'
+import { apiMutationLimiter, enforceRateLimit } from '@/lib/rate-limit'
 
 export async function GET(request: Request) {
   try {
@@ -49,6 +50,9 @@ export async function POST(request: Request) {
     if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
+
+    const limited = await enforceRateLimit(apiMutationLimiter, `pay:${session.user.id}`)
+    if (limited) return limited
 
     const body = await request.json()
     const { campaignId, clipId, amount, periodStart, periodEnd, notes } = body

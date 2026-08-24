@@ -2,6 +2,7 @@ import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
+import { apiMutationLimiter, enforceRateLimit } from '@/lib/rate-limit'
 
 const campaignSchema = z.object({
   name: z.string().min(1).max(100),
@@ -43,6 +44,9 @@ export async function POST(request: Request) {
     if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
+
+    const limited = await enforceRateLimit(apiMutationLimiter, `camp:${session.user.id}`)
+    if (limited) return limited
 
     const body = await request.json()
     const validated = campaignSchema.safeParse(body)
