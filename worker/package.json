@@ -1,29 +1,17 @@
 {
   "name": "cliptica-worker",
   "version": "1.0.0",
-  "description": "Video processing worker for Cliptica",
-  "main": "src/index.ts",
+  "description": "Video processing worker for NOLOGY",
+  "type": "module",
+  "main": "worker.mjs",
   "scripts": {
-    "dev": "tsx watch src/index.ts",
-    "build": "tsc",
-    "start": "node dist/index.js",
-    "test": "vitest run"
+    "start": "node worker.mjs"
   },
   "dependencies": {
-    "@prisma/client": "^5.10.0",
-    "bullmq": "^5.8.0",
-    "ioredis": "^5.3.0",
-    "fluent-ffmpeg": "^2.1.2",
-    "openai": "^4.28.0",
-    "replicate": "^0.29.0",
-    "zod": "^3.22.0",
+    "@prisma/client": "^6.5.0",
     "dotenv": "^16.4.0"
   },
   "devDependencies": {
-    "@types/node": "^20.11.0",
-    "@types/fluent-ffmpeg": "^2.1.24",
-    "typescript": "^5.3.0",
-    "tsx": "^4.7.0",
-    "vitest": "^1.3.0"
+    "@types/node": "^20.11.0"
   }
 }
