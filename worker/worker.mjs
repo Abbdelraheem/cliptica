@@ -1,11 +1,14 @@
 /**
- * NOLOGY processing worker
- * Polls ProcessingJob (status=queued) from Neon Postgres and runs:
- *   yt-dlp download -> faster-whisper transcribe -> moment scoring ->
- *   ffmpeg 9:16 cut + caption burn-in -> Cloudflare R2 upload.
+ * NOLOGY processing worker — PREMIUM pipeline
+ * ============================================================
+ *  yt-dlp (-N8)  →  Groq whisper-large-v3-turbo (words+segments)
+ *        →  LLM scoring chain (Groq Llama70B → OpenAI → heuristics)
+ *        →  [premium] InsightFace dominant-speaker tracking (sendcmd crop)
+ *        →  Karaoke word-pop captions (ASS) + auto emoji
+ *        →  FFmpeg 9:16 + loudnorm EBU R128  →  QC probe
+ *        →  Auto-thumbnail (best face frame)  →  Cloudflare R2
  *
- * Runs inside the repo dir so it reuses node_modules (@prisma/client).
- * Usage: pm2 start deploy/ecosystem.config.cjs   (script = worker/worker.mjs)
+ * PIPELINE_PREMIUM=0 degrades gracefully to v1 center-crop everywhere.
  */
 import { PrismaClient } from '@prisma/client'
 import { execFile } from 'child_process'
@@ -18,13 +21,21 @@ const run = promisify(execFile)
 const prisma = new PrismaClient()
 
 const CFG = {
-  r2Endpoint: process.env.R2_ENDPOINT, // https://<account>.r2.cloudflarestorage.com
+  r2Endpoint: process.env.R2_ENDPOINT,
   r2Bucket: process.env.R2_BUCKET ?? 'nology-clips',
   r2Key: process.env.R2_ACCESS_KEY_ID,
   r2Secret: process.env.R2_SECRET_ACCESS_KEY,
-  groqKey: process.env.GROQ_API_KEY, // FAST path: ~$0.04/hr audio
-  whisperModel: process.env.WHISPER_MODEL ?? 'small', // fallback when no Groq key
+
+  groqKey: process.env.GROQ_API_KEY,
   openaiKey: process.env.OPENAI_API_KEY,
+  whisperModel: process.env.WHISPER_MODEL ?? 'small',
+
+  premium: process.env.PIPELINE_PREMIUM !== '0',
+  faceFps: process.env.FACE_FPS ?? '4',
+  outW: Number(process.env.OUT_W ?? 1080),
+  outH: Number(process.env.OUT_H ?? 1920),
+  wordsPerCard: Math.max(1, Math.min(4, Number(process.env.WORDS_PER_CARD ?? 2))),
+
   clipsPerVideo: Number(process.env.CLIPS_PER_VIDEO ?? 6),
   clipLength: Number(process.env.CLIP_TARGET_SECONDS ?? 38),
   renderParallel: Number(process.env.RENDER_PARALLEL ?? 4),
@@ -35,12 +46,12 @@ async function sh(cmd, args, opts) {
   return stdout
 }
 
-/* ---------- pipeline stages ---------- */
+/* ================= stages ================= */
 
 async function download(url, dir) {
   const out = path.join(dir, 'source.%(ext)s')
   await sh('/usr/local/bin/yt-dlp', [
-    '-N', '8', // concurrent fragment downloads — ~4x faster
+    '-N', '8',
     '-f', 'bv*[height<=1080]+ba/b[height<=1080]',
     '--merge-output-format', 'mp4',
     '-o', out, url,
@@ -48,19 +59,19 @@ async function download(url, dir) {
   return findFile(dir, /^source\./)
 }
 
-function findFile(dir, re) {
-  return import('fs/promises').then(async (fs) => {
-    for (const f of await fs.readdir(dir)) if (re.test(f)) return path.join(dir, f)
-    throw new Error(`file not found: ${re}`)
-  })
+async function findFile(dir, re) {
+  const fs = await import('fs/promises')
+  for (const f of await fs.readdir(dir)) if (re.test(f)) return path.join(dir, f)
+  throw new Error(`file not found: ${re}`)
 }
 
 async function probeDuration(file) {
   const out = await sh('ffprobe', ['-v', 'quiet', '-print_format', 'json', '-show_format', file])
-  return Math.round(JSON.parse(out).format.duration)
+  return parseFloat(JSON.parse(out).format.duration)
 }
 
-/** Extract 16kHz mono audio — Groq wants small input; 1hr ≈ 28MB. */
+/* ---------- transcription ---------- */
+
 async function extractAudio(file, dir) {
   const mp3 = path.join(dir, 'audio.mp3')
   await sh('ffmpeg', ['-y', '-i', file, '-vn', '-ac', '1', '-ar', '16000', '-b:a', '64k', mp3], {
@@ -69,30 +80,27 @@ async function extractAudio(file, dir) {
   return mp3
 }
 
-/** FAST path: Groq whisper-large-v3-turbo (~200x realtime). */
 async function transcribeGroq(mp3) {
   const form = new FormData()
-  const blob = new Blob([await readFile(mp3)])
-  form.append('file', blob, 'audio.mp3')
+  form.append('file', new Blob([await readFile(mp3)]), 'audio.mp3')
   form.append('model', 'whisper-large-v3-turbo')
   form.append('response_format', 'verbose_json')
   form.append('timestamp_granularities[]', 'segment')
+  form.append('timestamp_granularities[]', 'word')
   const res = await fetch('https://api.groq.com/openai/v1/audio/transcriptions', {
     method: 'POST',
     headers: { Authorization: `Bearer ${CFG.groqKey}` },
     body: form,
   })
   if (!res.ok) throw new Error(`Groq ${res.status}: ${(await res.text()).slice(0, 200)}`)
-  const data = await res.json()
+  const d = await res.json()
   return {
-    language: data.language ?? 'en',
-    segments: (data.segments ?? []).map((s) => ({
-      start: s.start, end: s.end, text: (s.text ?? '').trim(),
-    })),
+    language: d.language ?? 'en',
+    segments: (d.segments ?? []).map((s) => ({ start: s.start, end: s.end, text: (s.text ?? '').trim() })),
+    words: (d.words ?? []).map((w) => ({ start: w.start, end: w.end, text: (w.word ?? '').trim() })),
   }
 }
 
-/** Fallback: local faster-whisper (no API key needed, slower). */
 async function transcribeLocal(file, dir) {
   const jsonPath = path.join(dir, 'transcript.json')
   await sh('/opt/nology-venv/bin/python', [
@@ -101,8 +109,12 @@ import sys, json
 from faster_whisper import WhisperModel
 m = WhisperModel(${JSON.stringify(CFG.whisperModel)}, device="cpu", compute_type="int8")
 segs, info = m.transcribe(sys.argv[1], word_timestamps=True)
-out = [{"start": s.start, "end": s.end, "text": s.text.strip()} for s in segs]
-json.dump({"language": info.language, "segments": out}, open(sys.argv[2], "w"))
+out, words = [], []
+for s in segs:
+    out.append({"start": s.start, "end": s.end, "text": s.text.strip()})
+    for w in (s.words or []):
+        words.append({"start": w.start, "end": w.end, "text": (w.word or "").strip()})
+json.dump({"language": info.language, "segments": out, "words": words}, open(sys.argv[2], "w"))
 `, file, jsonPath,
   ], { timeout: 1000 * 60 * 45 })
   return JSON.parse(await readFile(jsonPath, 'utf8'))
@@ -113,9 +125,9 @@ async function transcribe(file, dir) {
     if (CFG.groqKey) {
       const t0 = Date.now()
       const mp3 = await extractAudio(file, dir)
-      const result = await transcribeGroq(mp3)
-      console.log(`[worker] Groq transcription done in ${((Date.now() - t0) / 1000).toFixed(0)}s`)
-      return result
+      const r = await transcribeGroq(mp3)
+      console.log(`[worker] Groq transcription done in ${((Date.now() - t0) / 1000).toFixed(0)}s (${r.words.length} words)`)
+      return r
     }
   } catch (e) {
     console.error('[worker] Groq failed, falling back to local whisper:', e.message)
@@ -123,32 +135,20 @@ async function transcribe(file, dir) {
   return transcribeLocal(file, dir)
 }
 
-/** Ask an LLM to rank moments. Tries Groq (free/cheap) then OpenAI, else null. */
+/* ---------- scoring ---------- */
+
 async function llmScoreMoments(candidates) {
   const providers = []
   if (CFG.groqKey)
-    providers.push({
-      name: 'groq',
-      url: 'https://api.groq.com/openai/v1/chat/completions',
-      key: CFG.groqKey,
-      model: process.env.GROQ_SCORE_MODEL ?? 'llama-3.3-70b-versatile',
-    })
+    providers.push({ name: 'groq', url: 'https://api.groq.com/openai/v1/chat/completions', key: CFG.groqKey, model: process.env.GROQ_SCORE_MODEL ?? 'llama-3.3-70b-versatile' })
   if (CFG.openaiKey)
-    providers.push({
-      name: 'openai',
-      url: 'https://api.openai.com/v1/chat/completions',
-      key: CFG.openaiKey,
-      model: 'gpt-4o-mini',
-    })
+    providers.push({ name: 'openai', url: 'https://api.openai.com/v1/chat/completions', key: CFG.openaiKey, model: 'gpt-4o-mini' })
 
   const system =
-    'You rank short-form video moments for virality. ' +
-    'Return strict JSON {"moments":[{"index":<candidate index>,"score":<0-100 integer>,' +
-    '"title":"<=6 word punchy title","reason":"one sentence why this will perform"}]}. ' +
-    `Return only the ${CFG.clipsPerVideo} strongest, best first.`
-  const user = JSON.stringify(
-    candidates.map((c, i) => ({ index: i, text: c.text.slice(0, 600) }))
-  )
+    'You are a short-form virality expert ranking podcast/video moments for TikTok/Reels/Shorts. ' +
+    'Return strict JSON {"moments":[{"index":<int>,"score":<0-100>,"title":"<=6 punchy words",' +
+    '"reason":"one sentence why it performs","emoji":"one fitting emoji"}]}. ' +
+    `Return exactly the ${CFG.clipsPerVideo} strongest moments, best first.`
 
   for (const p of providers) {
     try {
@@ -161,7 +161,7 @@ async function llmScoreMoments(candidates) {
           temperature: 0.3,
           messages: [
             { role: 'system', content: system },
-            { role: 'user', content: user },
+            { role: 'user', content: JSON.stringify(candidates.map((c, i) => ({ index: i, text: c.text.slice(0, 600) }))) },
           ],
         }),
       })
@@ -175,6 +175,7 @@ async function llmScoreMoments(candidates) {
           score: Math.max(0, Math.min(100, Math.round(m.score))),
           title: String(m.title ?? '').slice(0, 80),
           reason: String(m.reason ?? ''),
+          emoji: String(m.emoji ?? '').slice(0, 4),
         }))
       if (valid.length) return valid.slice(0, CFG.clipsPerVideo)
     } catch (e) {
@@ -184,7 +185,20 @@ async function llmScoreMoments(candidates) {
   return null
 }
 
-/** Score candidate windows; LLM chain -> engagement heuristics. */
+function heuristicScoreMoments(candidates) {
+  const HOOKS = /\b(secret|never|nobody|mistake|million|why|how|best|worst|stop|truth)\b/gi
+  return candidates
+    .map((c) => ({
+      ...c,
+      score: Math.min(96, 40 + (c.text.match(HOOKS)?.length ?? 0) * 9 + Math.min(15, c.text.split('?').length * 7)),
+      title: c.text.split(/\s+/).slice(0, 5).join(' '),
+      reason: 'High keyword & question density',
+      emoji: '',
+    }))
+    .sort((a, b) => b.score - a.score)
+    .slice(0, CFG.clipsPerVideo)
+}
+
 async function scoreMoments(transcript, duration) {
   const win = CFG.clipLength
   const candidates = []
@@ -196,61 +210,161 @@ async function scoreMoments(transcript, duration) {
     if (text.split(/\s+/).length > 25) candidates.push({ start: Math.round(s), end: Math.round(s + win), text })
   }
   if (!candidates.length) return []
-
-  const llm = await llmScoreMoments(candidates)
-  if (llm) return llm
-
-  // Heuristic fallback: hook words + question density + position prior.
-  const HOOKS = /\b(secret|never|nobody|mistake|million|why|how|best|worst|stop|truth)\b/gi
-  const scored = candidates.map((c) => ({
-    ...c,
-    score: Math.min(96, 40 + (c.text.match(HOOKS)?.length ?? 0) * 9 + Math.min(15, c.text.split('?').length * 7)),
-    title: c.text.split(/\s+/).slice(0, 5).join(' '),
-    reason: 'High keyword & question density (heuristic mode)',
-  }))
-  scored.sort((a, b) => b.score - a.score)
-  return scored.slice(0, CFG.clipsPerVideo)
+  return (await llmScoreMoments(candidates)) ?? heuristicScoreMoments(candidates)
 }
 
-const ASS_HEADER = (w, h) => `[Script Info]
+/* ---------- premium vision ---------- */
+
+/** Dominant-speaker crop path via InsightFace. Returns null on any failure. */
+async function faceTrack(src, moment, dir, idx) {
+  if (!CFG.premium) return null
+  const outJson = path.join(dir, `faces${idx}.json`)
+  try {
+    await sh('python3', ['worker/premium/faces.py', 'track', src, String(moment.start), String(moment.end), outJson], {
+      timeout: 1000 * 60 * 10,
+      env: { ...process.env, FACE_FPS: CFG.faceFps, OUT_W: String(CFG.outW), OUT_H: String(CFG.outH) },
+    })
+    const data = JSON.parse(await readFile(outJson, 'utf8'))
+    return data.commands?.length ? data : null
+  } catch (e) {
+    console.error(`[worker] faceTrack failed (center-crop fallback): ${e.message}`)
+    return null
+  }
+}
+
+/* ---------- captions ---------- */
+
+const tsAss = (s) =>
+  `${Math.floor(s / 3600)}:${String(Math.floor((s % 3600) / 60)).padStart(2, '0')}:${String(Math.floor(s % 60)).padStart(2, '0')}.${String(Math.floor((s % 1) * 100)).padStart(2, '0')}`
+
+const ASS_STYLE = (W, H) => `[Script Info]
 ScriptType: v4.00+
-PlayResX: ${w}
-PlayResY: ${h}
+PlayResX: ${W}
+PlayResY: ${H}
 
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, OutlineColour, BackColour, Bold, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-Style: Nology,Arial Black,54,&H00FFFFFF,&H00000000,&H88000000,1,1,3,1,2,60,60,120,1
+Style: Pop,Arial Black,${Math.round(W * 0.085)},&H00FFFFFF,&H00000000,&HB4000000,-1,1,${Math.round(W * 0.012)},2,5,40,40,0,1
 
 [Events]
 Format: Layer, Start, End, Style, Text
 `
 
-const tsAss = (s) => `${Math.floor(s / 3600)}:${String(Math.floor((s % 3600) / 60)).padStart(2, '0')}:${String(Math.floor(s % 60)).padStart(2, '0')}.${String(Math.floor((s % 1) * 100)).padStart(2, '0')}`
+/** Word-pop cards (Hormozi-style): 1-3 big words per card, pop-in animation. */
+function buildKaraokeAss(words, start, end, emoji) {
+  const W = CFG.outW, H = CFG.outH
+  const inWin = words.filter((w) => w.end > start && w.start < end && w.text)
+  if (!inWin.length) return null
 
-async function renderClip(src, moment, dir, idx) {
-  const w = 1080, h = 1920
-  const ass = path.join(dir, `cap${idx}.ass`)
-  const lines = moment.text.match(/.{1,42}(\s|$)/g) ?? [moment.text]
+  const cards = []
+  let cur = []
+  for (const w of inWin) {
+    if (cur.length && w.start - cur[cur.length - 1].end > 0.6) { cards.push(cur); cur = [] }
+    cur.push(w)
+    if (cur.length >= CFG.wordsPerCard) { cards.push(cur); cur = [] }
+  }
+  if (cur.length) cards.push(cur)
+
   let events = ''
-  const per = (moment.end - moment.start) / lines.length
-  lines.forEach((l, i) => {
-    events += `Dialogue: 0,${tsAss(per * i)},${tsAss(per * (i + 1))},Nology,,0,0,0,,${l.trim()}\n`
+  if (emoji) {
+    events += `Dialogue: 1,${tsAss(start)},${tsAss(start + 0.8)},Pop,,0,0,0,,{\\fad(80,120)\\pos(${W / 2},${Math.round(H * 0.34)})}${emoji}\n`
+  }
+  cards.forEach((card, i) => {
+    const cs = Math.max(card[0].start, start)
+    let ce = i === cards.length - 1 ? Math.min(card[card.length - 1].end, end) : Math.min(card[card.length - 1].end, card[i + 1][0]?.start ?? end)
+    if (ce <= cs) ce = cs + 0.35
+    const text = card.map((w) => w.text.replace(/[{}]/g, '')).join(' ')
+    events +=
+      `Dialogue: 0,${tsAss(cs)},${tsAss(ce)},Pop,,0,0,0,,` +
+      `{\\fad(50,50)\\t(0,90,\\fscx118\\fscy118)\\t(90,180,\\fscx100\\fscy100)` +
+      `\\pos(${W / 2},${Math.round(H * 0.74)})}${text}\n`
   })
-  await writeFile(ass, ASS_HEADER(w, h) + events)
-
-  const out = path.join(dir, `clip${idx}.mp4`)
-  // v1 crop: smart center 9:16 (face-track upgrade lands with worker v2 mediapipe pass)
-  await sh('ffmpeg', [
-    '-y', '-ss', String(moment.start), '-t', String(moment.end - moment.start), '-i', src,
-    '-vf', `crop='min(ih*9/16,iw)':ih,scale=${w}:${h},subtitles=${ass.replace(/\\/g, '/').replace(':', '\\:')}`,
-    '-c:v', 'libx264', '-preset', 'superfast', '-crf', '22',
-    '-c:a', 'aac', '-b:a', '128k', '-movflags', '+faststart', out,
-  ], { timeout: 1000 * 60 * 20 })
-  return out
+  return ASS_STYLE(W, H) + events
 }
 
-/** Render N clips with bounded parallelism (default 4 across the ARM cores). */
-async function renderAll(src, moments, dir) {
+/** v1 fallback: static phrase lines. */
+function buildPhraseAss(text, start, end) {
+  const W = CFG.outW, H = CFG.outH
+  const lines = text.match(/.{1,42}(\s|$)/g) ?? [text]
+  const per = (end - start) / lines.length
+  let events = ''
+  lines.forEach((l, i) => {
+    events += `Dialogue: 0,${tsAss(start + per * i)},${tsAss(start + per * (i + 1))},Pop,,0,0,0,,{\\pos(${W / 2},${Math.round(H * 0.74)})}${l.trim()}\n`
+  })
+  return ASS_STYLE(W, H) + events
+}
+
+/* ---------- render ---------- */
+
+async function renderClip(src, moment, dir, idx, transcript) {
+  const W = CFG.outW, H = CFG.outH
+  const targetDur = moment.end - moment.start
+
+  // captions
+  const assPath = path.join(dir, `cap${idx}.ass`)
+  const karaoke = buildKaraokeAss(transcript.words ?? [], moment.start, moment.end, moment.emoji)
+  await writeFile(assPath, karaoke ?? buildPhraseAss(moment.text, moment.start, moment.end))
+
+  // face-tracked crop commands
+  const faces = await faceTrack(src, moment, dir, idx)
+  let cmdPath = null
+  let cropW, cropH
+  if (faces?.win) {
+    ;[cropW, cropH] = faces.win
+  } else {
+    const p = await probeSize(src)
+    cropW = Math.round(Math.min(p.w, p.h * W / H))
+    cropH = Math.round(cropW * H / W)
+  }
+  if (faces) {
+    cmdPath = path.join(dir, `cmds${idx}.txt`)
+    await writeFile(
+      cmdPath,
+      faces.commands.map(([t, k, v]) => `${t.toFixed(2)} crop ${k} ${Math.round(v)};`).join('\n')
+    )
+  }
+
+  const preCrop = cmdPath
+    ? `sendcmd=f='${cmdPath.replace(/\\/g, '/').replace(/:/g, '\\:')}',crop=${cropW}:${cropH}:x:y`
+    : `crop='min(ih*${H}/${W},iw)':ih`
+
+  const buildArgs = (useFaceFilter) => [
+    '-y', '-ss', String(moment.start), '-t', String(targetDur), '-i', src,
+    '-vf', `${useFaceFilter ? preCrop : `crop='min(ih*${H}/${W},iw)':ih`},scale=${W}:${H},subtitles=${assPath.replace(/\\/g, '/').replace(/:/g, '\\:')}`,
+    '-af', 'loudnorm=I=-14:TP=-1.5:LRA=11',
+    '-c:v', 'libx264', '-preset', 'superfast', '-crf', '22',
+    '-c:a', 'aac', '-b:a', '192k', '-movflags', '+faststart',
+  ]
+
+  const outFile = path.join(dir, `clip${idx}.mp4`)
+  await sh('ffmpeg', [...buildArgs(true), '-strict', '-2', outFile].map((a) => a), { timeout: 1000 * 60 * 20 })
+
+  // QC: duration must match ±0.75s, else one retry with plain center crop
+  const gotDur = await probeDuration(outFile)
+  if (Math.abs(gotDur - targetDur) > 0.75) {
+    console.warn(`[worker] QC duration off (${gotDur.toFixed(2)} vs ${targetDur}) — retrying center-crop`)
+    await sh('ffmpeg', [...buildArgs(false), outFile], { timeout: 1000 * 60 * 20 })
+  }
+
+  // thumbnail (best face frame when tracked, else +3s in)
+  const thumbTs = faces?.thumb_ts ?? moment.start + 3
+  const thumbPath = path.join(dir, `thumb${idx}.jpg`)
+  await sh('ffmpeg', ['-y', '-ss', String(thumbTs), '-i', outFile, '-frames:v', '1', '-q:v', '2', thumbPath])
+
+  return { file: outFile, thumb: thumbPath, cropMode: faces ? 'face-track' : 'center' }
+}
+
+let srcProbeCache = null
+async function probeSize(file) {
+  if (srcProbeCache) return srcProbeCache
+  const out = await sh('ffprobe', ['-v', 'quiet', '-select_streams', 'v:0', '-show_entries', 'stream=width,height', '-of', 'json', file])
+  const s = JSON.parse(out).streams[0]
+  srcProbeCache = { w: s.width, h: s.height }
+  return srcProbeCache
+}
+
+/** Render all clips with bounded parallelism. */
+async function renderAll(src, moments, dir, transcript) {
   const results = new Array(moments.length)
   let next = 0
   async function lane() {
@@ -258,32 +372,24 @@ async function renderAll(src, moments, dir) {
       const i = next++
       if (i >= moments.length) return
       console.log(`[worker] rendering clip ${i + 1}/${moments.length}`)
-      results[i] = await renderClip(src, moments[i], dir, i)
+      results[i] = await renderClip(src, moments[i], dir, i, transcript)
     }
   }
-  const lanes = Array.from({ length: Math.min(CFG.renderParallel, moments.length) }, lane)
-  await Promise.all(lanes)
+  await Promise.all(Array.from({ length: Math.min(CFG.renderParallel, moments.length) }, lane))
   return results
 }
 
-async function uploadToR2(file, key) {
-  await sh('aws', [
-    's3', 'cp', file, `s3://${CFG.r2Bucket}/${key}`,
-    '--endpoint-url', CFG.r2Endpoint,
-    '--content-type', 'video/mp4',
-  ], {
-    env: {
-      ...process.env,
-      AWS_ACCESS_KEY_ID: CFG.r2Key,
-      AWS_SECRET_ACCESS_KEY: CFG.r2Secret,
-      AWS_DEFAULT_REGION: 'auto',
-    },
+/* ---------- storage ---------- */
+
+async function uploadToR2(file, key, contentType = 'video/mp4') {
+  await sh('aws', ['s3', 'cp', file, `s3://${CFG.r2Bucket}/${key}`, '--endpoint-url', CFG.r2Endpoint, '--content-type', contentType], {
+    env: { ...process.env, AWS_ACCESS_KEY_ID: CFG.r2Key, AWS_SECRET_ACCESS_KEY: CFG.r2Secret, AWS_DEFAULT_REGION: 'auto' },
     timeout: 1000 * 60 * 15,
   })
   return `${CFG.r2Endpoint}/${CFG.r2Bucket}/${key}`
 }
 
-/* ---------- job loop ---------- */
+/* ================= job loop ================= */
 
 async function processJob(job) {
   const project = await prisma.project.findUnique({ where: { id: job.projectId } })
@@ -295,27 +401,29 @@ async function processJob(job) {
   const dir = await mkdtemp(path.join(tmpdir(), 'nology-'))
   try {
     console.log(`[worker] ${job.id}: downloading`)
-    await setP(10)
+    await setP(8)
     const src = await download(project.sourceUrl, dir)
-    const duration = await probeDuration(src)
 
-    console.log(`[worker] ${job.id}: transcribing (${duration}s audio)`)
-    await setP(35)
+    console.log('[worker] transcribing')
+    await setP(30)
     const transcript = await transcribe(src, dir)
 
     console.log('[worker] scoring moments')
-    await setP(55)
-    const moments = await scoreMoments(transcript, duration)
+    await setP(52)
+    const moments = await scoreMoments(transcript, await probeDuration(src))
     if (!moments.length) throw new Error('no viable moments found')
 
-    console.log(`[worker] rendering ${moments.length} clips in parallel`)
+    console.log(`[worker] rendering ${moments.length} clips (premium=${CFG.premium})`)
     await setP(58)
-    const files = await renderAll(src, moments, dir)
+    const files = await renderAll(src, moments, dir, transcript)
 
     for (let i = 0; i < moments.length; i++) {
       const m = moments[i]
-      const key = `${project.userId}/${project.id}/clip-${i + 1}.mp4`
-      const url = await uploadToR2(files[i], key)
+      const base = `${project.userId}/${project.id}`
+      const url = await uploadToR2(files[i].file, `${base}/clip-${i + 1}.mp4`)
+      const thumbUrl = await uploadToR2(files[i].thumb, `${base}/thumb-${i + 1}.jpg`, 'image/jpeg')
+
+      const winWords = (transcript.words ?? []).filter((w) => w.end > m.start && w.start < m.end)
       await prisma.clip.create({
         data: {
           projectId: project.id,
@@ -323,16 +431,19 @@ async function processJob(job) {
           title: m.title || `Clip ${i + 1}`,
           description: m.reason,
           sourceStart: m.start, sourceEnd: m.end,
-          duration: m.end - m.start,
+          duration: Math.round(m.end - m.start),
           viralScore: Math.round(m.score),
           status: 'READY',
           videoUrl: url,
           exportUrl: url,
-          captionData: { segments: transcript.segments.filter((s) => s.start >= m.start && s.end <= m.end) },
+          thumbnailUrl: thumbUrl,
+          captionData: { mode: 'karaoke', emoji: m.emoji ?? '', words: winWords },
+          motionGraphics: { cropMode: files[i].cropMode },
         },
       })
-      await setP(60 + Math.round(((i + 1) / moments.length) * 38))
+      await setP(62 + Math.round(((i + 1) / moments.length) * 36))
     }
+
     await prisma.project.update({ where: { id: project.id }, data: { status: 'COMPLETED' } })
   } finally {
     await rm(dir, { recursive: true, force: true }).catch(() => {})
@@ -340,31 +451,21 @@ async function processJob(job) {
 }
 
 async function loop() {
-  console.log('[worker] online — polling for jobs')
+  console.log(`[worker] online — premium=${CFG.premium}, parallel=${CFG.renderParallel}`)
   for (;;) {
     try {
-      const job = await prisma.processingJob.findFirst({
-        where: { status: 'queued' }, orderBy: { createdAt: 'asc' },
-      })
+      const job = await prisma.processingJob.findFirst({ where: { status: 'queued' }, orderBy: { createdAt: 'asc' } })
       if (!job) { await new Promise((r) => setTimeout(r, 5000)); continue }
-      await prisma.processingJob.update({
-        where: { id: job.id }, data: { status: 'processing', startedAt: new Date() },
-      })
+
+      await prisma.processingJob.update({ where: { id: job.id }, data: { status: 'processing', startedAt: new Date() } })
       try {
         await processJob(job)
-        await prisma.processingJob.update({
-          where: { id: job.id },
-          data: { status: 'completed', progress: 100, completedAt: new Date() },
-        })
+        await prisma.processingJob.update({ where: { id: job.id }, data: { status: 'completed', progress: 100, completedAt: new Date() } })
         console.log(`[worker] ${job.id}: DONE ✔`)
       } catch (e) {
         console.error(`[worker] ${job.id} FAILED:`, e.message)
-        await prisma.processingJob.update({
-          where: { id: job.id }, data: { status: 'failed', error: e.message },
-        }).catch(() => {})
-        await prisma.project.update({
-          where: { id: job.projectId }, data: { status: 'FAILED' },
-        }).catch(() => {})
+        await prisma.processingJob.update({ where: { id: job.id }, data: { status: 'failed', error: e.message } }).catch(() => {})
+        await prisma.project.update({ where: { id: job.projectId }, data: { status: 'FAILED' } }).catch(() => {})
       }
     } catch (e) {
       console.error('[worker] loop error:', e.message)
