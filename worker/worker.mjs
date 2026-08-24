@@ -608,34 +608,80 @@ async function processJob(job) {
     await prisma.project.update({ where: { id: project.id }, data: { status: 'COMPLETED' } })
 
     // Charge real usage on completion: 1 credit/min of source video, +2 flat when AI motion was actually applied.
+    // The user's balance is the hard floor — we charge what exists so a
+    // concurrent purchase can never drive credits below zero.
     const creditsSpent = calcCredits(duration, fx)
-    await prisma.$transaction([
-      prisma.user.update({ where: { id: project.userId }, data: { credits: { decrement: creditsSpent } } }),
-      prisma.creditTransaction.create({
-        data: {
-          userId: project.userId,
-          amount: -creditsSpent,
-          type: 'usage',
-          description: `Clipping "${project.title}" (${Math.round(duration / 60)} min${fx ? ' · AI motion' : ''})`,
-          metadata: { projectId: project.id },
-        },
-      }),
-    ])
+    await prisma.$transaction(async (tx) => {
+      const owner = await tx.user.findUnique({ where: { id: project.userId }, select: { credits: true } })
+      const charged = Math.max(0, Math.min(creditsSpent, owner?.credits ?? 0))
+      if (charged > 0) {
+        await tx.user.update({ where: { id: project.userId }, data: { credits: { decrement: charged } } })
+        await tx.creditTransaction.create({
+          data: {
+            userId: project.userId,
+            amount: -charged,
+            type: 'usage',
+            description: `Clipping "${project.title}" (${Math.round(duration / 60)} min${fx ? ' · AI motion' : ''})`,
+            metadata: { projectId: project.id },
+          },
+        })
+      }
+      if (charged < creditsSpent) {
+        console.log(`[worker] ${project.id}: balance covered ${charged}/${creditsSpent} credits`)
+      }
+    })
     await prisma.project.update({ where: { id: project.id }, data: { creditsUsed: creditsSpent } })
-    console.log(`[worker] charged ${creditsSpent} credits for ${project.id}`)
+    console.log(`[worker] charged up to ${creditsSpent} credits for ${project.id}`)
   } finally {
     await rm(dir, { recursive: true, force: true }).catch(() => {})
   }
 }
 
+/** Jobs stuck in `processing` longer than this are assumed lost to a crash. */
+const STALE_JOB_MINUTES = Number(process.env.STALE_JOB_MINUTES ?? 30)
+
+/**
+ * Atomic claim: the conditional updateMany only succeeds for ONE worker —
+ * a second worker's claim matches zero rows and it moves on. This closes
+ * the findFirst→update double-processing race between worker instances.
+ */
+async function claimNextJob() {
+  const candidate = await prisma.processingJob.findFirst({
+    where: { status: 'queued' },
+    orderBy: { createdAt: 'asc' },
+    select: { id: true },
+  })
+  if (!candidate) return null
+
+  const claimed = await prisma.processingJob.updateMany({
+    where: { id: candidate.id, status: 'queued' },
+    data: { status: 'processing', startedAt: new Date() },
+  })
+  if (claimed.count !== 1) return null // another worker won the race
+
+  return prisma.processingJob.findUnique({ where: { id: candidate.id } })
+}
+
 async function loop() {
   console.log(`[worker] online — premium=${CFG.premium}, parallel=${CFG.renderParallel}`)
+
+  // Recover jobs abandoned by a crashed worker before entering the poll loop.
+  try {
+    const staleBefore = new Date(Date.now() - STALE_JOB_MINUTES * 60_000)
+    const revived = await prisma.processingJob.updateMany({
+      where: { status: 'processing', startedAt: { lt: staleBefore } },
+      data: { status: 'queued', startedAt: null },
+    })
+    if (revived.count > 0) console.log(`[worker] requeued ${revived.count} stale job(s)`)
+  } catch (e) {
+    console.error('[worker] stale-job recovery failed:', e.message)
+  }
+
   for (;;) {
     try {
-      const job = await prisma.processingJob.findFirst({ where: { status: 'queued' }, orderBy: { createdAt: 'asc' } })
+      const job = await claimNextJob()
       if (!job) { await new Promise((r) => setTimeout(r, 5000)); continue }
 
-      await prisma.processingJob.update({ where: { id: job.id }, data: { status: 'processing', startedAt: new Date() } })
       try {
         await processJob(job)
         await prisma.processingJob.update({ where: { id: job.id }, data: { status: 'completed', progress: 100, completedAt: new Date() } })

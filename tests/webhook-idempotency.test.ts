@@ -7,13 +7,20 @@ const { create, userUpdate, creditTransactionCreate, constructEvent } = vi.hoist
   constructEvent: vi.fn(),
 }))
 
-vi.mock('@/lib/prisma', () => ({
-  prisma: {
+vi.mock('@/lib/prisma', () => {
+  const tx = {
     processedWebhookEvent: { create },
     user: { update: userUpdate },
     creditTransaction: { create: creditTransactionCreate },
-  },
-}))
+  }
+  return {
+    prisma: {
+      // Interactive transaction: run the callback against the same mocks.
+      $transaction: (cb: (t: typeof tx) => Promise<unknown>) => cb(tx),
+      ...tx,
+    },
+  }
+})
 
 vi.mock('@/lib/stripe', () => ({
   stripe: { webhooks: { constructEvent } },
@@ -56,7 +63,7 @@ function makeRequest() {
   })
 }
 
-describe('Stripe webhook idempotency (atomic insert-first)', () => {
+describe('Stripe webhook idempotency (atomic insert-first transaction)', () => {
   beforeEach(() => {
     create.mockReset()
     userUpdate.mockReset()

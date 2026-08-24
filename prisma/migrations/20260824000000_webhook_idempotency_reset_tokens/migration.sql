@@ -2,7 +2,7 @@
 CREATE SCHEMA IF NOT EXISTS "public";
 
 -- CreateEnum
-CREATE TYPE "UserRole" AS ENUM ('FREE', 'CLIPPER', 'STUDIO');
+CREATE TYPE "UserRole" AS ENUM ('FREE', 'CLIPPER', 'STUDIO', 'ADMIN');
 
 -- CreateEnum
 CREATE TYPE "ProjectStatus" AS ENUM ('PENDING', 'PROCESSING', 'COMPLETED', 'FAILED');
@@ -301,10 +301,34 @@ CREATE UNIQUE INDEX "VerificationToken_identifier_token_key" ON "VerificationTok
 CREATE UNIQUE INDEX "ApiKey_key_key" ON "ApiKey"("key");
 
 -- CreateIndex
+CREATE INDEX "Project_userId_createdAt_idx" ON "Project"("userId", "createdAt");
+
+-- CreateIndex
+CREATE INDEX "ProcessingJob_status_createdAt_idx" ON "ProcessingJob"("status", "createdAt");
+
+-- CreateIndex
+CREATE INDEX "ProcessingJob_projectId_idx" ON "ProcessingJob"("projectId");
+
+-- CreateIndex
+CREATE INDEX "Clip_projectId_viralScore_idx" ON "Clip"("projectId", "viralScore");
+
+-- CreateIndex
+CREATE INDEX "Clip_userId_idx" ON "Clip"("userId");
+
+-- CreateIndex
+CREATE INDEX "Campaign_userId_idx" ON "Campaign"("userId");
+
+-- CreateIndex
 CREATE UNIQUE INDEX "CampaignClip_campaignId_clipId_key" ON "CampaignClip"("campaignId", "clipId");
 
 -- CreateIndex
+CREATE INDEX "Payout_userId_createdAt_idx" ON "Payout"("userId", "createdAt");
+
+-- CreateIndex
 CREATE UNIQUE INDEX "PostingDay_userId_date_key" ON "PostingDay"("userId", "date");
+
+-- CreateIndex
+CREATE INDEX "CreditTransaction_userId_createdAt_idx" ON "CreditTransaction"("userId", "createdAt");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "ProcessedWebhookEvent_stripeEventId_key" ON "ProcessedWebhookEvent"("stripeEventId");

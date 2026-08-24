@@ -1,10 +1,14 @@
 import { headers } from 'next/headers'
 import { NextResponse } from 'next/server'
+import type { PrismaClient } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { stripe, PLANS, getPlanFromPriceId } from '@/lib/stripe'
 import Stripe from 'stripe'
 
 const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET!
+
+/** Models the webhook handlers touch inside the idempotency transaction. */
+type Tx = Pick<PrismaClient, 'user' | 'creditTransaction' | 'processedWebhookEvent'>
 
 export async function POST(request: Request) {
   try {
@@ -21,51 +25,56 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Webhook signature verification failed' }, { status: 400 })
     }
 
-    // Atomic idempotency lock: recording the event FIRST means a concurrent
-    // retry of the same event fails on the unique constraint (P2002) and is
-    // rejected before any side effects (credits, plan changes) run twice.
     try {
-      await prisma.processedWebhookEvent.create({
-        data: { stripeEventId: event.id },
+      await prisma.$transaction(async (tx) => {
+        // Atomic idempotency lock. Recording the event FIRST means a
+        // concurrent retry of the same event fails on the unique constraint
+        // (P2002) before any side effects run. Because the marker commits in
+        // the SAME transaction as every business effect below, a failure
+        // mid-processing rolls back both — Stripe's retry then finds no
+        // marker and safely reprocesses instead of silently dropping credits.
+        await tx.processedWebhookEvent.create({
+          data: { stripeEventId: event.id },
+        })
+
+        switch (event.type) {
+          case 'checkout.session.completed': {
+            const session = event.data.object as Stripe.Checkout.Session
+            await handleCheckoutCompleted(tx, session)
+            break
+          }
+
+          case 'customer.subscription.created':
+          case 'customer.subscription.updated': {
+            const subscription = event.data.object as Stripe.Subscription
+            await handleSubscriptionUpdated(tx, subscription)
+            break
+          }
+
+          case 'customer.subscription.deleted': {
+            const subscription = event.data.object as Stripe.Subscription
+            await handleSubscriptionDeleted(tx, subscription)
+            break
+          }
+
+          case 'invoice.payment_succeeded': {
+            const invoice = event.data.object as Stripe.Invoice
+            await handleInvoicePaymentSucceeded(tx, invoice)
+            break
+          }
+
+          case 'invoice.payment_failed': {
+            const invoice = event.data.object as Stripe.Invoice
+            await handleInvoicePaymentFailed(tx, invoice)
+            break
+          }
+        }
       })
     } catch (err) {
       if ((err as { code?: string })?.code === 'P2002') {
         return NextResponse.json({ received: true, duplicate: true })
       }
       throw err
-    }
-
-    switch (event.type) {
-      case 'checkout.session.completed': {
-        const session = event.data.object as Stripe.Checkout.Session
-        await handleCheckoutCompleted(session)
-        break
-      }
-
-      case 'customer.subscription.created':
-      case 'customer.subscription.updated': {
-        const subscription = event.data.object as Stripe.Subscription
-        await handleSubscriptionUpdated(subscription)
-        break
-      }
-
-      case 'customer.subscription.deleted': {
-        const subscription = event.data.object as Stripe.Subscription
-        await handleSubscriptionDeleted(subscription)
-        break
-      }
-
-      case 'invoice.payment_succeeded': {
-        const invoice = event.data.object as Stripe.Invoice
-        await handleInvoicePaymentSucceeded(invoice)
-        break
-      }
-
-      case 'invoice.payment_failed': {
-        const invoice = event.data.object as Stripe.Invoice
-        await handleInvoicePaymentFailed(invoice)
-        break
-      }
     }
 
     return NextResponse.json({ received: true })
@@ -75,7 +84,7 @@ export async function POST(request: Request) {
   }
 }
 
-async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
+async function handleCheckoutCompleted(tx: Tx, session: Stripe.Checkout.Session) {
   const userId = session.metadata?.userId
   const planKey = session.metadata?.plan as keyof typeof PLANS
 
@@ -84,7 +93,7 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
   const plan = PLANS[planKey]
   const credits = plan.credits
 
-  await prisma.user.update({
+  await tx.user.update({
     where: { id: userId },
     data: {
       role: planKey.toUpperCase() as never,
@@ -97,7 +106,7 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
   })
 
   // Add credit transaction
-  await prisma.creditTransaction.create({
+  await tx.creditTransaction.create({
     data: {
       userId,
       amount: credits,
@@ -108,7 +117,7 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
   })
 }
 
-async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
+async function handleSubscriptionUpdated(tx: Tx, subscription: Stripe.Subscription) {
   const userId = subscription.metadata?.userId
   if (!userId) return
 
@@ -117,7 +126,7 @@ async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
 
   if (!planKey) return
 
-  await prisma.user.update({
+  await tx.user.update({
     where: { id: userId },
     data: {
       role: planKey.toUpperCase() as never,
@@ -128,11 +137,11 @@ async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
   })
 }
 
-async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
+async function handleSubscriptionDeleted(tx: Tx, subscription: Stripe.Subscription) {
   const userId = subscription.metadata?.userId
   if (!userId) return
 
-  await prisma.user.update({
+  await tx.user.update({
     where: { id: userId },
     data: {
       role: 'FREE',
@@ -143,7 +152,7 @@ async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
   })
 }
 
-async function handleInvoicePaymentSucceeded(invoice: Stripe.Invoice) {
+async function handleInvoicePaymentSucceeded(tx: Tx, invoice: Stripe.Invoice) {
   const subscriptionId = invoice.subscription as string
   if (!subscriptionId) return
 
@@ -158,7 +167,7 @@ async function handleInvoicePaymentSucceeded(invoice: Stripe.Invoice) {
 
   const plan = PLANS[planKey]
 
-  await prisma.user.update({
+  await tx.user.update({
     where: { id: userId },
     data: {
       credits: { increment: plan.credits },
@@ -166,7 +175,7 @@ async function handleInvoicePaymentSucceeded(invoice: Stripe.Invoice) {
     },
   })
 
-  await prisma.creditTransaction.create({
+  await tx.creditTransaction.create({
     data: {
       userId,
       amount: plan.credits,
@@ -177,7 +186,7 @@ async function handleInvoicePaymentSucceeded(invoice: Stripe.Invoice) {
   })
 }
 
-async function handleInvoicePaymentFailed(invoice: Stripe.Invoice) {
+async function handleInvoicePaymentFailed(tx: Tx, invoice: Stripe.Invoice) {
   const subscriptionId = invoice.subscription as string
   if (!subscriptionId) return
 
@@ -185,7 +194,7 @@ async function handleInvoicePaymentFailed(invoice: Stripe.Invoice) {
   const userId = subscription.metadata?.userId
   if (!userId) return
 
-  await prisma.user.update({
+  await tx.user.update({
     where: { id: userId },
     data: {
       subscriptionStatus: 'past_due',
