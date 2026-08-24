@@ -123,7 +123,68 @@ async function transcribe(file, dir) {
   return transcribeLocal(file, dir)
 }
 
-/** Score candidate windows; uses OpenAI when key present, else engagement heuristics. */
+/** Ask an LLM to rank moments. Tries Groq (free/cheap) then OpenAI, else null. */
+async function llmScoreMoments(candidates) {
+  const providers = []
+  if (CFG.groqKey)
+    providers.push({
+      name: 'groq',
+      url: 'https://api.groq.com/openai/v1/chat/completions',
+      key: CFG.groqKey,
+      model: process.env.GROQ_SCORE_MODEL ?? 'llama-3.3-70b-versatile',
+    })
+  if (CFG.openaiKey)
+    providers.push({
+      name: 'openai',
+      url: 'https://api.openai.com/v1/chat/completions',
+      key: CFG.openaiKey,
+      model: 'gpt-4o-mini',
+    })
+
+  const system =
+    'You rank short-form video moments for virality. ' +
+    'Return strict JSON {"moments":[{"index":<candidate index>,"score":<0-100 integer>,' +
+    '"title":"<=6 word punchy title","reason":"one sentence why this will perform"}]}. ' +
+    `Return only the ${CFG.clipsPerVideo} strongest, best first.`
+  const user = JSON.stringify(
+    candidates.map((c, i) => ({ index: i, text: c.text.slice(0, 600) }))
+  )
+
+  for (const p of providers) {
+    try {
+      const res = await fetch(p.url, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${p.key}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: p.model,
+          response_format: { type: 'json_object' },
+          temperature: 0.3,
+          messages: [
+            { role: 'system', content: system },
+            { role: 'user', content: user },
+          ],
+        }),
+      })
+      if (!res.ok) throw new Error(`${p.name} ${res.status}`)
+      const data = await res.json()
+      const parsed = JSON.parse(data.choices[0].message.content)
+      const valid = (parsed.moments ?? [])
+        .filter((m) => Number.isInteger(m.index) && candidates[m.index])
+        .map((m) => ({
+          ...candidates[m.index],
+          score: Math.max(0, Math.min(100, Math.round(m.score))),
+          title: String(m.title ?? '').slice(0, 80),
+          reason: String(m.reason ?? ''),
+        }))
+      if (valid.length) return valid.slice(0, CFG.clipsPerVideo)
+    } catch (e) {
+      console.error(`[worker] scoring via ${p.name} failed:`, e.message)
+    }
+  }
+  return null
+}
+
+/** Score candidate windows; LLM chain -> engagement heuristics. */
 async function scoreMoments(transcript, duration) {
   const win = CFG.clipLength
   const candidates = []
@@ -136,29 +197,8 @@ async function scoreMoments(transcript, duration) {
   }
   if (!candidates.length) return []
 
-  if (CFG.openaiKey) {
-    try {
-      const res = await fetch('https://api.openai.com/v1/chat/completions', {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${CFG.openaiKey}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          model: 'gpt-4o-mini',
-          response_format: { type: 'json_object' },
-          messages: [
-            { role: 'system', content: 'You rank short-form video moments for virality. Return JSON {"moments":[{"index":0,"score":0-100,"title":"...","reason":"..."}]} — only the strongest.' },
-            { role: 'user', content: JSON.stringify(candidates.map((c, i) => ({ index: i, text: c.text.slice(0, 600) }))) },
-          ],
-        }),
-      })
-      const data = await res.json()
-      const parsed = JSON.parse(data.choices[0].message.content)
-      return parsed.moments.slice(0, CFG.clipsPerVideo).map((m) => ({
-        ...candidates[m.index], score: m.score, title: m.title, reason: m.reason,
-      }))
-    } catch (e) {
-      console.error('[worker] OpenAI scoring failed, falling back to heuristics:', e.message)
-    }
-  }
+  const llm = await llmScoreMoments(candidates)
+  if (llm) return llm
 
   // Heuristic fallback: hook words + question density + position prior.
   const HOOKS = /\b(secret|never|nobody|mistake|million|why|how|best|worst|stop|truth)\b/gi
