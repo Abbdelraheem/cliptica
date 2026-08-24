@@ -22,10 +22,12 @@ const CFG = {
   r2Bucket: process.env.R2_BUCKET ?? 'nology-clips',
   r2Key: process.env.R2_ACCESS_KEY_ID,
   r2Secret: process.env.R2_SECRET_ACCESS_KEY,
-  whisperModel: process.env.WHISPER_MODEL ?? 'small', // tiny|base|small|medium
+  groqKey: process.env.GROQ_API_KEY, // FAST path: ~$0.04/hr audio
+  whisperModel: process.env.WHISPER_MODEL ?? 'small', // fallback when no Groq key
   openaiKey: process.env.OPENAI_API_KEY,
   clipsPerVideo: Number(process.env.CLIPS_PER_VIDEO ?? 6),
   clipLength: Number(process.env.CLIP_TARGET_SECONDS ?? 38),
+  renderParallel: Number(process.env.RENDER_PARALLEL ?? 4),
 }
 
 async function sh(cmd, args, opts) {
@@ -38,6 +40,7 @@ async function sh(cmd, args, opts) {
 async function download(url, dir) {
   const out = path.join(dir, 'source.%(ext)s')
   await sh('/usr/local/bin/yt-dlp', [
+    '-N', '8', // concurrent fragment downloads — ~4x faster
     '-f', 'bv*[height<=1080]+ba/b[height<=1080]',
     '--merge-output-format', 'mp4',
     '-o', out, url,
@@ -57,8 +60,40 @@ async function probeDuration(file) {
   return Math.round(JSON.parse(out).format.duration)
 }
 
-async function transcribe(file, dir) {
-  // faster-whisper via the venv python; writes segments JSON
+/** Extract 16kHz mono audio — Groq wants small input; 1hr ≈ 28MB. */
+async function extractAudio(file, dir) {
+  const mp3 = path.join(dir, 'audio.mp3')
+  await sh('ffmpeg', ['-y', '-i', file, '-vn', '-ac', '1', '-ar', '16000', '-b:a', '64k', mp3], {
+    timeout: 1000 * 60 * 10,
+  })
+  return mp3
+}
+
+/** FAST path: Groq whisper-large-v3-turbo (~200x realtime). */
+async function transcribeGroq(mp3) {
+  const form = new FormData()
+  const blob = new Blob([await readFile(mp3)])
+  form.append('file', blob, 'audio.mp3')
+  form.append('model', 'whisper-large-v3-turbo')
+  form.append('response_format', 'verbose_json')
+  form.append('timestamp_granularities[]', 'segment')
+  const res = await fetch('https://api.groq.com/openai/v1/audio/transcriptions', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${CFG.groqKey}` },
+    body: form,
+  })
+  if (!res.ok) throw new Error(`Groq ${res.status}: ${(await res.text()).slice(0, 200)}`)
+  const data = await res.json()
+  return {
+    language: data.language ?? 'en',
+    segments: (data.segments ?? []).map((s) => ({
+      start: s.start, end: s.end, text: (s.text ?? '').trim(),
+    })),
+  }
+}
+
+/** Fallback: local faster-whisper (no API key needed, slower). */
+async function transcribeLocal(file, dir) {
   const jsonPath = path.join(dir, 'transcript.json')
   await sh('/opt/nology-venv/bin/python', [
     '-c', `
@@ -69,8 +104,23 @@ segs, info = m.transcribe(sys.argv[1], word_timestamps=True)
 out = [{"start": s.start, "end": s.end, "text": s.text.strip()} for s in segs]
 json.dump({"language": info.language, "segments": out}, open(sys.argv[2], "w"))
 `, file, jsonPath,
-  ], { timeout: 1000 * 60 * 45 }) // 45 min ceiling for a 1-2 h video on small model
+  ], { timeout: 1000 * 60 * 45 })
   return JSON.parse(await readFile(jsonPath, 'utf8'))
+}
+
+async function transcribe(file, dir) {
+  try {
+    if (CFG.groqKey) {
+      const t0 = Date.now()
+      const mp3 = await extractAudio(file, dir)
+      const result = await transcribeGroq(mp3)
+      console.log(`[worker] Groq transcription done in ${((Date.now() - t0) / 1000).toFixed(0)}s`)
+      return result
+    }
+  } catch (e) {
+    console.error('[worker] Groq failed, falling back to local whisper:', e.message)
+  }
+  return transcribeLocal(file, dir)
 }
 
 /** Score candidate windows; uses OpenAI when key present, else engagement heuristics. */
@@ -153,10 +203,27 @@ async function renderClip(src, moment, dir, idx) {
   await sh('ffmpeg', [
     '-y', '-ss', String(moment.start), '-t', String(moment.end - moment.start), '-i', src,
     '-vf', `crop='min(ih*9/16,iw)':ih,scale=${w}:${h},subtitles=${ass.replace(/\\/g, '/').replace(':', '\\:')}`,
-    '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '21',
+    '-c:v', 'libx264', '-preset', 'superfast', '-crf', '22',
     '-c:a', 'aac', '-b:a', '128k', '-movflags', '+faststart', out,
   ], { timeout: 1000 * 60 * 20 })
   return out
+}
+
+/** Render N clips with bounded parallelism (default 4 across the ARM cores). */
+async function renderAll(src, moments, dir) {
+  const results = new Array(moments.length)
+  let next = 0
+  async function lane() {
+    for (;;) {
+      const i = next++
+      if (i >= moments.length) return
+      console.log(`[worker] rendering clip ${i + 1}/${moments.length}`)
+      results[i] = await renderClip(src, moments[i], dir, i)
+    }
+  }
+  const lanes = Array.from({ length: Math.min(CFG.renderParallel, moments.length) }, lane)
+  await Promise.all(lanes)
+  return results
 }
 
 async function uploadToR2(file, key) {
@@ -201,13 +268,14 @@ async function processJob(job) {
     const moments = await scoreMoments(transcript, duration)
     if (!moments.length) throw new Error('no viable moments found')
 
+    console.log(`[worker] rendering ${moments.length} clips in parallel`)
+    await setP(58)
+    const files = await renderAll(src, moments, dir)
+
     for (let i = 0; i < moments.length; i++) {
-      console.log(`[worker] rendering clip ${i + 1}/${moments.length}`)
-      await setP(55 + Math.round(((i + 1) / moments.length) * 40))
       const m = moments[i]
-      const file = await renderClip(src, m, dir, i)
       const key = `${project.userId}/${project.id}/clip-${i + 1}.mp4`
-      const url = await uploadToR2(file, key)
+      const url = await uploadToR2(files[i], key)
       await prisma.clip.create({
         data: {
           projectId: project.id,
@@ -223,6 +291,7 @@ async function processJob(job) {
           captionData: { segments: transcript.segments.filter((s) => s.start >= m.start && s.end <= m.end) },
         },
       })
+      await setP(60 + Math.round(((i + 1) / moments.length) * 38))
     }
     await prisma.project.update({ where: { id: project.id }, data: { status: 'COMPLETED' } })
   } finally {
