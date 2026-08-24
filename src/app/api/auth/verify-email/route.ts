@@ -1,16 +1,12 @@
 import { prisma } from '@/lib/prisma'
 import { NextResponse } from 'next/server'
-import { z } from 'zod'
 import { hashToken } from '@/lib/email'
-
-const verifySchema = z.object({
-  token: z.string().min(32).max(128),
-})
+import { verificationTokenSchema } from '@/lib/validation'
 
 export async function POST(request: Request) {
   try {
     const body = await request.json()
-    const validated = verifySchema.safeParse(body)
+    const validated = verificationTokenSchema.safeParse(body)
 
     if (!validated.success) {
       return NextResponse.json({ error: 'Invalid token' }, { status: 400 })

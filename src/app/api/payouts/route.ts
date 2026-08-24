@@ -2,23 +2,13 @@ import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { NextResponse } from 'next/server'
 import { apiMutationLimiter, enforceRateLimit } from '@/lib/rate-limit'
+import { payoutCreateSchema, MAX_PAYOUT_AMOUNT } from '@/lib/validation'
 import { z } from 'zod'
 import type { Prisma } from '@prisma/client'
 
-/** Hard ceiling per payout request (USD). */
-export const MAX_PAYOUT_AMOUNT = 10_000
+export { MAX_PAYOUT_AMOUNT }
 
-const createPayoutSchema = z.object({
-  campaignId: z.string().min(1).max(128).nullable().optional(),
-  clipId: z.string().min(1).max(128).nullable().optional(),
-  amount: z
-    .number()
-    .positive()
-    .max(MAX_PAYOUT_AMOUNT, `Amount cannot exceed $${MAX_PAYOUT_AMOUNT.toLocaleString()} per payout`),
-  periodStart: z.coerce.date(),
-  periodEnd: z.coerce.date(),
-  notes: z.string().max(1000).optional(),
-})
+const createPayoutSchema = payoutCreateSchema
 
 export async function GET(request: Request) {
   try {

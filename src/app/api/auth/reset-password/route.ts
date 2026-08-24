@@ -1,17 +1,12 @@
 import { prisma } from '@/lib/prisma'
 import { NextResponse } from 'next/server'
 import { hash } from 'bcryptjs'
-import { z } from 'zod'
 import {
   enforceRequestRateLimit,
   resetPasswordLimiter,
 } from '@/lib/rate-limit'
 import { hashToken } from '@/lib/email'
-
-const resetPasswordSchema = z.object({
-  token: z.string().min(32).max(128),
-  password: z.string().min(8),
-})
+import { resetPasswordSchema } from '@/lib/validation'
 
 export async function POST(request: Request) {
   try {

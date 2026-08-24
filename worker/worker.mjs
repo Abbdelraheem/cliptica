@@ -16,6 +16,7 @@ import { promisify } from 'util'
 import { mkdtemp, rm, writeFile, readFile } from 'fs/promises'
 import { tmpdir } from 'os'
 import path from 'path'
+import { calcCredits } from './credits.mjs'
 
 const run = promisify(execFile)
 const prisma = new PrismaClient()
@@ -659,7 +660,7 @@ async function processJob(job) {
     await prisma.project.update({ where: { id: project.id }, data: { status: 'COMPLETED' } })
 
     // Charge real usage on completion: 1 credit/min of source video, +2 flat when AI motion was actually applied.
-    const creditsSpent = Math.max(1, Math.ceil(duration / 60)) + (fx ? 2 : 0)
+    const creditsSpent = calcCredits(duration, fx)
     await prisma.$transaction([
       prisma.user.update({ where: { id: project.userId }, data: { credits: { decrement: creditsSpent } } }),
       prisma.creditTransaction.create({

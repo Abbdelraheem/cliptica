@@ -1,17 +1,10 @@
 import { prisma } from '@/lib/prisma'
 import { NextResponse } from 'next/server'
 import { hash } from 'bcryptjs'
-import { z } from 'zod'
 import { assertDeviceAvailable, bindDevice, DeviceConflictError } from '@/lib/device'
 import { enforceRequestRateLimit, registerLimiter } from '@/lib/rate-limit'
 import { generateVerificationToken, sendEmail } from '@/lib/email'
-
-const registerSchema = z.object({
-  email: z.string().email(),
-  password: z.string().min(8),
-  name: z.string().min(2).max(100).optional(),
-  deviceId: z.string().min(8).max(256),
-})
+import { registerSchema } from '@/lib/validation'
 
 export async function POST(request: Request) {
   try {

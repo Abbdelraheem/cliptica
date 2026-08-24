@@ -1,15 +1,11 @@
 import { prisma } from '@/lib/prisma'
 import { NextResponse } from 'next/server'
-import { z } from 'zod'
 import {
   enforceRequestRateLimit,
   forgotPasswordLimiter,
 } from '@/lib/rate-limit'
 import { generateVerificationToken, sendEmail } from '@/lib/email'
-
-const resendSchema = z.object({
-  email: z.string().email(),
-})
+import { emailOnlySchema } from '@/lib/validation'
 
 export async function POST(request: Request) {
   try {
@@ -17,7 +13,7 @@ export async function POST(request: Request) {
     if (limited) return limited
 
     const body = await request.json()
-    const validated = resendSchema.safeParse(body)
+    const validated = emailOnlySchema.safeParse(body)
 
     if (!validated.success) {
       return NextResponse.json(
