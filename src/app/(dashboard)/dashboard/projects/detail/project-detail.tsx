@@ -52,6 +52,7 @@ export default function ProjectDetail({ projectId }: { projectId: string }) {
   const [error, setError] = useState('')
 
   const load = useCallback(() => {
+    if (!projectId) return Promise.reject(new Error('No project id given'))
     return fetch(`/api/projects/${projectId}`)
       .then(async (r) => {
         if (!r.ok) throw new Error(r.status === 404 ? 'Project not found' : 'Failed to load project')
@@ -134,7 +135,7 @@ export default function ProjectDetail({ projectId }: { projectId: string }) {
           {project.status === 'FAILED' ? (
             <>
               <p className="flex items-center gap-2 text-sm text-red-300">
-                <AlertTriangle className="h-4 w-4" /> Processing failed — no credits were wasted retrying automatically.
+                <AlertTriangle className="h-4 w-4" /> Processing failed.
               </p>
               {job?.error && <p className="mt-2 font-mono text-xs text-red-300/70">{job.error}</p>}
             </>
@@ -187,7 +188,6 @@ export default function ProjectDetail({ projectId }: { projectId: string }) {
               </div>
               <div className="p-4">
                 <h3 className="truncate text-sm font-medium">{c.title}</h3>
-                {c.captionData?.emoji && <span className="text-base">{c.captionData.emoji}</span>}
                 <div className="mt-2 flex items-center justify-between text-xs font-light text-mist-2">
                   <span>{mmss(c.duration)}</span>
                   {c.hookScore != null && <span>hook {c.hookScore}</span>}

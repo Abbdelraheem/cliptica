@@ -83,7 +83,7 @@ export default function ProjectsPage() {
             return (
               <Link
                 key={p.id}
-                href={`/dashboard/projects/${p.id}`}
+                href={`/dashboard/projects/detail?id=${p.id}`}
                 className="glass-card group !p-0 transition-transform duration-300 hover:-translate-y-1"
               >
                 {/* Thumbnail */}
