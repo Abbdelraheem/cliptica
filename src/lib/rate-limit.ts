@@ -19,6 +19,8 @@ function makeLimiter(prefix: string, maxRequests: number, window: `${number} ${'
 export const loginIpLimiter = makeLimiter('rl:login-ip', 5, '1 m')
 export const loginEmailLimiter = makeLimiter('rl:login-email', 5, '1 m')
 export const registerLimiter = makeLimiter('rl:register', 5, '1 m')
+export const forgotPasswordLimiter = makeLimiter('rl:forgot-password', 3, '1 m')
+export const resetPasswordLimiter = makeLimiter('rl:reset-password', 5, '1 m')
 export const apiMutationLimiter = makeLimiter('rl:api-mutation', 30, '1 m')
 
 type RequestLike = {

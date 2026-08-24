@@ -120,6 +120,12 @@ export default function LoginPage() {
             <button type="submit" disabled={loading} className="btn-lux btn-gold w-full disabled:opacity-60">
               {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Log in'}
             </button>
+
+            <p className="text-center text-sm font-light text-mist-2">
+              <Link href="/forgot-password" className="underline underline-offset-4 hover:text-gold">
+                Forgot password?
+              </Link>
+            </p>
           </form>
 
           <div className="my-6 flex items-center gap-4">
