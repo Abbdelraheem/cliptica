@@ -34,3 +34,11 @@ export const payoutCreateSchema = z.object({
   periodEnd: z.coerce.date(),
   notes: z.string().max(1000).optional(),
 })
+
+/** Converts "1:05:30" / "4:10" / 90 into seconds. */
+export function parseClipFrom(v?: string | number): number {
+  if (v === undefined) return 0
+  if (typeof v === 'number') return v
+  const parts = v.split(':').map(Number)
+  return parts.length === 3 ? parts[0] * 3600 + parts[1] * 60 + parts[2] : parts[0] * 60 + parts[1]
+}

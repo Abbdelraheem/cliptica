@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma'
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { apiMutationLimiter, enforceRateLimit } from '@/lib/rate-limit'
+import { parseClipFrom } from '@/lib/validation'
 
 const MIN_CREDITS_REQUIRED = Number(process.env.MIN_CREDITS_REQUIRED ?? 10)
 
@@ -22,13 +23,6 @@ const createSchema = z.object({
   language: z.enum(LANGUAGES).default('auto'),
   motionFx: z.boolean().default(false),
 })
-
-function parseClipFrom(v?: string | number): number {
-  if (v === undefined) return 0
-  if (typeof v === 'number') return v
-  const parts = v.split(':').map(Number)
-  return parts.length === 3 ? parts[0] * 3600 + parts[1] * 60 + parts[2] : parts[0] * 60 + parts[1]
-}
 
 export async function POST(request: Request) {
   try {

@@ -282,9 +282,9 @@ model Setting {
 }
 
 model ProcessedWebhookEvent {
-  id          String   @id
-  type        String
-  processedAt DateTime @default(now())
+  id            String   @id @default(cuid())
+  stripeEventId String   @unique
+  processedAt   DateTime @default(now())
 }
 
 model PasswordResetToken {

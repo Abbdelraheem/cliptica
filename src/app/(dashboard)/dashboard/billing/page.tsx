@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useSession } from 'next-auth/react'
-import { Check, Loader2 } from 'lucide-react'
+import { Check } from 'lucide-react'
 
 const PLANS = [
   {

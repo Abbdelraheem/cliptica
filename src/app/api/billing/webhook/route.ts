@@ -22,7 +22,7 @@ export async function POST(request: Request) {
     }
 
     const alreadyProcessed = await prisma.processedWebhookEvent.findUnique({
-      where: { id: event.id },
+      where: { stripeEventId: event.id },
     })
     if (alreadyProcessed) {
       return NextResponse.json({ received: true, duplicate: true })
@@ -62,7 +62,7 @@ export async function POST(request: Request) {
     }
 
     await prisma.processedWebhookEvent.create({
-      data: { id: event.id, type: event.type },
+      data: { stripeEventId: event.id },
     })
 
     return NextResponse.json({ received: true })
