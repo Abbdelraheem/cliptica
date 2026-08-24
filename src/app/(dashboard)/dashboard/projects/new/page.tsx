@@ -1,6 +1,6 @@
 'use client'
 
-import { useRef, useState } from 'react'
+import { useRef, useState, useEffect } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import {
@@ -45,8 +45,16 @@ export default function NewProjectPage() {
   const [framing, setFraming] = useState<(typeof FRAMINGS)[number]['id']>('smart')
   const [language, setLanguage] = useState('auto')
   const [motionFx, setMotionFx] = useState(false)
+  const [motionAvailable, setMotionAvailable] = useState(false)
   const [error, setError] = useState('')
   const [submitting, setSubmitting] = useState(false)
+
+  useEffect(() => {
+    fetch('/api/admin/motion-fx')
+      .then(async (r) => (r.ok ? r.json() : { enabled: false, isAdmin: false }))
+      .then((d) => setMotionAvailable(!!d.enabled && !!d.isAdmin))
+      .catch(() => setMotionAvailable(false))
+  }, [])
 
   async function pickFile(f: File | undefined | null) {
     setError('')
@@ -120,7 +128,7 @@ export default function NewProjectPage() {
           clipFrom: clipFrom || undefined,
           framing,
           language,
-          motionFx,
+          motionFx: motionAvailable && motionFx,
         }),
       })
       if (!res.ok) {
@@ -292,7 +300,8 @@ export default function NewProjectPage() {
           </div>
         </div>
 
-        {/* AI motion graphics toggle */}
+        {/* AI motion graphics toggle — admin only, globally switchable */}
+        {motionAvailable && (
         <button
           type="button"
           onClick={() => setMotionFx((v) => !v)}
@@ -328,6 +337,7 @@ export default function NewProjectPage() {
             />
           </span>
         </button>
+        )}
 
         {/* Language */}
         <div>

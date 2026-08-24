@@ -273,3 +273,8 @@ model CreditTransaction {
 
   user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
+
+model Setting {
+  key   String @id
+  value String
+}

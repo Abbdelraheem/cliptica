@@ -557,8 +557,12 @@ async function processJob(job) {
     const moments = await scoreMoments(transcript, duration, project.clipFrom ?? 0, project.instructions)
     if (!moments.length) throw new Error('no viable moments found')
 
-    // AI motion graphics packages (headline/kicker per clip) when enabled
-    const fx = !!project.motionFx
+    // AI motion graphics: admin-only feature with a global kill switch — re-checked at render time.
+    let fx = !!project.motionFx
+    if (fx) {
+      const flag = await prisma.setting.findUnique({ where: { key: 'motion_fx' } })
+      if (flag && flag.value !== 'true') fx = false
+    }
     let pkgs = null
     if (fx) {
       console.log('[worker] designing AI motion packages')
@@ -600,8 +604,8 @@ async function processJob(job) {
 
     await prisma.project.update({ where: { id: project.id }, data: { status: 'COMPLETED' } })
 
-    // Charge real usage on completion: 1 credit/min of source video, +2 flat when AI motion was applied.
-    const creditsSpent = Math.max(1, Math.ceil(duration / 60)) + (project.motionFx ? 2 : 0)
+    // Charge real usage on completion: 1 credit/min of source video, +2 flat when AI motion was actually applied.
+    const creditsSpent = Math.max(1, Math.ceil(duration / 60)) + (fx ? 2 : 0)
     await prisma.$transaction([
       prisma.user.update({ where: { id: project.userId }, data: { credits: { decrement: creditsSpent } } }),
       prisma.creditTransaction.create({
@@ -609,7 +613,7 @@ async function processJob(job) {
           userId: project.userId,
           amount: -creditsSpent,
           type: 'usage',
-          description: `Clipping "${project.title}" (${Math.round(duration / 60)} min${project.motionFx ? ' · AI motion' : ''})`,
+          description: `Clipping "${project.title}" (${Math.round(duration / 60)} min${fx ? ' · AI motion' : ''})`,
           metadata: { projectId: project.id },
         },
       }),

@@ -54,9 +54,20 @@ export async function POST(request: Request) {
 
     const user = await prisma.user.findUnique({
       where: { id: session.user.id },
-      select: { credits: true },
+      select: { credits: true, role: true },
     })
     if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 })
+
+    // AI motion graphics is an admin-only feature with a global kill switch.
+    let motionFx = d.motionFx
+    if (motionFx) {
+      if (user.role !== 'ADMIN') {
+        motionFx = false
+      } else {
+        const setting = await prisma.setting.findUnique({ where: { key: 'motion_fx' } })
+        if (setting && setting.value !== 'true') motionFx = false
+      }
+    }
 
     // Eligibility gate only — actual usage charged by the worker on real duration.
     if (user.credits < MIN_CREDITS_REQUIRED) {
@@ -83,7 +94,7 @@ export async function POST(request: Request) {
         clipFrom: parseClipFrom(d.clipFrom),
         framing: d.framing,
         language: d.language,
-        motionFx: d.motionFx,
+        motionFx,
         status: 'PENDING',
       },
     })
