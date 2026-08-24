@@ -21,6 +21,13 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Webhook signature verification failed' }, { status: 400 })
     }
 
+    const alreadyProcessed = await prisma.processedWebhookEvent.findUnique({
+      where: { id: event.id },
+    })
+    if (alreadyProcessed) {
+      return NextResponse.json({ received: true, duplicate: true })
+    }
+
     switch (event.type) {
       case 'checkout.session.completed': {
         const session = event.data.object as Stripe.Checkout.Session
@@ -53,6 +60,10 @@ export async function POST(request: Request) {
         break
       }
     }
+
+    await prisma.processedWebhookEvent.create({
+      data: { id: event.id, type: event.type },
+    })
 
     return NextResponse.json({ received: true })
   } catch (error) {
