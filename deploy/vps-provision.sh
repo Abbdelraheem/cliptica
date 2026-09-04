@@ -71,8 +71,8 @@ log_info "[1/10] Installing system packages (~350 MB, 3-5 min)"
     apt-get install -y -qq \
         curl git ca-certificates gnupg lsb-release software-properties-common \
         build-essential pkg-config cmake \
-        python3 python3-pip python3-venv python3-dev python3.11-venv python3.11-dev \
-        ffmpeg ffprobe jq wget unzip \
+        python3 python3-pip python3-venv python3-dev \
+        ffmpeg jq wget unzip fonts-dejavu-core \
         logrotate cron rsync sqlite3 postgresql-client \
         >/dev/null
 } 2>&1 | tee -a "$LOG_FILE"
@@ -116,8 +116,7 @@ log_success "FFmpeg + ffprobe verified"
 # ============================================================
 log_info "[5/10] Python AI venv (~2.2 GB, 8-12 min)"
 {
-    apt-get install -y -qq python3.11-venv python3.11-dev >/dev/null
-    python3.11 -m venv /opt/nology-venv
+    python3 -m venv /opt/nology-venv
     /opt/nology-venv/bin/pip install -q --upgrade pip setuptools wheel
     /opt/nology-venv/bin/pip install -q --no-cache-dir torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
     /opt/nology-venv/bin/pip install -q --no-cache-dir \
