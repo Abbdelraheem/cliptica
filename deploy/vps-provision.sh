@@ -94,7 +94,11 @@ log_success "Node.js $(node --version) + PM2 $(pm2 --version) installed"
 # ============================================================
 log_info "[3/10] Installing yt-dlp (~35 MB, 30 s)"
 {
-    YTDLP_URL="https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_linux_${ARCH_SUFFIX}"
+    case "$ARCH_SUFFIX" in
+        aarch64) YTDLP_FILE="yt-dlp_linux_aarch64" ;;
+        *)       YTDLP_FILE="yt-dlp_linux" ;;
+    esac
+    YTDLP_URL="https://github.com/yt-dlp/yt-dlp/releases/latest/download/${YTDLP_FILE}"
     curl -L "$YTDLP_URL" -o /usr/local/bin/yt-dlp
     chmod +x /usr/local/bin/yt-dlp
     yt-dlp --version
