@@ -174,7 +174,11 @@ log_info "[8/10] Cloning repository (~1 min)"
         git clone --depth 1 -b "$BRANCH" "$REPO_URL" "$APP_DIR"
         cd "$APP_DIR"
     fi
-    if [ ! -f "$APP_DIR/.env.production" ]; then
+    if [ -f "/opt/nology.env" ]; then
+        cp /opt/nology.env "$APP_DIR/.env.production"
+        chmod 600 "$APP_DIR/.env.production"
+        log_success ".env.production seeded from /opt/nology.env"
+    elif [ ! -f "$APP_DIR/.env.production" ]; then
         cp deploy/.env.production.example "$APP_DIR/.env.production"
         log_warn "CREATED placeholder .env.production — EDIT before build: nano /opt/nology/.env.production"
     fi
