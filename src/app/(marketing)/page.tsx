@@ -88,8 +88,19 @@ const DEMO_URLS = [
 function PasteBar() {
   const [text, setText] = useState('')
   const [urlIdx, setUrlIdx] = useState(0)
+  const boxRef = useRef<HTMLDivElement>(null)
+  const [visible, setVisible] = useState(false)
 
   useEffect(() => {
+    const el = boxRef.current
+    if (!el) return
+    const io = new IntersectionObserver(([e]) => setVisible(e.isIntersecting), { threshold: 0.1 })
+    io.observe(el)
+    return () => io.disconnect()
+  }, [])
+
+  useEffect(() => {
+    if (!visible) return
     let char = 0
     let deleting = false
     const id = setInterval(() => {
@@ -109,12 +120,12 @@ function PasteBar() {
         }
         setText(full.slice(0, Math.max(0, char)))
       }
-    }, 55)
+    }, 85)
     return () => clearInterval(id)
-  }, [urlIdx])
+  }, [urlIdx, visible])
 
   return (
-    <div className="input-lux flex items-center gap-3 !rounded-2xl !py-2 pl-5 pr-2">
+    <div ref={boxRef} className="input-lux flex items-center gap-3 !rounded-2xl !py-2 pl-5 pr-2">
       <Youtube className="h-5 w-5 shrink-0 text-champagne" />
       <span className="min-w-0 flex-1 truncate font-mono text-sm text-mist">
         https://{text}
@@ -166,8 +177,8 @@ function ClipCard({
 }) {
   return (
     <div
-      className="glass-card group relative overflow-hidden rounded-2xl p-3"
-      style={{ animation: `floaty 6s ease-in-out ${delay}s infinite` }}
+      className="glass-card floaty-card group relative w-[58%] shrink-0 snap-start overflow-hidden rounded-2xl p-3 sm:w-auto"
+      style={{ animationDelay: `${delay}s` }}
     >
       <div className="relative mb-3 aspect-[9/14] overflow-hidden rounded-xl border border-hair bg-gradient-to-b from-[#141414] to-[#0b0b0b]">
         <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-champagne/60 to-transparent" />
@@ -202,8 +213,8 @@ function ClipCard({
 
 function Hero() {
   return (
-    <section className="relative mx-auto max-w-6xl px-6 pt-36 lg:pt-44">
-      <div className="grid items-center gap-14 lg:grid-cols-[1.05fr_0.95fr]">
+    <section className="relative mx-auto max-w-6xl px-5 pt-28 sm:px-6 sm:pt-32 lg:pt-44">
+      <div className="grid items-center gap-10 sm:gap-14 lg:grid-cols-[1.05fr_0.95fr]">
         <div>
           <p className="eyebrow rv in">AI Clipping Engine</p>
           <h1 className="display-xl mt-5 leading-[1.02]">
@@ -275,7 +286,7 @@ function Hero() {
               ))}
             </div>
 
-            <div className="grid grid-cols-3 gap-3">
+            <div className="-mx-5 flex snap-x snap-mandatory gap-3 overflow-x-auto px-5 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:mx-0 sm:grid sm:grid-cols-3 sm:overflow-visible sm:px-0 sm:pb-0">
               <ClipCard
                 title="The $40M mistake"
                 score={94}
@@ -320,7 +331,7 @@ function FactTicker() {
   ]
   const row = [...facts, ...facts]
   return (
-    <section className="mt-28 border-y border-hair/60 bg-[#080808] py-5">
+    <section className="mt-16 border-y border-hair/60 bg-[#080808] py-5 sm:mt-28">
       <div className="ticker">
         <div className="ticker-track">
           {[0, 1].map((half) => (
@@ -371,7 +382,7 @@ const STEPS = [
 
 function HowItWorks() {
   return (
-    <section id="how" className="mx-auto max-w-6xl scroll-mt-28 px-6 pt-28">
+    <section id="how" className="mx-auto max-w-6xl scroll-mt-28 px-5 pt-20 sm:px-6 sm:pt-28">
       <p className="eyebrow rv">How It Works</p>
       <h2 className="display-md mt-4 max-w-xl rv">
         From raw footage to posted shorts in{' '}
@@ -444,7 +455,7 @@ const FEATURES = [
 
 function Features() {
   return (
-    <section id="features" className="mx-auto max-w-6xl scroll-mt-28 px-6 pt-28">
+    <section id="features" className="mx-auto max-w-6xl scroll-mt-28 px-5 pt-20 sm:px-6 sm:pt-28">
       <p className="eyebrow rv">Inside The Engine</p>
       <h2 className="display-md mt-4 max-w-2xl rv">
         An editor that works while <span className="gold-text">you sleep</span>
@@ -477,8 +488,8 @@ function TimeCompare() {
     ['Exporting for each app', 35],
   ]
   return (
-    <section className="mx-auto max-w-6xl px-6 pt-28">
-      <div className="glass-card relative overflow-hidden rounded-[2rem] p-8 md:p-12 rv">
+    <section className="mx-auto max-w-6xl px-5 pt-20 sm:px-6 sm:pt-28">
+      <div className="glass-card relative overflow-hidden rounded-[2rem] p-5 sm:p-8 md:p-12 rv">
         <div className="pointer-events-none absolute -left-24 -top-24 h-72 w-72 rounded-full bg-[#ff5a1f]/10 blur-3xl" />
         <div className="grid items-center gap-12 lg:grid-cols-2">
           <div>
@@ -583,7 +594,7 @@ const PLANS = [
 
 function Pricing() {
   return (
-    <section id="pricing" className="mx-auto max-w-6xl scroll-mt-28 px-6 pt-28">
+    <section id="pricing" className="mx-auto max-w-6xl scroll-mt-28 px-5 pt-20 sm:px-6 sm:pt-28">
       <p className="eyebrow rv">Pricing</p>
       <h2 className="display-md mt-4 max-w-xl rv">
         Cheaper than <span className="gold-text">one edit</span>
@@ -595,7 +606,7 @@ function Pricing() {
         {PLANS.map((p, i) => (
           <div
             key={p.name}
-            className={`rv relative rounded-3xl border p-8 ${
+            className={`rv relative rounded-3xl border p-6 sm:p-8 ${
               p.featured
                 ? 'border-[#ff5a1f]/50 bg-gradient-to-b from-[#ff5a1f]/[0.08] to-transparent shadow-[0_20px_80px_rgba(255,90,31,0.12)]'
                 : 'glass-card'
@@ -669,7 +680,7 @@ const FAQS: [string, string][] = [
 function Faq() {
   const [open, setOpen] = useState<number | null>(0)
   return (
-    <section id="faq" className="mx-auto max-w-3xl scroll-mt-28 px-6 pt-28">
+    <section id="faq" className="mx-auto max-w-3xl scroll-mt-28 px-5 pt-20 sm:px-6 sm:pt-28">
       <p className="eyebrow rv">FAQ</p>
       <h2 className="display-md mt-4 rv">Questions, answered</h2>
       <div className="mt-12 space-y-3">
@@ -709,8 +720,8 @@ function Faq() {
 
 function FinalCta() {
   return (
-    <section className="mx-auto max-w-6xl px-6 pt-28">
-      <div className="glass-card relative overflow-hidden rounded-[2.5rem] px-8 py-20 text-center rv">
+    <section className="mx-auto max-w-6xl px-5 pt-20 sm:px-6 sm:pt-28">
+      <div className="glass-card relative overflow-hidden rounded-[2.5rem] px-5 py-14 text-center rv sm:px-8 sm:py-20">
         <div className="pointer-events-none absolute inset-0">
           <div className="absolute -left-20 top-0 h-64 w-64 rounded-full bg-[#ff5a1f]/15 blur-3xl" />
           <div className="absolute -right-20 bottom-0 h-64 w-64 rounded-full bg-[#ff7a3d]/10 blur-3xl" />
@@ -747,17 +758,6 @@ function FinalCta() {
 export default function HomePage() {
   return (
     <MarketingLayout>
-      <style>{`
-        @keyframes floaty {
-          0%, 100% { transform: translateY(0); }
-          50% { transform: translateY(-7px); }
-        }
-        @keyframes scanpulse {
-          0%, 100% { opacity: 0.5; transform: translate(-50%, 0); }
-          50% { opacity: 1; transform: translate(-50%, 4px); }
-        }
-        .scanface { animation: scanpulse 2.6s ease-in-out infinite; }
-      `}</style>
       <Hero />
       <FactTicker />
       <HowItWorks />

@@ -59,6 +59,8 @@
 
 html {
   scroll-behavior: smooth;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
 }
 
 body {
@@ -329,6 +331,66 @@ body {
 }
 .cursor-blink {
   animation: blink 1s step-end infinite;
+}
+
+/* ---------- Floating clip mock ---------- */
+.floaty-card {
+  animation: floaty 6s ease-in-out infinite;
+}
+@keyframes floaty {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-7px); }
+}
+@keyframes scanpulse {
+  0%, 100% { opacity: 0.5; transform: translate(-50%, 0); }
+  50% { opacity: 1; transform: translate(-50%, 4px); }
+}
+.scanface { animation: scanpulse 2.6s ease-in-out infinite; }
+
+/* ---------- Touch devices: no sticky hover lifts ---------- */
+@media (hover: none) {
+  .glass-card:hover,
+  .btn-primary:hover,
+  .btn-gold:hover {
+    transform: none;
+  }
+}
+
+/* ---------- Mobile: performance + readability ---------- */
+@media (max-width: 767px) {
+  /* Heavy fixed blur layer -> plain gradients (visually identical, far cheaper) */
+  .amb { filter: none; }
+
+  /* Animated full-screen grain off */
+  .grain::after { display: none; }
+
+  /* backdrop-filter on dozens of cards is the #1 jank source on phones */
+  .glass-card,
+  .price-ring,
+  .eyebrow,
+  .btn-outline {
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+  .glass-card {
+    background: linear-gradient(165deg, rgba(255, 255, 255, 0.055), rgba(255, 255, 255, 0.025));
+  }
+  .eyebrow { background: rgba(10, 10, 10, 0.75); }
+
+  /* Stop perpetual motion while scrolling */
+  .floaty-card { animation: none !important; }
+
+  /* Subtler, faster reveals — no "page keeps resizing" feeling */
+  .rv {
+    transform: translateY(14px);
+    transition-duration: 0.55s;
+  }
+
+  .ticker-track { animation-duration: 42s; }
+  .ticker-track span { font-size: 1rem; }
+
+  /* 16px+ prevents iOS Safari auto-zooming the page on input focus */
+  .input-lux { font-size: 16px; }
 }
 
 /* ---------- Form inputs ---------- */
