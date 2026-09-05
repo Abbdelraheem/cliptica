@@ -64,7 +64,14 @@ export async function middleware(request: NextRequest) {
   const loggedIn = hasSessionCookie(request)
 
   // Protected routes
-  const protectedPaths = ['/dashboard', '/api/projects', '/api/campaigns', '/api/payouts']
+  const protectedPaths = [
+    '/dashboard',
+    '/admin',
+    '/api/projects',
+    '/api/campaigns',
+    '/api/payouts',
+    '/api/admin',
+  ]
   const isProtected = protectedPaths.some((path) => pathname.startsWith(path))
 
   // Auth routes (redirect to dashboard if already logged in)
@@ -87,9 +94,11 @@ export async function middleware(request: NextRequest) {
 export const config = {
   matcher: [
     '/dashboard/:path*',
+    '/admin/:path*',
     '/api/projects/:path*',
     '/api/campaigns/:path*',
     '/api/payouts/:path*',
+    '/api/admin/:path*',
     '/api/auth/callback/:path*',
     '/login',
     '/register',

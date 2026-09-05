@@ -14,6 +14,16 @@ export async function auth() {
   return getServerSession(authOptions)
 }
 
+/**
+ * Server-side ADMIN gate for layouts & API routes.
+ * Returns the session only when the caller is an ADMIN, otherwise null.
+ */
+export async function getAdminSession() {
+  const session = await auth()
+  if (!session?.user?.id || session.user.role !== 'ADMIN') return null
+  return session
+}
+
 const loginSchema = z.object({
   email: z.string().email(),
   password: z.string().min(8),
