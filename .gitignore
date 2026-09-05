@@ -70,3 +70,10 @@ worker/node_modules/
 *.err
 .vercel
 .env*
+
+# Email preview builder output (generated)
+/email-preview.html
+/public/email-preview.html
+
+# Telegram bot deploy internals (contains owner chat id + runtime config)
+/deploy/tg-bot/
