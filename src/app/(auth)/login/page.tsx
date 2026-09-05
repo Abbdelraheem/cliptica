@@ -76,7 +76,7 @@ export default function LoginPage() {
     }
   }
 
-  function oauth(provider: 'google' | 'github') {
+  function oauth(provider: 'google') {
     // Device enforcement for OAuth happens on first dashboard load.
     signIn(provider, { callbackUrl: '/dashboard' })
   }
@@ -148,18 +148,12 @@ export default function LoginPage() {
             <span className="h-px flex-1 bg-hair/40" />
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3">
             <button
               onClick={() => oauth('google')}
               className="btn-lux btn-outline !py-3 !text-sm"
             >
-              Google
-            </button>
-            <button
-              onClick={() => oauth('github')}
-              className="btn-lux btn-outline !py-3 !text-sm"
-            >
-              GitHub
+              Continue with Google
             </button>
           </div>
 
