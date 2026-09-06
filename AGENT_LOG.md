@@ -90,4 +90,4 @@ Date format: YYYY-MM-DD. One entry per completed round (what was checked → wha
 - `node --check worker/worker.mjs`, `npm run lint`, `npm run typecheck`, `npm run build` — all clean.
 
 **Deploy/publish**
-- Committed + pushed to origin (server pull + rebuild + `pm2 restart nology-web` + `pm2 restart nology-worker` next).
+- `5845a44` (worker config) + `96c6c1a` (web gates) pushed; server reset to `96c6c1a`, build clean (47/47), `pm2 restart nology-web` (restarts 10, uptime 190s) + `nology-worker` (restarts 4). Worker boot log confirms DB-first config live (`premium=true, parallel=4`, no config errors). `/api/health` HTTP 200 healthy. Note: site is served on `:3000` directly — no nginx/caddy on 80/443 currently listening.
