@@ -115,10 +115,14 @@ async function handleSubscriptionUpdated(tx: Tx, subscription: Stripe.Subscripti
 
   if (!planKey) return
 
+  // Non-paying statuses must not keep premium plan limits. `canceled` is
+  // handled by customer.subscription.deleted; these cover the rest.
+  const unpaid = ['past_due', 'unpaid', 'incomplete', 'incomplete_expired'].includes(subscription.status)
+
   await tx.user.update({
     where: { id: userId },
     data: {
-      role: planKey.toUpperCase() as never,
+      role: unpaid ? 'FREE' : (planKey.toUpperCase() as never),
       stripeSubscriptionId: subscription.id,
       stripePriceId: priceId,
       subscriptionStatus: subscription.status,

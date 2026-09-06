@@ -14,9 +14,14 @@ export function isPrivateIp(ip) {
       (a === 172 && b >= 16 && b <= 31) ||
       (a === 192 && b === 168) ||
       (a === 192 && b === 0) ||
+      (a === 198 && (b === 18 || b === 19 || b === 51)) ||
+      (a === 203 && b === 0) ||
       a >= 224
     )
   }
+  // IPv4-mapped IPv6 (::ffff:a.b.c.d) — decode and re-check as IPv4.
+  const v4mapped = /^::ffff:(\d+\.\d+\.\d+\.\d+)$/.exec(ip.toLowerCase())
+  if (v4mapped) return isPrivateIp(v4mapped[1])
   const v6 = ip.toLowerCase()
   return (
     v6 === '::1' ||
@@ -24,7 +29,7 @@ export function isPrivateIp(ip) {
     v6.startsWith('fc') ||
     v6.startsWith('fd') ||
     v6.startsWith('fe80') ||
-    v6.startsWith('::ffff:127.')
+    v6.startsWith('2001:db8:')
   )
 }
 

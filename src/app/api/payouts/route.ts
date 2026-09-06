@@ -17,8 +17,10 @@ export async function GET(request: Request) {
     const statusParam = searchParams.get('status')
     const status = z.enum(['PENDING', 'APPROVED', 'PAID']).safeParse(statusParam)
     const campaignId = searchParams.get('campaignId')
-    const page = parseInt(searchParams.get('page') || '1')
-    const limit = parseInt(searchParams.get('limit') || '50')
+    const rawPage = parseInt(searchParams.get('page') || '1', 10)
+    const rawLimit = parseInt(searchParams.get('limit') || '50', 10)
+    const page = Number.isFinite(rawPage) ? Math.max(1, rawPage) : 1
+    const limit = Number.isFinite(rawLimit) ? Math.min(100, Math.max(1, rawLimit)) : 50
 
     const where: Prisma.PayoutWhereInput = { userId: session.user.id }
     if (status.success) where.status = status.data
@@ -72,6 +74,26 @@ export async function POST(request: Request) {
 
     if (periodEnd < periodStart) {
       return NextResponse.json({ error: 'Period end must be after period start' }, { status: 400 })
+    }
+
+    // Ownership: a payout may only reference the requester's own campaign/clip.
+    if (campaignId) {
+      const ownedCampaign = await prisma.campaign.findFirst({
+        where: { id: campaignId, userId: session.user.id },
+        select: { id: true },
+      })
+      if (!ownedCampaign) {
+        return NextResponse.json({ error: 'Campaign not found' }, { status: 404 })
+      }
+    }
+    if (clipId) {
+      const ownedClip = await prisma.clip.findFirst({
+        where: { id: clipId, userId: session.user.id },
+        select: { id: true },
+      })
+      if (!ownedClip) {
+        return NextResponse.json({ error: 'Clip not found' }, { status: 404 })
+      }
     }
 
     const payout = await prisma.payout.create({
