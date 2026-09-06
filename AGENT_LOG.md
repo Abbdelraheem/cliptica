@@ -91,3 +91,14 @@ Date format: YYYY-MM-DD. One entry per completed round (what was checked → wha
 
 **Deploy/publish**
 - `5845a44` (worker config) + `96c6c1a` (web gates) pushed; server reset to `96c6c1a`, build clean (47/47), `pm2 restart nology-web` (restarts 10, uptime 190s) + `nology-worker` (restarts 4). Worker boot log confirms DB-first config live (`premium=true, parallel=4`, no config errors). `/api/health` HTTP 200 healthy. Note: site is served on `:3000` directly — no nginx/caddy on 80/443 currently listening.
+
+## 2026-09-06 — Round 5: R2 enablement + yt-dlp hardening (ops)
+
+**Findings/changes**
+- R2 credentials were empty on the server (`len=2` placeholders). Wired real Cloudflare R2 creds into `/opt/nology/.env.production` (NOT in git): `R2_ENDPOINT`, `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`. Access verified via aws cli; `nology-clips` bucket did not exist → created (`aws s3 mb`). Health storage flipped `not_configured` → `healthy`.
+- Server smoke test proved R2 write/read/delete OK, and exposed a launch blocker: YouTube bot-checks this EC2 IP ("Sign in to confirm you're not a bot") for every player client tried (default/android/ios/tv/embedded/mweb/vr/safari). Local whisper + cv2 in `/opt/nology-venv` verified OK; yt-dlp/ffmpeg/aws/fonts all present.
+- `worker/worker.mjs` (commit `0803c64`): yt-dlp now runs with `--js-runtimes node` (fixes "no JavaScript runtime" format loss) and `--cookies <YTDLP_COOKIES>` when that env is set — the cookies file is the remaining piece to unblock YouTube.
+- Verified: `node --check`, `npm run lint` clean; worker deployed at `0803c64`, restarts=6, clean boot (`premium=true, parallel=4`).
+
+**Status**
+- End-to-end works for direct video-file URLs now; YouTube needs a cookies.txt export from the user's browser (logged-out is usually enough) placed on the server + `YTDLP_COOKIES` env + worker restart.
