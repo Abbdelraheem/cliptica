@@ -43,6 +43,60 @@ const CFG = {
   renderParallel: Number(process.env.RENDER_PARALLEL ?? 4),
 }
 
+/* ------------------------------------------------------------------ */
+/* DB-first runtime config                                            */
+/* The admin Settings panel writes to the `Setting` table. These      */
+/* knobs resolve Setting > process.env > default so the panel is real. */
+/* ------------------------------------------------------------------ */
+
+const ENV_DEFAULTS = {
+  pipeline_premium: process.env.PIPELINE_PREMIUM !== '0',
+  clips_per_video: Number(process.env.CLIPS_PER_VIDEO ?? 6),
+  clip_target_seconds: Number(process.env.CLIP_TARGET_SECONDS ?? 38),
+  render_parallel: Number(process.env.RENDER_PARALLEL ?? 4),
+  stale_job_minutes: Number(process.env.STALE_JOB_MINUTES ?? 30),
+}
+
+const SETTING_PARSE = {
+  pipeline_premium: (v) => v === 'true',
+  clips_per_video: (v) => Math.max(1, Number(v) || 6),
+  clip_target_seconds: (v) => Math.max(5, Number(v) || 38),
+  render_parallel: (v) => Math.max(1, Math.min(8, Number(v) || 4)),
+  stale_job_minutes: (v) => Math.max(1, Number(v) || 30),
+}
+
+let configCache = null
+let configCacheAt = 0
+
+async function refreshConfig() {
+  try {
+    const rows = await prisma.setting.findMany({ where: { key: { in: Object.keys(SETTING_PARSE) } } })
+    const map = Object.fromEntries(rows.map((r) => [r.key, r.value]))
+    const merged = { ...ENV_DEFAULTS }
+    for (const [k, parse] of Object.entries(SETTING_PARSE)) {
+      if (rows.some((r) => r.key === k)) merged[k] = parse(map[k])
+    }
+    configCache = merged
+    configCacheAt = Date.now()
+  } catch (e) {
+    console.error('[worker] config refresh failed (using last-known):', e.message)
+  }
+}
+
+async function cfg() {
+  if (!configCache || Date.now() - configCacheAt > 60_000) await refreshConfig()
+  return configCache ?? ENV_DEFAULTS
+}
+
+/** Push DB-backed knobs into the live CFG object (mutated in place). */
+async function syncConfigInto() {
+  const c = await cfg()
+  CFG.premium = c.pipeline_premium
+  CFG.clipsPerVideo = c.clips_per_video
+  CFG.clipLength = c.clip_target_seconds
+  CFG.renderParallel = c.render_parallel
+}
+
 async function sh(cmd, args, opts) {
   const { stdout } = await run(cmd, args, { maxBuffer: 64 * 1024 * 1024, ...opts })
   return stdout
@@ -695,14 +749,9 @@ async function processJob(job) {
 }
 
 /** Jobs stuck in `processing` longer than this are assumed lost to a crash. */
-const STALE_JOB_MINUTES = Number(process.env.STALE_JOB_MINUTES ?? 30)
-
-/** How often the loop re-scans for stale `processing` jobs (ms). */
-const STALE_SWEEP_MS = Number(process.env.STALE_SWEEP_MS ?? 5 * 60_000)
-
 async function recoverStale() {
   try {
-    const staleBefore = new Date(Date.now() - STALE_JOB_MINUTES * 60_000)
+    const staleBefore = new Date(Date.now() - (await cfg()).stale_job_minutes * 60_000)
     const revived = await prisma.processingJob.updateMany({
       where: { status: 'processing', startedAt: { lt: staleBefore } },
       data: { status: 'queued', startedAt: null },
@@ -740,8 +789,12 @@ async function loop() {
 
   let lastSweep = 0
   for (;;) {
+    // DB-backed knobs can be changed from the admin Settings panel at any
+    // time — refresh the live config each loop (cheap, 60s cache).
+    await syncConfigInto()
+
     // Periodic stale-job recovery: also rescues jobs abandoned since boot.
-    if (Date.now() - lastSweep >= STALE_SWEEP_MS) {
+    if (Date.now() - lastSweep >= 5 * 60_000) {
       lastSweep = Date.now()
       await recoverStale()
     }
