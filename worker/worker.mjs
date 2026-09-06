@@ -131,7 +131,7 @@ async function download(url, dir) {
   const out = path.join(dir, 'source.%(ext)s')
   await sh('/usr/local/bin/yt-dlp', ytdlpArgs([
     '-N', '8',
-    '-f', 'bv*[height<=1080]+ba/b[height<=1080]',
+    '-f', 'bv*[height<=1080]+ba/b[height<=1080]/b',
     '--merge-output-format', 'mp4',
     '-o', out, url,
   ]))
