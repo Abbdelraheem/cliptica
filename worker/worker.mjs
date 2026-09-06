@@ -242,7 +242,12 @@ async function transcribe(file, dir, language = 'auto') {
   } catch (e) {
     console.error('[worker] Groq failed, falling back to local whisper:', e.message)
   }
-  return transcribeLocal(file, dir)
+  try {
+    return await transcribeLocal(file, dir)
+  } catch (e) {
+    console.error('[worker] Local whisper failed (audio-only or no audio stream):', e.message)
+    return { language: language === 'auto' ? 'en' : language, segments: [], words: [] }
+  }
 }
 
 /* ---------- scoring ---------- */
