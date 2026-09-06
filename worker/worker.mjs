@@ -83,6 +83,26 @@ async function probeDuration(file) {
   return parseFloat(JSON.parse(out).format.duration)
 }
 
+/**
+ * Cheap pre-download duration probe via yt-dlp metadata (no media fetched).
+ * Returns seconds, or null when the URL doesn't report one (then we proceed
+ * to download and probe the file as usual).
+ */
+async function probeUrlDuration(url) {
+  await assertPublicHttpUrl(url)
+  try {
+    const out = await sh('/usr/local/bin/yt-dlp', [
+      '-f', 'bv*[height<=1080]+ba/b[height<=1080]',
+      '--print', 'duration',
+      '--no-download', url,
+    ], { timeout: 1000 * 60 * 2 })
+    const v = parseFloat(out.trim())
+    return Number.isFinite(v) && v > 0 ? v : null
+  } catch {
+    return null
+  }
+}
+
 /* ---------- transcription ---------- */
 
 async function extractAudio(file, dir) {
@@ -489,7 +509,10 @@ async function renderClip(src, moment, dir, idx, transcript, mode = 'smart', mot
   }
 
   // thumbnail (best face frame when tracked, else +3s in)
-  const thumbTs = faces?.thumb_ts ?? moment.start + 3
+  // faces.thumb_ts and moment.start are ABSOLUTE source timestamps, but the
+  // seek below reads the rendered CLIP (relative 0) — so both must be offset
+  // by moment.start, else the seek lands past EOF and produces a blank frame.
+  const thumbTs = faces?.thumb_ts != null ? Math.max(0, faces.thumb_ts - moment.start) : 3
   const thumbPath = path.join(dir, `thumb${idx}.jpg`)
   await sh('ffmpeg', ['-y', '-ss', String(thumbTs), '-i', outFile, '-frames:v', '1', '-q:v', '2', thumbPath])
 
@@ -535,6 +558,23 @@ async function uploadToR2(file, key, contentType = 'video/mp4') {
 
 /* ================= job loop ================= */
 
+/**
+ * Early, cheap gate: probe the URL's duration via yt-dlp metadata and reject
+ * an out-of-plan source BEFORE downloading the media. The authoritative
+ * post-download check still runs (file uploads and live/misreported URLs
+ * rely on it), so this only saves bandwidth/disk on the common reject path.
+ */
+async function ensureWithinPlan(project) {
+  const preDur = await probeUrlDuration(project.sourceUrl)
+  if (!preDur) return
+  const owner = await prisma.user.findUnique({ where: { id: project.userId }, select: { role: true } })
+  if (exceedsPlanMinutes(preDur / 60, owner?.role)) {
+    throw new Error(
+      `Source is ~${Math.round(preDur / 60)} min — exceeds the ${planMaxMinutes(owner?.role)} min limit for the ${owner?.role ?? 'FREE'} plan (pre-download check)`
+    )
+  }
+}
+
 async function processJob(job) {
   const project = await prisma.project.findUnique({ where: { id: job.projectId } })
   if (!project || (!project.sourceUrl && !project.sourceFile)) throw new Error('project has no source')
@@ -548,7 +588,7 @@ async function processJob(job) {
     await setP(8)
     const src = project.sourceFile
       ? await downloadFromR2(project.sourceFile, dir)
-      : await download(project.sourceUrl, dir)
+      : (await ensureWithinPlan(project), await download(project.sourceUrl, dir))
 
     // Probe BEFORE transcribing — a too-long source must fail fast and
     // cheaply instead of paying for transcription of an out-of-plan video.
@@ -590,6 +630,13 @@ async function processJob(job) {
 
     for (let i = 0; i < moments.length; i++) {
       const m = moments[i]
+      // Retry idempotency: a partially-failed run that uploaded clip N and is
+      // re-queued must not duplicate it. Keeping the earlier render is safe.
+      const existing = await prisma.clip.findFirst({ where: { projectId: project.id, sourceStart: m.start } })
+      if (existing) {
+        console.log(`[worker] ${project.id}: clip @${m.start}s already exists — keeping earlier render`)
+        continue
+      }
       const base = `${project.userId}/${project.id}`
       const url = await uploadToR2(files[i].file, `${base}/clip-${i + 1}.mp4`)
       const thumbUrl = await uploadToR2(files[i].thumb, `${base}/thumb-${i + 1}.jpg`, 'image/jpeg')
@@ -650,6 +697,22 @@ async function processJob(job) {
 /** Jobs stuck in `processing` longer than this are assumed lost to a crash. */
 const STALE_JOB_MINUTES = Number(process.env.STALE_JOB_MINUTES ?? 30)
 
+/** How often the loop re-scans for stale `processing` jobs (ms). */
+const STALE_SWEEP_MS = Number(process.env.STALE_SWEEP_MS ?? 5 * 60_000)
+
+async function recoverStale() {
+  try {
+    const staleBefore = new Date(Date.now() - STALE_JOB_MINUTES * 60_000)
+    const revived = await prisma.processingJob.updateMany({
+      where: { status: 'processing', startedAt: { lt: staleBefore } },
+      data: { status: 'queued', startedAt: null },
+    })
+    if (revived.count > 0) console.log(`[worker] requeued ${revived.count} stale job(s)`)
+  } catch (e) {
+    console.error('[worker] stale-job recovery failed:', e.message)
+  }
+}
+
 /**
  * Atomic claim: the conditional updateMany only succeeds for ONE worker —
  * a second worker's claim matches zero rows and it moves on. This closes
@@ -675,19 +738,14 @@ async function claimNextJob() {
 async function loop() {
   console.log(`[worker] online — premium=${CFG.premium}, parallel=${CFG.renderParallel}`)
 
-  // Recover jobs abandoned by a crashed worker before entering the poll loop.
-  try {
-    const staleBefore = new Date(Date.now() - STALE_JOB_MINUTES * 60_000)
-    const revived = await prisma.processingJob.updateMany({
-      where: { status: 'processing', startedAt: { lt: staleBefore } },
-      data: { status: 'queued', startedAt: null },
-    })
-    if (revived.count > 0) console.log(`[worker] requeued ${revived.count} stale job(s)`)
-  } catch (e) {
-    console.error('[worker] stale-job recovery failed:', e.message)
-  }
-
+  let lastSweep = 0
   for (;;) {
+    // Periodic stale-job recovery: also rescues jobs abandoned since boot.
+    if (Date.now() - lastSweep >= STALE_SWEEP_MS) {
+      lastSweep = Date.now()
+      await recoverStale()
+    }
+
     try {
       const job = await claimNextJob()
       if (!job) { await new Promise((r) => setTimeout(r, 5000)); continue }
