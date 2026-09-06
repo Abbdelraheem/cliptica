@@ -20,6 +20,21 @@ import { calcCredits, exceedsPlanMinutes, planMaxMinutes } from './credits.mjs'
 import { assertPublicHttpUrl } from './ssrf.mjs'
 
 const run = promisify(execFile)
+
+// Bootstrap env from the production env file so the worker is never at the
+// mercy of how pm2 / shells were launched. Existing process env wins.
+function loadEnvFile() {
+  const file = process.env.NOLOGY_ENV_FILE ?? '/opt/nology/.env.production'
+  if (typeof process.loadEnvFile === 'function') {
+    try {
+      process.loadEnvFile(file)
+    } catch {
+      /* file absent in dev / non-prod — fall back to process env */
+    }
+  }
+}
+loadEnvFile()
+
 const prisma = new PrismaClient()
 
 const CFG = {
@@ -792,7 +807,13 @@ async function claimNextJob() {
 }
 
 async function loop() {
-  console.log(`[worker] online — premium=${CFG.premium}, parallel=${CFG.renderParallel}`)
+  const envFlags = {
+    db: process.env.DATABASE_URL ? 1 : 0,
+    r2: process.env.R2_ACCESS_KEY_ID && process.env.R2_SECRET_ACCESS_KEY && process.env.R2_ENDPOINT ? 1 : 0,
+    cookies: process.env.YTDLP_COOKIES ? 1 : 0,
+    groq: process.env.GROQ_API_KEY ? 1 : 0,
+  }
+  console.log(`[worker] online — premium=${CFG.premium}, parallel=${CFG.renderParallel}, env=${Object.entries(envFlags).map(([k, v]) => `${k}${v ? '+' : '-'}`).join('')}`)
 
   let lastSweep = 0
   for (;;) {
