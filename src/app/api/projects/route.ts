@@ -5,8 +5,7 @@ import { z } from 'zod'
 import { apiMutationLimiter, enforceRateLimit } from '@/lib/rate-limit'
 import { parseClipFrom } from '@/lib/validation'
 import { planForRole } from '@/lib/stripe'
-
-const MIN_CREDITS_REQUIRED = Number(process.env.MIN_CREDITS_REQUIRED ?? 10)
+import { getSettingNumber } from '@/lib/settings'
 
 const FRAMINGS = ['smart', 'face', 'center', 'blur', 'letter', 'variety'] as const
 const LANGUAGES = ['auto', 'en', 'ar', 'es', 'fr', 'de', 'tr', 'hi', 'pt'] as const
@@ -69,9 +68,10 @@ export async function POST(request: Request) {
     }
 
     // Eligibility gate only — actual usage charged by the worker on real duration.
-    if (user.credits < MIN_CREDITS_REQUIRED) {
+    const minCredits = await getSettingNumber('min_credits_required', process.env.MIN_CREDITS_REQUIRED, 10)
+    if (user.credits < minCredits) {
       return NextResponse.json(
-        { error: 'Insufficient credits', required: MIN_CREDITS_REQUIRED, available: user.credits },
+        { error: 'Insufficient credits', required: minCredits, available: user.credits },
         { status: 402 }
       )
     }

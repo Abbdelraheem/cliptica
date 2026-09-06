@@ -16,8 +16,10 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url)
     const q = searchParams.get('q')?.trim()
     const statusParam = searchParams.get('status')?.trim()
-    const page = Math.max(1, parseInt(searchParams.get('page') || '1'))
-    const limit = Math.min(100, Math.max(1, parseInt(searchParams.get('limit') || '25')))
+    const rawPage = parseInt(searchParams.get('page') || '1', 10)
+    const rawLimit = parseInt(searchParams.get('limit') || '25', 10)
+    const page = Number.isFinite(rawPage) ? Math.max(1, rawPage) : 1
+    const limit = Number.isFinite(rawLimit) ? Math.min(100, Math.max(1, rawLimit)) : 25
 
     const where: Prisma.ProjectWhereInput = {}
     if (q) where.OR = [{ user: { email: { contains: q, mode: 'insensitive' } } }]
