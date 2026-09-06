@@ -119,7 +119,7 @@ async function sh(cmd, args, opts) {
 
 /** Base yt-dlp args: JS runtimes (deno preferred — solves YouTube's n challenge), plus optional cookies file. */
 function ytdlpArgs(extra) {
-  const args = ['--js-runtimes', 'node,deno']
+  const args = ['--js-runtimes', 'node', '--js-runtimes', 'deno']
   if (process.env.YTDLP_COOKIES) args.push('--cookies', process.env.YTDLP_COOKIES)
   return args.concat(extra)
 }
@@ -168,7 +168,7 @@ async function probeUrlDuration(url) {
   await assertPublicHttpUrl(url)
   try {
     const out = await sh('/usr/local/bin/yt-dlp', ytdlpArgs([
-      '-f', 'bv*[height<=1080]+ba/b[height<=1080]',
+    '-f', 'bv*[height<=1080]+ba/b[height<=1080]/b',
       '--print', 'duration',
       '--no-download', url,
     ]), { timeout: 1000 * 60 * 2 })
