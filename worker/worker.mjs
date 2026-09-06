@@ -102,17 +102,24 @@ async function sh(cmd, args, opts) {
   return stdout
 }
 
+/** Base yt-dlp args: use the server's node as JS runtime, plus optional cookies file. */
+function ytdlpArgs(extra) {
+  const args = ['--js-runtimes', 'node']
+  if (process.env.YTDLP_COOKIES) args.push('--cookies', process.env.YTDLP_COOKIES)
+  return args.concat(extra)
+}
+
 /* ================= stages ================= */
 
 async function download(url, dir) {
   await assertPublicHttpUrl(url)
   const out = path.join(dir, 'source.%(ext)s')
-  await sh('/usr/local/bin/yt-dlp', [
+  await sh('/usr/local/bin/yt-dlp', ytdlpArgs([
     '-N', '8',
     '-f', 'bv*[height<=1080]+ba/b[height<=1080]',
     '--merge-output-format', 'mp4',
     '-o', out, url,
-  ])
+  ]))
   return findFile(dir, /^source\./)
 }
 
@@ -145,11 +152,11 @@ async function probeDuration(file) {
 async function probeUrlDuration(url) {
   await assertPublicHttpUrl(url)
   try {
-    const out = await sh('/usr/local/bin/yt-dlp', [
+    const out = await sh('/usr/local/bin/yt-dlp', ytdlpArgs([
       '-f', 'bv*[height<=1080]+ba/b[height<=1080]',
       '--print', 'duration',
       '--no-download', url,
-    ], { timeout: 1000 * 60 * 2 })
+    ]), { timeout: 1000 * 60 * 2 })
     const v = parseFloat(out.trim())
     return Number.isFinite(v) && v > 0 ? v : null
   } catch {
