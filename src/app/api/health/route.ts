@@ -2,8 +2,6 @@ import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 
 export async function GET() {
-  const start = Date.now()
-  
   // Check database connectivity
   let dbStatus = 'healthy'
   let dbLatency = 0
@@ -12,6 +10,7 @@ export async function GET() {
     await prisma.$queryRaw`SELECT 1`
     dbLatency = Date.now() - startDb
   } catch (error) {
+    console.error('DB health check failed:', error)
     dbStatus = 'unhealthy'
   }
   

@@ -34,6 +34,13 @@ yarn-error.log*
 .env*
 !.env.example
 
+# bot secrets & runtime state
+/deploy/tg-bot/.env
+/deploy/tg-bot/models.json
+/deploy/tg-bot/setup-env.sh
+/deploy/tg-bot/test-bot.sh
+*.pem
+
 # vercel
 .vercel
 

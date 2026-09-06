@@ -90,29 +90,18 @@ async function handleCheckoutCompleted(tx: Tx, session: Stripe.Checkout.Session)
 
   if (!userId || !planKey) return
 
-  const plan = PLANS[planKey]
-  const credits = plan.credits
-
+  // Role + subscription mapping only. Credits are granted by the initial
+  // invoice via `invoice.payment_succeeded` — granting here would double the
+  // first period, because checkout.session.completed AND the initial invoice
+  // both fire on a non-trial signup.
   await tx.user.update({
     where: { id: userId },
     data: {
       role: planKey.toUpperCase() as never,
-      credits: { increment: credits },
       stripeCustomerId: session.customer as string,
       stripeSubscriptionId: session.subscription as string,
-      stripePriceId: plan.priceId,
+      stripePriceId: PLANS[planKey].priceId,
       subscriptionStatus: 'active',
-    },
-  })
-
-  // Add credit transaction
-  await tx.creditTransaction.create({
-    data: {
-      userId,
-      amount: credits,
-      type: 'purchase',
-      description: `Subscription to ${plan.name} plan`,
-      metadata: { plan: planKey, sessionId: session.id },
     },
   })
 }
