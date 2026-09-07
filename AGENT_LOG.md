@@ -102,3 +102,17 @@ Date format: YYYY-MM-DD. One entry per completed round (what was checked → wha
 
 **Status**
 - End-to-end works for direct video-file URLs now; YouTube needs a cookies.txt export from the user's browser (logged-out is usually enough) placed on the server + `YTDLP_COOKIES` env + worker restart.
+
+## 2026-09-07 — Round 7: karaoke render fix + YouTube bot-wall bypass (proxy pool)
+
+**Findings/changes**
+- `worker/worker.mjs` karaoke bug: `buildKaraokeAss` indexed `card[i + 1][0]` (current card's word array with the card index) → "Cannot read properties of undefined (reading '0')" crashed every render with >1 card. Fixed to `cards[i + 1][0]?.start`. `e.stack` now logged on FAILED for future diagnosis. Verified full R2 E2E (upload→download→transcribe→score→render→upload→READY).
+- YouTube still bot-checks the EC2 IP even with real cookies (`__Secure-3PSID` etc.). Tested all player clients + `--impersonate` alone → all blocked. The one working recipe: **cookies + `--impersonate Safari-18.4` + HTTP proxy** (proved by full downloads through `103.161.69.252:2698`, `102.68.98.94:3128`, `103.237.102.191:11111`).
+- `worker/worker.mjs`: `ytdlpArgs()` now always passes `--impersonate Safari-18.4`; `download()` tries direct first then rotates a refreshable proxy pool (`ytProxyPool()` reads `/opt/nology/proxies.txt`, falls back to `YTDLP_PROXIES`). yt-dlp binary switched to `/opt/nology-venv/bin/yt-dlp` (pip install, no PyInstaller temp-dir buildup that filled `/` at 100%).
+- New `scripts/refresh-proxies.sh` + systemd timer `nology-proxy-refresh.timer` (OnUnitActiveSec=20min): pulls free proxy lists, keeps HTTP-reachable YouTube candidates in `/opt/nology/proxies.txt`; live validation happens in the worker at download time.
+- `.env.production` (server-only): added `YTDLP_PROXIES_FILE=/opt/nology/proxies.txt`; split the `MOTION_FONT…YTDLP_COOKIES` mashed-together line.
+- Verified: `probeUrlDuration`/`download` both on venv yt-dlp; **YouTube E2E DONE** — project `yte2eproj001` (`watch?v=dQw4w9WgXcQ`) downloaded via proxy `103.237.102.191:11111`, transcribed, scored, rendered 1 clip (h264 1080x1920 12s), uploaded to R2, clip READY, charged 4 credits.
+
+**Notes / next**
+- Free proxies are flaky (die within minutes). For production reliability switch to a paid residential/rotating proxy and bake it into `YTDLP_PROXIES` env; keep the free-pool refresh as the pre-shared fallback.
+- `rm /opt/nology/*.cjs` scratch scripts on next housekeeping; `proxies.txt` is root-owned (`-rw-------`), readable by the root-run worker.

@@ -117,11 +117,28 @@ async function sh(cmd, args, opts) {
   return stdout
 }
 
-/** Base yt-dlp args: JS runtimes (deno preferred — solves YouTube's n challenge), plus optional cookies file. */
+/** Base yt-dlp args: JS runtimes (deno preferred — solves YouTube's n challenge), mandatory impersonate
+ * (server IP is a flagged AWS datacenter; faking a real browser TLS fingerprint is what gets past the
+ * "Sign in to confirm you're not a bot" wall), plus optional cookies file / proxy given via extra. */
 function ytdlpArgs(extra) {
-  const args = ['--js-runtimes', 'node', '--js-runtimes', 'deno']
+  const args = ['--js-runtimes', 'node', '--js-runtimes', 'deno', '--impersonate', 'Safari-18.4']
   if (process.env.YTDLP_COOKIES) args.push('--cookies', process.env.YTDLP_COOKIES)
   return args.concat(extra)
+}
+
+/** Refreshable proxy pool for YouTube. Written by scripts/refresh-proxies.sh
+ * (systemd timer); worker reads the file fresh on every download so a dead
+ * proxy from minutes ago never blocks a job. Falls back to YTDLP_PROXIES env. */
+async function ytProxyPool() {
+  const envList = (process.env.YTDLP_PROXIES ?? '').split(',').map((p) => p.trim()).filter(Boolean)
+  try {
+    const fs = await import('fs/promises')
+    const fileList = (await fs.readFile(process.env.YTDLP_PROXIES_FILE ?? '/opt/nology/proxies.txt', 'utf8'))
+      .split('\n').map((l) => l.trim()).filter(Boolean)
+    return [...fileList, ...envList]
+  } catch {
+    return envList
+  }
 }
 
 /* ================= stages ================= */
@@ -129,13 +146,37 @@ function ytdlpArgs(extra) {
 async function download(url, dir) {
   await assertPublicHttpUrl(url)
   const out = path.join(dir, 'source.%(ext)s')
-  await sh('/usr/local/bin/yt-dlp', ytdlpArgs([
+
+  const attempt = (proxy) => sh('/opt/nology-venv/bin/yt-dlp', ytdlpArgs([
+    ...(proxy ? ['--proxy', proxy] : []),
     '-N', '8',
     '-f', 'bv*[height<=1080]+ba/b[height<=1080]/b',
     '--merge-output-format', 'mp4',
     '-o', out, url,
-  ]))
-  return findFile(dir, /^source\./)
+  ]), { timeout: 1000 * 60 * 10 })
+
+  // Direct first — most stable when YouTube isn't flagging the IP.
+  try {
+    await attempt(null)
+    return await findFile(dir, /^source\./)
+  } catch (e) {
+    console.warn(`[worker] direct download failed: ${e.message.split('\n')[0]} — trying proxies`)
+  }
+
+  // Rotate the refreshable proxy pool. Success is authoritative; on failure
+  // keep the last non-network error (bot-wall etc.) for the job report.
+  let lastErr = null
+  for (const proxy of await ytProxyPool()) {
+    try {
+      await attempt(proxy)
+      console.log(`[worker] downloaded via proxy ${proxy}`)
+      return await findFile(dir, /^source\./)
+    } catch (e) {
+      lastErr = e
+      console.warn(`[worker] proxy ${proxy} failed: ${e.message.split('\n')[0]}`)
+    }
+  }
+  throw lastErr ?? new Error('all download paths failed')
 }
 
 /** Uploaded files live in R2 — pull them with the same AWS creds. */
@@ -167,7 +208,7 @@ async function probeDuration(file) {
 async function probeUrlDuration(url) {
   await assertPublicHttpUrl(url)
   try {
-    const out = await sh('/usr/local/bin/yt-dlp', ytdlpArgs([
+    const out = await sh('/opt/nology-venv/bin/yt-dlp', ytdlpArgs([
     '-f', 'bv*[height<=1080]+ba/b[height<=1080]/b',
       '--print', 'duration',
       '--no-download', url,
@@ -389,7 +430,7 @@ function buildKaraokeAss(words, start, end, emoji) {
   }
   cards.forEach((card, i) => {
     const cs = Math.max(card[0].start, start)
-    let ce = i === cards.length - 1 ? Math.min(card[card.length - 1].end, end) : Math.min(card[card.length - 1].end, card[i + 1][0]?.start ?? end)
+    let ce = i === cards.length - 1 ? Math.min(card[card.length - 1].end, end) : Math.min(card[card.length - 1].end, cards[i + 1][0]?.start ?? end)
     if (ce <= cs) ce = cs + 0.35
     const text = card.map((w) => w.text.replace(/[{}]/g, '')).join(' ')
     events +=
@@ -842,6 +883,7 @@ async function loop() {
         console.log(`[worker] ${job.id}: DONE ✔`)
       } catch (e) {
         console.error(`[worker] ${job.id} FAILED:`, e.message)
+        console.error(e.stack ?? e)
         await prisma.processingJob.update({ where: { id: job.id }, data: { status: 'failed', error: e.message } }).catch(() => {})
         await prisma.project.update({ where: { id: job.projectId }, data: { status: 'FAILED' } }).catch(() => {})
       }
