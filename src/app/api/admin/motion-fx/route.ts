@@ -2,6 +2,7 @@ import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
+import { invalidateSetting } from '@/lib/settings'
 
 const MOTION_FX_KEY = 'motion_fx'
 
@@ -43,6 +44,7 @@ export async function PATCH(request: Request) {
       update: { value: String(parsed.data.enabled) },
       create: { key: MOTION_FX_KEY, value: String(parsed.data.enabled) },
     })
+    invalidateSetting(MOTION_FX_KEY)
 
     return NextResponse.json({ enabled: parsed.data.enabled })
   } catch (error) {

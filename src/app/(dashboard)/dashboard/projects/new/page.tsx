@@ -97,9 +97,14 @@ export default function NewProjectPage() {
   function validate(): string | null {
     if (tab === 'upload' && !uploadedKey) return 'Wait for the upload to finish first.'
     if (tab === 'link') {
+      const s = url.trim()
+      if (!s) return 'Paste a video link.'
+      let candidate = s
+      if (!/^https?:\/\//i.test(candidate)) candidate = `https://${candidate}`
       try {
-        const u = new URL(url)
-        if (!/^https?:$/.test(u.protocol)) throw 0
+        const u = new URL(candidate)
+        if (u.protocol !== 'http:' && u.protocol !== 'https:') throw 0
+        if (!/^[0-9a-zA-Z.\-/?:&=+%_~#@]+$/.test(s)) return 'Paste a valid video link.'
       } catch {
         return 'Paste a valid video link.'
       }

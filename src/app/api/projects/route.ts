@@ -12,10 +12,18 @@ const LANGUAGES = ['auto', 'en', 'ar', 'es', 'fr', 'de', 'tr', 'hi', 'pt'] as co
 
 const createSchema = z.object({
   sourceType: z.enum(['url', 'file']),
-  url: z.string().url().max(500).optional(),
+  // Lenient: trim whitespace and append a protocol when the user pastes a bare
+  // domain/short-link (e.g. "youtu.be/xyz") — otherwise zod .url() rejects it
+  // with a confusing "Invalid input".
+  url: z
+    .string()
+    .max(500)
+    .transform((v) => v.trim())
+    .refine((v) => v.length === 0 || /^[0-9a-zA-Z.\-/?:&=+%_~#@]+$/.test(v), 'Invalid URL characters')
+    .optional(),
   fileKey: z.string().max(300).optional(),
   fileName: z.string().max(200).optional(),
-  title: z.string().min(1).max(120).optional(),
+  title: z.string().trim().min(1).max(120).optional(),
   instructions: z.string().max(2000).optional(),
   /** "mm:ss" or seconds — start clipping here */
   clipFrom: z.union([z.string().regex(/^\d{1,2}:\d{2}(:\d{2})?$/), z.number().int().min(0)]).optional(),
@@ -23,6 +31,52 @@ const createSchema = z.object({
   language: z.enum(LANGUAGES).default('auto'),
   motionFx: z.boolean().default(false),
 })
+
+/** Normalise a pasted link into an absolute https URL. Returns null if invalid. */
+function normaliseUrl(input: string): string | null {
+  let s = input.trim()
+  if (!s) return null
+  if (!/^https?:\/\//i.test(s)) s = `https://${s}`
+  try {
+    const u = new URL(s)
+    return u.protocol === 'http:' || u.protocol === 'https:' ? u.toString() : null
+  } catch {
+    return null
+  }
+}
+
+export async function GET(request: Request) {
+  try {
+    const session = await auth()
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const { searchParams } = new URL(request.url)
+    const rawLimit = parseInt(searchParams.get('limit') ?? '50', 10)
+    const limit = Number.isFinite(rawLimit) ? Math.min(100, Math.max(1, rawLimit)) : 50
+
+    const projects = await prisma.project.findMany({
+      where: { userId: session.user.id },
+      orderBy: { createdAt: 'desc' },
+      take: limit,
+      select: {
+        id: true,
+        title: true,
+        status: true,
+        duration: true,
+        createdAt: true,
+        _count: { select: { clips: true } },
+        clips: { select: { viralScore: true }, orderBy: { viralScore: 'desc' }, take: 1 },
+      },
+    })
+
+    return NextResponse.json({ projects })
+  } catch (error) {
+    console.error('Projects list error:', error)
+    return NextResponse.json({ error: 'Failed to load projects' }, { status: 500 })
+  }
+}
 
 export async function POST(request: Request) {
   try {
@@ -40,8 +94,13 @@ export async function POST(request: Request) {
     }
     const d = parsed.data
 
-    if (d.sourceType === 'url' && !d.url) {
-      return NextResponse.json({ error: 'URL required' }, { status: 400 })
+    let sourceUrl: string | null = null
+    if (d.sourceType === 'url') {
+      const url = d.url ? normaliseUrl(d.url) : null
+      if (!url) {
+        return NextResponse.json({ error: 'Paste a valid video link' }, { status: 400 })
+      }
+      sourceUrl = url
     }
     // Security: uploads may only reference the user's own R2 prefix.
     if (d.sourceType === 'file') {
@@ -56,6 +115,34 @@ export async function POST(request: Request) {
     })
     if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 })
 
+    // Run the independent gate checks in parallel (each is a DB round-trip to a
+    // remote database; sequential execution would compound ~1s each).
+    const plan = planForRole(user.role)
+    const startOfDay = new Date()
+    startOfDay.setHours(0, 0, 0, 0)
+
+    const [minCredits, todaysCount] = await Promise.all([
+      getSettingNumber('min_credits_required', process.env.MIN_CREDITS_REQUIRED, 10),
+      plan
+        ? prisma.project.count({ where: { userId: session.user.id, createdAt: { gte: startOfDay } } })
+        : Promise.resolve(0),
+    ])
+
+    if (user.credits < minCredits) {
+      return NextResponse.json(
+        { error: 'Insufficient credits', required: minCredits, available: user.credits },
+        { status: 402 }
+      )
+    }
+
+    // Per-plan daily cap — keeps one account from monopolising the worker.
+    if (plan && todaysCount >= plan.maxDailyVideos) {
+      return NextResponse.json(
+        { error: 'Daily project limit reached', limit: plan.maxDailyVideos },
+        { status: 429 }
+      )
+    }
+
     // AI motion graphics is an admin-only feature with a global kill switch.
     let motionFx = d.motionFx
     if (motionFx) {
@@ -67,42 +154,17 @@ export async function POST(request: Request) {
       }
     }
 
-    // Eligibility gate only — actual usage charged by the worker on real duration.
-    const minCredits = await getSettingNumber('min_credits_required', process.env.MIN_CREDITS_REQUIRED, 10)
-    if (user.credits < minCredits) {
-      return NextResponse.json(
-        { error: 'Insufficient credits', required: minCredits, available: user.credits },
-        { status: 402 }
-      )
-    }
-
-    // Per-plan daily cap — keeps one account from monopolising the worker.
-    const plan = planForRole(user.role)
-    if (plan) {
-      const startOfDay = new Date()
-      startOfDay.setHours(0, 0, 0, 0)
-      const todaysCount = await prisma.project.count({
-        where: { userId: session.user.id, createdAt: { gte: startOfDay } },
-      })
-      if (todaysCount >= plan.maxDailyVideos) {
-        return NextResponse.json(
-          { error: 'Daily project limit reached', limit: plan.maxDailyVideos },
-          { status: 429 }
-        )
-      }
-    }
-
     const title =
       d.title ??
-      (d.sourceType === 'url' && d.url
-        ? `Project from ${safeHost(d.url)}`
+      (d.sourceType === 'url' && sourceUrl
+        ? `Project from ${safeHost(sourceUrl)}`
         : (d.fileName ?? 'Uploaded project'))
 
     const project = await prisma.project.create({
       data: {
         userId: session.user.id,
         title,
-        sourceUrl: d.sourceType === 'url' ? d.url : null,
+        sourceUrl: d.sourceType === 'url' ? sourceUrl : null,
         sourceFile: d.sourceType === 'file' ? d.fileKey : null,
         duration: 0, // probed by the worker
         instructions: d.instructions,
