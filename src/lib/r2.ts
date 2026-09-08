@@ -34,17 +34,14 @@ export function r2Presign(
   const dateStamp = amzDate.slice(0, 8)
   const credentialScope = `${dateStamp}/${region}/${service}/aws4_request`
 
-  const signedHeaders = method === 'PUT' ? 'host' : 'host'
-
   const query = new URLSearchParams({
     'X-Amz-Algorithm': 'AWS4-HMAC-SHA256',
     'X-Amz-Credential': `${process.env.R2_ACCESS_KEY_ID}/${credentialScope}`,
     'X-Amz-Date': amzDate,
     'X-Amz-Expires': String(expiresInSec),
-    'X-Amz-SignedHeaders': signedHeaders,
+    'X-Amz-SignedHeaders': 'host',
+    'x-amz-content-sha256': 'UNSIGNED-PAYLOAD',
   })
-
-  const payloadHash = method === 'PUT' ? 'UNSIGNED-PAYLOAD' : sha256hex('')
 
   const canonicalUri = `/${bucket}/${key.split('/').map(enc).join('/')}`
   const canonicalQueryString = [...query.entries()]
@@ -53,10 +50,14 @@ export function r2Presign(
     .map(([k, v]) => `${k}=${v}`)
     .join('&')
 
+  // Signed headers: `host` only for plain GET; `content-type` is only signed
+  // when explicitly provided (uploads). Anything signed must appear in
+  // canonicalHeaders AND X-Amz-SignedHeaders.
+  let signedHeaders = 'host'
   let canonicalHeaders = `host:${host}\n`
   if (method === 'PUT' && opts.contentType) {
+    signedHeaders = 'content-type;host'
     canonicalHeaders = `content-type:${opts.contentType}\nhost:${host}\n`
-    query.set('x-amz-content-sha256', 'UNSIGNED-PAYLOAD')
   }
 
   const canonicalRequest = [
@@ -65,7 +66,7 @@ export function r2Presign(
     canonicalQueryString,
     canonicalHeaders,
     signedHeaders,
-    payloadHash === 'UNSIGNED-PAYLOAD' ? 'UNSIGNED-PAYLOAD' : payloadHash,
+    'UNSIGNED-PAYLOAD',
   ].join('\n')
 
   const stringToSign = [
