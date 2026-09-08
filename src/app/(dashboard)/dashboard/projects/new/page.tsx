@@ -8,6 +8,7 @@ import {
   RectangleHorizontal, Shuffle, CloudUpload, CheckCircle2,
   Clapperboard,
 } from 'lucide-react'
+import { fetchWithTimeout } from '@/lib/utils'
 
 const FRAMINGS = [
   { id: 'smart', name: 'Smart framing', desc: 'Crops to the speaker when there is one — center otherwise.', icon: ScanFace },
@@ -50,7 +51,7 @@ export default function NewProjectPage() {
   const [submitting, setSubmitting] = useState(false)
 
   useEffect(() => {
-    fetch('/api/admin/motion-fx')
+    fetchWithTimeout('/api/admin/motion-fx', {}, 8000)
       .then(async (r) => (r.ok ? r.json() : { enabled: false, isAdmin: false }))
       .then((d) => setMotionAvailable(!!d.enabled && !!d.isAdmin))
       .catch(() => setMotionAvailable(false))
@@ -67,11 +68,11 @@ export default function NewProjectPage() {
     // presign → PUT to R2 with progress
     try {
       setPct(0)
-      const sign = await fetch('/api/projects/upload-url', {
+      const sign = await fetchWithTimeout('/api/projects/upload-url', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ filename: f.name, contentType: f.type, sizeMb: +(f.size / 1048576).toFixed(1) }),
-      })
+      }, 20000)
       if (!sign.ok) throw new Error((await sign.json().catch(() => null))?.error ?? 'Sign failed')
       const { uploadUrl, key } = await sign.json()
 
@@ -120,7 +121,7 @@ export default function NewProjectPage() {
     setError('')
     setSubmitting(true)
     try {
-      const res = await fetch('/api/projects', {
+      const res = await fetchWithTimeout('/api/projects', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -135,7 +136,7 @@ export default function NewProjectPage() {
           language,
           motionFx: motionAvailable && motionFx,
         }),
-      })
+      }, 20000)
       if (!res.ok) {
         const data = await res.json().catch(() => null)
         throw new Error(data?.error ?? 'Failed to start clipping')

@@ -40,20 +40,11 @@ export default function BillingPage() {
     setError('')
     setLoading(plan)
     try {
-      const res = await fetch('/api/billing/checkout', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ plan }),
-      })
-      if (!res.ok) {
-        setError('Could not start checkout. Please try again.')
-        setLoading(null)
-        return
-      }
-      const data = await res.json()
-      if (data?.url) window.location.href = data.url
+      // Checkout is a server-side GET redirect (to Stripe Checkout). Navigate
+      // the browser there directly — no JSON round-trip needed.
+      window.location.href = `/api/billing/checkout?plan=${encodeURIComponent(plan)}`
     } catch {
-      setError('Something went wrong. Please try again.')
+      setError('Could not start checkout. Please try again.')
       setLoading(null)
     }
   }

@@ -157,9 +157,12 @@ export default function SettingsPage() {
         <p className="mt-2 text-sm font-light text-mist">
           Deleting your account removes all projects, clips and ledger history. This cannot be undone.
         </p>
-        <button className="btn-lux mt-6 border border-red-400/40 !bg-transparent text-red-300 hover:!bg-red-400/10">
-          Delete account
-        </button>
+        <a
+          href={`mailto:support@getnology.com?subject=${encodeURIComponent('Account deletion request')}&body=${encodeURIComponent(`Please delete my account (${session?.user?.email ?? ''}).`)}`}
+          className="btn-lux mt-6 inline-flex border border-red-400/40 !bg-transparent text-red-300 hover:!bg-red-400/10"
+        >
+          Request account deletion
+        </a>
       </section>
     </div>
   )

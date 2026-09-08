@@ -7,6 +7,7 @@ import { useRouter } from 'next/navigation'
 import { Loader2, Check, ShieldAlert } from 'lucide-react'
 import { Wordmark } from '@/components/logo'
 import { getDeviceId } from '@/lib/fingerprint'
+import { fetchWithTimeout } from '@/lib/utils'
 
 export default function RegisterPage() {
   const router = useRouter()
@@ -26,7 +27,7 @@ export default function RegisterPage() {
     setError('')
     setLoading(true)
     try {
-      const res = await fetch('/api/auth/register', {
+      const res = await fetchWithTimeout('/api/auth/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name, email, password, deviceId }),
@@ -89,9 +90,6 @@ export default function RegisterPage() {
           </Link>
 
           <h1 className="display-md">Create your account</h1>
-          <p className="mt-2 rounded-lg border border-hair bg-surface px-4 py-2.5 text-xs leading-relaxed text-mist-2">
-            Preview build — accounts activate once the backend goes live.
-          </p>
 
           <form onSubmit={handleSubmit} className="mt-7 space-y-4">
             <div>

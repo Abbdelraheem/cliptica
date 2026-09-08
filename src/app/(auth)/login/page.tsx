@@ -7,6 +7,7 @@ import { useRouter } from 'next/navigation'
 import { Loader2, ShieldAlert } from 'lucide-react'
 import { Wordmark } from '@/components/logo'
 import { getDeviceId } from '@/lib/fingerprint'
+import { fetchWithTimeout } from '@/lib/utils'
 
 export default function LoginPage() {
   const router = useRouter()
@@ -32,7 +33,7 @@ export default function LoginPage() {
     setLoading(true)
     try {
       // Pre-check: precise message when this device belongs to another account.
-      const check = await fetch('/api/device/check', {
+      const check = await fetchWithTimeout('/api/device/check', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ deviceId, email }),
@@ -44,7 +45,7 @@ export default function LoginPage() {
       }
 
       // Precise message for accounts that haven't confirmed their email yet.
-      const verification = await fetch('/api/auth/verification-status', {
+      const verification = await fetchWithTimeout('/api/auth/verification-status', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password }),
@@ -93,9 +94,6 @@ export default function LoginPage() {
         <div className="rounded-3xl border border-hair bg-gradient-to-b from-pearl/[0.05] to-pearl/[0.01] p-9 backdrop-blur-xl">
           <p className="text-xs uppercase tracking-[0.3em] text-champagne">Welcome back</p>
           <h1 className="display-md mt-3">Welcome back, creator</h1>
-          <p className="mt-2 rounded-lg border border-hair bg-surface px-4 py-2.5 text-xs leading-relaxed text-mist-2">
-            Preview build — accounts activate once the backend goes live.
-          </p>
 
           <form onSubmit={handleSubmit} className="mt-8 space-y-4">
             <div>
