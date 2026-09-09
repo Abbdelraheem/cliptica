@@ -170,4 +170,25 @@ Date format: YYYY-MM-DD. One entry per completed round (what was checked → wha
 
 **Notes / decision needed**
 - Rate limiting (Upstash) still a NO-OP without `UPSTASH_REDIS_REST_URL/TOKEN` (carried from Round 3) — highest-value config step for launch.
-- `npm audit` flags `next` CRITICAL (RCE on Windows-hosted servers + image-optimizer AVIF RCE) + 6 HIGH — documented in AUDIT_REPORT.md, see Round 10.
+- `npm audit` flags `next` CRITICAL (RCE on Windows-hosted servers + image-optimizer AVIF RCE) + 6 HIGH — documented in AUDIT_REPORT.md, resolved in Round 10.
+
+## 2026-09-09 — Round 10: Security Patching, DB Automation, Nginx Proxy, & Settings Completeness
+
+**Scanned**
+- `package.json`, `next.config.ts`, `prisma/schema.prisma`, `worker/worker.mjs`, `src/app/api/billing/webhook/route.ts`, `src/app/api/projects/route.ts`, `src/app/(dashboard)/dashboard/settings/page.tsx`, `deploy/backup.sh`.
+
+**Findings & Vulnerability Mitigations**
+- CRITICAL CVEs (Next.js 15.5.23): Next.js bumped to `15.5.25` locally and on EC2 to patch critical RCE vulnerabilities GHSA-p293-qw3h-jr36 & GHSA-2xp9-vwfh-vxw4.
+- Security Headers: Added `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin`, `Strict-Transport-Security`, `Permissions-Policy`, and disabled `poweredByHeader` in `next.config.ts`.
+- Stripe Webhook Deadlock & Unhandled Missing Users: Added fallback user resolution by `stripeSubscriptionId` or `stripeCustomerId` in `src/app/api/billing/webhook/route.ts`.
+- Credit Overdraft Prevention: Added atomic upfront balance reservation (10 credits) in `src/app/api/projects/route.ts` and automated settlement/refund in `worker/worker.mjs`.
+- Worker Disk Safety: Added `--max-filesize 2.5G` and duration limits to `yt-dlp` commands; added `cleanOrphanTempDirs()` for `nology-*` temporary folders.
+- Database Indexing: Added performance indexes on `User(email)`, `Project(userId, status)`, `Project(status, createdAt)`, and `Clip(projectId, status)` in `prisma/schema.prisma`.
+- Automated Backups: Added `deploy/export-db.mjs` Prisma fallback for Neon PostgreSQL version mismatches; scheduled daily cron at `/etc/cron.d/nology-backup`.
+- Nginx Reverse Proxy: Installed on EC2 port 80 proxying to `127.0.0.1:3000` with rate limiting, Gzip compression, and security headers. Verified live via `http://13.62.192.145/api/health` (`HTTP 200 OK`).
+- Settings Completeness: Implemented Change Password with bcrypt verification, API Key issuance with `nlg_live_` hashing, Active Sessions management and remote sign-out, and Notification Preference toggles (`notifyOnComplete`, `notifyOnLowCredits`, `notifyOnWeeklyDigest`).
+
+**Verified**
+- Vitest: 7 test files, 64 tests passing (100%), including new comprehensive suite `tests/settings-features.test.ts`.
+- `npx tsc --noEmit` clean; `npm run build` clean (51/51 routes generated).
+- Production deployment on EC2: `git pull`, `npx prisma db push` (synced with Neon), `npm run build`, `pm2 reload nology-web` (clean uptime, zero downtime). Verified live via curl.

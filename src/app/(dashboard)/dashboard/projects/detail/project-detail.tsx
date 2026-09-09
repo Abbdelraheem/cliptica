@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState } from 'react'
 import {
   ArrowLeft, Loader2, AlertTriangle, Download, Sparkles,
   Captions, ScanFace, Clock, Flame, Clapperboard,
+  Copy, Check, Share2,
 } from 'lucide-react'
 
 type Clip = {
@@ -51,6 +52,32 @@ export default function ProjectDetail({ projectId }: { projectId: string }) {
   const [project, setProject] = useState<Project | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [copiedId, setCopiedId] = useState<string | null>(null)
+
+  const copySocialKit = async (c: Clip) => {
+    const hook = c.description || (c.motionGraphics?.headline ? `${c.motionGraphics.headline} — ${c.motionGraphics.kicker}` : 'Watch this viral highlight.')
+    const hashtags = '#shorts #viral #fyp #reels #trending #growth'
+    const postText = `${c.title}\n\n${hook}\n\n${hashtags}`
+    try {
+      await navigator.clipboard.writeText(postText)
+      setCopiedId(`kit-${c.id}`)
+      setTimeout(() => setCopiedId(null), 2500)
+    } catch {
+      /* ignore clipboard rejection */
+    }
+  }
+
+  const copyVideoLink = async (c: Clip) => {
+    const url = c.exportUrl || c.videoUrl
+    if (!url) return
+    try {
+      await navigator.clipboard.writeText(url)
+      setCopiedId(`link-${c.id}`)
+      setTimeout(() => setCopiedId(null), 2500)
+    } catch {
+      /* ignore */
+    }
+  }
 
   const load = useCallback(() => {
     if (!projectId) return Promise.reject(new Error('No project id given'))
@@ -183,32 +210,88 @@ export default function ProjectDetail({ projectId }: { projectId: string }) {
                     )}
                   </div>
                 )}
-                <span className="absolute right-2.5 top-2.5 rounded-lg border border-gold/40 bg-black/70 px-2 py-0.5 font-display text-sm italic text-gold backdrop-blur">
-                  {c.viralScore}%
-                </span>
+                <div className="absolute right-2.5 top-2.5 flex items-center gap-1.5 rounded-lg border border-gold/40 bg-black/75 px-2.5 py-1 font-display text-xs backdrop-blur shadow-sm">
+                  {c.viralScore >= 90 ? (
+                    <span className="flex items-center gap-1 text-gold font-bold">
+                      <Flame className="h-3.5 w-3.5 fill-gold/30" /> {c.viralScore}% VIRAL
+                    </span>
+                  ) : c.viralScore >= 75 ? (
+                    <span className="flex items-center gap-1 text-champagne font-semibold">
+                      <Sparkles className="h-3.5 w-3.5" /> {c.viralScore}% HIGH
+                    </span>
+                  ) : (
+                    <span className="text-white/80 font-medium">{c.viralScore}%</span>
+                  )}
+                </div>
                 {c.motionGraphics?.mode === 'ai-motion' && (
                   <span className="absolute left-2.5 top-2.5 flex items-center gap-1 rounded-lg border border-champagne/40 bg-black/70 px-2 py-0.5 font-mono text-[10px] uppercase tracking-wider text-champagne backdrop-blur">
                     <Clapperboard className="h-3 w-3" /> AI motion
                   </span>
                 )}
               </div>
-              <div className="p-4">
-                <h3 className="truncate text-sm font-medium">{c.title}</h3>
-                <div className="mt-2 flex items-center justify-between text-xs font-light text-mist-2">
-                  <span>{mmss(c.duration)}</span>
-                  {c.hookScore != null && <span>hook {c.hookScore}</span>}
+              <div className="p-4 flex flex-col justify-between flex-1">
+                <div>
+                  <h3 className="line-clamp-2 text-sm font-semibold text-white group-hover:text-gold transition-colors">{c.title}</h3>
+                  <div className="mt-2 flex items-center justify-between text-xs font-light text-mist-2">
+                    <span className="flex items-center gap-1"><Clock className="h-3 w-3" /> {mmss(c.duration)}</span>
+                    {c.hookScore != null && <span className="rounded bg-white/5 px-1.5 py-0.5 font-mono">hook: {c.hookScore}</span>}
+                  </div>
+                  {c.description && (
+                    <div className="mt-2.5 rounded-lg border border-hair-soft bg-white/[0.02] p-2 text-[11px] text-mist leading-relaxed">
+                      <span className="font-semibold text-champagne">AI Hook:</span> {c.description}
+                    </div>
+                  )}
                 </div>
-                {(c.exportUrl || c.videoUrl) && (
-                  <a
-                    href={c.exportUrl ?? c.videoUrl ?? '#'}
-                    download
-                    target="_blank"
-                    rel="noreferrer"
-                    className="btn-lux btn-outline mt-3 w-full !py-2 !text-xs"
-                  >
-                    <Download className="h-3.5 w-3.5" /> Download MP4
-                  </a>
-                )}
+
+                <div className="mt-4 space-y-2 pt-2 border-t border-hair-soft">
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => copySocialKit(c)}
+                      className="btn-lux btn-outline flex-1 !py-1.5 !px-2 !text-xs !font-normal"
+                      title="Copy viral title, hook, and trending hashtags for TikTok/Shorts/Reels"
+                    >
+                      {copiedId === `kit-${c.id}` ? (
+                        <>
+                          <Check className="h-3.5 w-3.5 text-emerald-400" />
+                          <span className="text-emerald-400 font-medium">Copied!</span>
+                        </>
+                      ) : (
+                        <>
+                          <Copy className="h-3.5 w-3.5 text-champagne" />
+                          <span>Copy Social Kit</span>
+                        </>
+                      )}
+                    </button>
+
+                    {(c.exportUrl || c.videoUrl) && (
+                      <button
+                        type="button"
+                        onClick={() => copyVideoLink(c)}
+                        className="btn-lux btn-outline !py-1.5 !px-2.5 !text-xs"
+                        title="Copy direct video stream link"
+                      >
+                        {copiedId === `link-${c.id}` ? (
+                          <Check className="h-3.5 w-3.5 text-emerald-400" />
+                        ) : (
+                          <Share2 className="h-3.5 w-3.5 text-mist-2 hover:text-white" />
+                        )}
+                      </button>
+                    )}
+                  </div>
+
+                  {(c.exportUrl || c.videoUrl) && (
+                    <a
+                      href={c.exportUrl ?? c.videoUrl ?? '#'}
+                      download
+                      target="_blank"
+                      rel="noreferrer"
+                      className="btn-lux btn-primary w-full !py-2 !text-xs !font-medium"
+                    >
+                      <Download className="h-3.5 w-3.5" /> Download 9:16 MP4
+                    </a>
+                  )}
+                </div>
               </div>
             </div>
           ))}
