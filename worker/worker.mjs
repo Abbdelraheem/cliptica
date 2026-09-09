@@ -152,6 +152,8 @@ async function download(url, dir) {
     '-N', '8',
     '-f', 'bv*[height<=1080]+ba/b[height<=1080]/b',
     '--merge-output-format', 'mp4',
+    '--max-filesize', '2.5G',
+    '--match-filter', 'duration <= 7200',
     '-o', out, url,
   ]), { timeout: 1000 * 60 * 10 })
 
