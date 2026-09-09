@@ -3,11 +3,11 @@ import { prisma } from '@/lib/prisma'
 import { stripe } from '@/lib/stripe'
 import { NextResponse } from 'next/server'
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
     const session = await auth()
     if (!session?.user?.id) {
-      return NextResponse.redirect(new URL('/login'))
+      return NextResponse.redirect(new URL('/login', request.url))
     }
 
     const user = await prisma.user.findUnique({
@@ -16,17 +16,19 @@ export async function GET() {
     })
 
     if (!user?.stripeCustomerId) {
-      return NextResponse.redirect(new URL('/dashboard/billing?error=no_customer'))
+      return NextResponse.redirect(new URL('/dashboard/billing?error=no_customer', request.url))
     }
+
+    const baseUrl = process.env.NEXTAUTH_URL || process.env.NEXT_PUBLIC_APP_URL || new URL(request.url).origin
 
     const portalSession = await stripe.billingPortal.sessions.create({
       customer: user.stripeCustomerId,
-      return_url: `${process.env.NEXT_PUBLIC_APP_URL}/dashboard/billing`,
+      return_url: `${baseUrl}/dashboard/billing`,
     })
 
     return NextResponse.redirect(portalSession.url, 303)
   } catch (error) {
     console.error('Portal error:', error)
-    return NextResponse.redirect(new URL('/dashboard/billing?error=portal_failed'))
+    return NextResponse.redirect(new URL('/dashboard/billing?error=portal_failed', request.url))
   }
 }

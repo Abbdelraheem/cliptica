@@ -7,20 +7,20 @@ export async function GET(request: Request) {
   try {
     const session = await auth()
     if (!session?.user?.id) {
-      return NextResponse.redirect(new URL('/login?callbackUrl=/dashboard/billing'))
+      return NextResponse.redirect(new URL('/login?callbackUrl=/dashboard/billing', request.url))
     }
 
     const { searchParams } = new URL(request.url)
     const planKey = searchParams.get('plan') as keyof typeof PLANS
 
     if (!planKey || !PLANS[planKey]) {
-      return NextResponse.redirect(new URL('/dashboard/billing?error=invalid_plan'))
+      return NextResponse.redirect(new URL('/dashboard/billing?error=invalid_plan', request.url))
     }
 
     const plan = PLANS[planKey]
 
     if (!plan.priceId) {
-      return NextResponse.redirect(new URL('/dashboard/billing?error=plan_not_configured'))
+      return NextResponse.redirect(new URL('/dashboard/billing?error=plan_not_configured', request.url))
     }
 
     // Get or create Stripe customer
@@ -30,7 +30,7 @@ export async function GET(request: Request) {
     })
 
     if (!user) {
-      return NextResponse.redirect(new URL('/dashboard/billing?error=user_not_found'))
+      return NextResponse.redirect(new URL('/dashboard/billing?error=user_not_found', request.url))
     }
 
     let customerId = user.stripeCustomerId
@@ -48,6 +48,8 @@ export async function GET(request: Request) {
       })
     }
 
+    const baseUrl = process.env.NEXTAUTH_URL || process.env.NEXT_PUBLIC_APP_URL || new URL(request.url).origin
+
     // Create checkout session
     const checkoutSession = await stripe.checkout.sessions.create({
       customer: customerId,
@@ -59,8 +61,8 @@ export async function GET(request: Request) {
           quantity: 1,
         },
       ],
-      success_url: `${process.env.NEXT_PUBLIC_APP_URL}/dashboard/billing?success=true&session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${process.env.NEXT_PUBLIC_APP_URL}/dashboard/billing?canceled=true`,
+      success_url: `${baseUrl}/dashboard/billing?success=true&session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${baseUrl}/dashboard/billing?canceled=true`,
       metadata: {
         userId: session.user.id,
         plan: planKey,
@@ -76,6 +78,6 @@ export async function GET(request: Request) {
     return NextResponse.redirect(checkoutSession.url!, 303)
   } catch (error) {
     console.error('Checkout error:', error)
-    return NextResponse.redirect(new URL('/dashboard/billing?error=checkout_failed'))
+    return NextResponse.redirect(new URL('/dashboard/billing?error=checkout_failed', request.url))
   }
 }
