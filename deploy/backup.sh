@@ -50,7 +50,9 @@ done
 # Load environment
 if [[ -f /opt/nology/.env.production ]]; then
     set +u
+    set -a
     source /opt/nology/.env.production
+    set +a
     set -u
 fi
 
@@ -122,10 +124,11 @@ mkdir -p "$BACKUP_PATH"
 if [[ "$MODE" != "files" ]]; then
     log_info "Backing up database..."
     if command -v pg_dump &>/dev/null && [[ -n "${DATABASE_URL:-}" ]]; then
-        if pg_dump "$DATABASE_URL" > "$BACKUP_PATH/database.sql" 2>/dev/null; then
-            log_success "Database backup completed"
+        DB_ERR=$(pg_dump "$DATABASE_URL" --schema=public --no-owner --no-privileges -f "$BACKUP_PATH/database.sql" 2>&1 || true)
+        if [[ -s "$BACKUP_PATH/database.sql" ]]; then
+            log_success "Database backup completed ($(du -sh "$BACKUP_PATH/database.sql" | cut -f1))"
         else
-            log_warn "Database backup failed with pg_dump"
+            log_warn "Database backup failed: $DB_ERR"
         fi
     else
         log_warn "Database backup skipped (pg_dump not available or DATABASE_URL not set)"
