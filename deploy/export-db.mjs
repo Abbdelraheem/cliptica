@@ -1,4 +1,4 @@
-﻿import { PrismaClient } from '@prisma/client'
+import { PrismaClient } from '@prisma/client'
 import fs from 'fs'
 
 const prisma = new PrismaClient()
@@ -42,12 +42,12 @@ async function exportAll() {
     }
 
     fs.writeFileSync(targetFile, JSON.stringify(dump, null, 2), 'utf-8')
-    console.log(Exported database cleanly to \)
+    console.log('Exported database cleanly to ' + targetFile)
   } catch (err) {
     console.error('Failed to export database:', err)
     process.exit(1)
   } finally {
-    await prisma.()
+    await prisma.$disconnect()
   }
 }
 
