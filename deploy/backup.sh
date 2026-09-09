@@ -123,15 +123,21 @@ mkdir -p "$BACKUP_PATH"
 # Backup database
 if [[ "$MODE" != "files" ]]; then
     log_info "Backing up database..."
+    DUMPED=false
     if command -v pg_dump &>/dev/null && [[ -n "${DATABASE_URL:-}" ]]; then
         DB_ERR=$(pg_dump "$DATABASE_URL" --schema=public --no-owner --no-privileges -f "$BACKUP_PATH/database.sql" 2>&1 || true)
         if [[ -s "$BACKUP_PATH/database.sql" ]]; then
-            log_success "Database backup completed ($(du -sh "$BACKUP_PATH/database.sql" | cut -f1))"
-        else
-            log_warn "Database backup failed: $DB_ERR"
+            log_success "Database SQL backup completed ($(du -sh "$BACKUP_PATH/database.sql" | cut -f1))"
+            DUMPED=true
         fi
-    else
-        log_warn "Database backup skipped (pg_dump not available or DATABASE_URL not set)"
+    fi
+    if [[ "$DUMPED" != "true" ]]; then
+        log_info "Running Prisma JSON database export fallback..."
+        if node /opt/nology/deploy/export-db.mjs "$BACKUP_PATH/database.json" 2>&1; then
+            log_success "Database JSON backup completed ($(du -sh "$BACKUP_PATH/database.json" | cut -f1))"
+        else
+            log_warn "Database backup could not be completed"
+        fi
     fi
 fi
 
