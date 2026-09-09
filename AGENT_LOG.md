@@ -192,3 +192,20 @@ Date format: YYYY-MM-DD. One entry per completed round (what was checked → wha
 - Vitest: 7 test files, 64 tests passing (100%), including new comprehensive suite `tests/settings-features.test.ts`.
 - `npx tsc --noEmit` clean; `npm run build` clean (51/51 routes generated).
 - Production deployment on EC2: `git pull`, `npx prisma db push` (synced with Neon), `npm run build`, `pm2 reload nology-web` (clean uptime, zero downtime). Verified live via curl.
+
+## 2026-09-09 — Round 11: SEO, Design System, Social Kit, & Billing URL Defect Elimination
+
+**Scanned**
+- Root metadata, App Router SEO structure (`robots.ts`, `sitemap.ts`), `DESIGN_SYSTEM.md`, `COMPETITIVE_GAP_ANALYSIS.md`, `src/app/(dashboard)/dashboard/projects/detail/project-detail.tsx`, `src/app/(dashboard)/dashboard/billing/page.tsx`, `src/app/api/billing/checkout/route.ts`, `src/app/api/billing/portal/route.ts`.
+
+**Findings & Remediations**
+- Missing SEO Crawl Infrastructure: Created native Next.js App Router `src/app/robots.ts` and `src/app/sitemap.ts`. Verified live via Nginx port 80 proxy (`/robots.txt` HTTP 200 OK, `/sitemap.xml` HTTP 200 OK).
+- Design System Documentation: Produced `DESIGN_SYSTEM.md` detailing surfaces (`--onyx`, `--onyx-2`, `--surface`), Forge Orange accents (`--gold`, `--gold-2`, `--champagne`), typography scale, glassmorphic elevation, and WCAG AA contrast calibrations.
+- Competitive Gap Closure vs Opus Clip: Created `COMPETITIVE_GAP_ANALYSIS.md` benchmarking against Opus Clip and Vizard.ai across 8 capability vectors. Implemented the top-ROI gap: Instant Social Post Kit in `project-detail.tsx` with AI Virality Insight callout, tiered viral score badges, and 1-click clipboard copy for TikTok/Reels/Shorts captions and hashtags.
+- CRITICAL Billing Defect: In `src/app/api/billing/checkout/route.ts` and `src/app/api/billing/portal/route.ts`, relative calls to `new URL('/login')` without a request base threw unhandled `TypeError: Invalid URL` in Node.js, crashing unauthenticated and error redirects with HTTP 500. Fixed by providing `request.url` base and `baseUrl` fallbacks.
+- Billing Role Awareness: Dynamic plan role detection in `dashboard/billing` replaces static hardcoded `current: true` for Free tier, allowing Clipper and Studio users to manage subscriptions via Stripe Customer Portal.
+
+**Verified**
+- Vitest: 8 test files, 68 tests passing (100%), including new regression suite `tests/billing-redirects.test.ts`.
+- `npx tsc --noEmit` clean; `npm run build` clean (53/53 pages generated).
+- EC2 Live Verification: `curl -sI http://127.0.0.1:3000/api/billing/checkout?plan=clipper` correctly returns `HTTP 307 Temporary Redirect` to `/login?callbackUrl=/dashboard/billing`. Nginx port 80 verified. PM2 `nology-web` reloaded cleanly with zero downtime.
