@@ -15,8 +15,8 @@
 
   /* Ink */
   --pearl: #ffffff;
-  --mist: rgba(255, 255, 255, 0.6);
-  --mist-2: rgba(255, 255, 255, 0.38);
+  --mist: rgba(255, 255, 255, 0.75);
+  --mist-2: rgba(255, 255, 255, 0.58);
 
   /* Forge accent */
   --champagne: #ff7a3d;
@@ -176,6 +176,12 @@ body {
   padding: 13px 28px;
   transition: all 0.3s var(--ease-lux);
   white-space: nowrap;
+}
+.btn-lux:focus-visible,
+button:focus-visible,
+a:focus-visible {
+  outline: 2px solid var(--champagne);
+  outline-offset: 3px;
 }
 .btn-primary,
 .btn-gold {

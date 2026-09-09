@@ -160,28 +160,62 @@ export async function POST(request: Request) {
         ? `Project from ${safeHost(sourceUrl)}`
         : (d.fileName ?? 'Uploaded project'))
 
-    const project = await prisma.project.create({
-      data: {
-        userId: session.user.id,
-        title,
-        sourceUrl: d.sourceType === 'url' ? sourceUrl : null,
-        sourceFile: d.sourceType === 'file' ? d.fileKey : null,
-        duration: 0, // probed by the worker
-        instructions: d.instructions,
-        clipFrom: parseClipFrom(d.clipFrom),
-        framing: d.framing,
-        language: d.language,
-        motionFx,
-        status: 'PENDING',
-      },
-    })
+    // Atomic credit reservation: hold minCredits upfront so concurrent requests
+    // cannot overdraft the balance. The worker deducts any remaining balance
+    // upon completion or refunds minCredits if the job fails.
+    const project = await prisma.$transaction(async (tx) => {
+      const u = await tx.user.findUnique({
+        where: { id: session.user.id },
+        select: { credits: true },
+      })
+      if (!u || u.credits < minCredits) {
+        throw new Error('INSUFFICIENT_CREDITS')
+      }
 
-    await prisma.processingJob.create({
-      data: { projectId: project.id, type: 'clip_generation', status: 'queued' },
+      await tx.user.update({
+        where: { id: session.user.id },
+        data: { credits: { decrement: minCredits } },
+      })
+
+      await tx.creditTransaction.create({
+        data: {
+          userId: session.user.id,
+          amount: -minCredits,
+          type: 'usage',
+          description: `Credit reservation for "${title.slice(0, 60)}"`,
+          metadata: { minCreditsReserved: minCredits },
+        },
+      })
+
+      const p = await tx.project.create({
+        data: {
+          userId: session.user.id,
+          title,
+          sourceUrl: d.sourceType === 'url' ? sourceUrl : null,
+          sourceFile: d.sourceType === 'file' ? d.fileKey : null,
+          duration: 0, // probed by the worker
+          instructions: d.instructions,
+          clipFrom: parseClipFrom(d.clipFrom),
+          framing: d.framing,
+          language: d.language,
+          motionFx,
+          status: 'PENDING',
+          creditsUsed: minCredits, // tracks reserved credits
+        },
+      })
+
+      await tx.processingJob.create({
+        data: { projectId: p.id, type: 'clip_generation', status: 'queued' },
+      })
+
+      return p
     })
 
     return NextResponse.json({ id: project.id }, { status: 201 })
   } catch (error) {
+    if ((error as Error)?.message === 'INSUFFICIENT_CREDITS') {
+      return NextResponse.json({ error: 'Insufficient credits' }, { status: 402 })
+    }
     console.error('Project creation error:', error)
     return NextResponse.json({ error: 'Failed to create project' }, { status: 500 })
   }

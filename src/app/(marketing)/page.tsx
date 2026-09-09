@@ -568,17 +568,17 @@ const PLANS = [
     price: 0,
     credits: '40 credits / month',
     blurb: 'See the magic on your own footage.',
-    features: ['~1 hr of video processed', 'All caption styles', '9:16 face-tracked exports', 'Watermark-free MP4s'],
+    features: ['~40 min of video processed', 'All caption styles', '9:16 face-tracked exports', 'Watermarked 720p exports'],
     cta: 'Start Free',
     featured: false,
   },
   {
-    name: 'Creator',
+    name: 'Clipper',
     price: 19,
-    credits: '400 credits / month',
+    credits: '300 credits / month',
     blurb: 'For daily posters building an audience.',
-    features: ['~10 hrs of video processed', 'Everything in Free', 'Brand kit + saved presets', 'Campaign ledger & calendar', 'Priority rendering queue'],
-    cta: 'Go Creator',
+    features: ['~5 hrs of video processed', 'Everything in Free', 'Watermark-free 1080p', 'Campaign ledger & calendar', 'Priority rendering queue'],
+    cta: 'Go Clipper',
     featured: true,
   },
   {
@@ -586,7 +586,7 @@ const PLANS = [
     price: 49,
     credits: '1,200 credits / month',
     blurb: 'For teams and agencies at scale.',
-    features: ['~30 hrs of video processed', 'Everything in Creator', 'Multiple brand kits', 'Team seats included', 'API access'],
+    features: ['~20 hrs of video processed', 'Everything in Clipper', 'Multiple brand kits', 'Team seats included', 'API access'],
     cta: 'Go Studio',
     featured: false,
   },
@@ -600,7 +600,7 @@ function Pricing() {
         Cheaper than <span className="gold-text">one edit</span>
       </h2>
       <p className="mt-4 max-w-lg text-mist rv">
-        1 credit ≈ 1 minute of source video. Unused credits roll over for 30 days.
+        1 credit ≈ 1 minute of source video. Credits refresh every monthly billing cycle.
       </p>
       <div className="mt-14 grid gap-6 lg:grid-cols-3">
         {PLANS.map((p, i) => (

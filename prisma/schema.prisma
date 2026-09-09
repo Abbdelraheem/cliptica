@@ -69,6 +69,9 @@ model User {
   creditTransactions      CreditTransaction[]
   passwordResetTokens     PasswordResetToken[]
   emailVerificationTokens EmailVerificationToken[]
+
+  @@index([stripeCustomerId])
+  @@index([stripeSubscriptionId])
 }
 
 /// One physical browser/device can ever be linked to exactly ONE account.
@@ -152,6 +155,7 @@ model Project {
   processingJobs ProcessingJob[]
 
   @@index([userId, createdAt])
+  @@index([status, createdAt])
 }
 
 model ProcessingJob {
@@ -202,6 +206,7 @@ model Clip {
   payouts       Payout[]
 
   @@index([projectId, viralScore])
+  @@index([projectId, sourceStart])
   @@index([userId])
 }
 

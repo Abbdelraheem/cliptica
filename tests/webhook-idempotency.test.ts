@@ -1,16 +1,18 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-const { create, userUpdate, creditTransactionCreate, constructEvent } = vi.hoisted(() => ({
+const { create, userUpdate, userFindFirst, creditTransactionCreate, constructEvent, subscriptionRetrieve } = vi.hoisted(() => ({
   create: vi.fn(),
   userUpdate: vi.fn(),
+  userFindFirst: vi.fn(),
   creditTransactionCreate: vi.fn(),
   constructEvent: vi.fn(),
+  subscriptionRetrieve: vi.fn(),
 }))
 
 vi.mock('@/lib/prisma', () => {
   const tx = {
     processedWebhookEvent: { create },
-    user: { update: userUpdate },
+    user: { update: userUpdate, findFirst: userFindFirst },
     creditTransaction: { create: creditTransactionCreate },
   }
   return {
@@ -23,7 +25,10 @@ vi.mock('@/lib/prisma', () => {
 })
 
 vi.mock('@/lib/stripe', () => ({
-  stripe: { webhooks: { constructEvent } },
+  stripe: {
+    webhooks: { constructEvent },
+    subscriptions: { retrieve: subscriptionRetrieve },
+  },
   PLANS: { clipper: { name: 'Clipper', credits: 300, priceId: 'price_x' } },
   getPlanFromPriceId: () => 'clipper',
 }))
@@ -63,15 +68,38 @@ function makeRequest() {
   })
 }
 
+function makeInvoiceEvent(id: string) {
+  return {
+    id,
+    type: 'invoice.payment_succeeded',
+    data: {
+      object: {
+        id: 'inv_1',
+        customer: 'cus_1',
+        subscription: 'sub_1',
+        lines: { data: [{ price: { id: 'price_x' } }] },
+      },
+    },
+  }
+}
+
 describe('Stripe webhook idempotency (atomic insert-first transaction)', () => {
   beforeEach(() => {
     create.mockReset()
     userUpdate.mockReset()
+    userFindFirst.mockReset()
     creditTransactionCreate.mockReset()
     constructEvent.mockReset()
+    subscriptionRetrieve.mockReset()
     create.mockResolvedValue({})
     userUpdate.mockResolvedValue({})
+    userFindFirst.mockResolvedValue({ id: 'u1' })
     creditTransactionCreate.mockResolvedValue({})
+    subscriptionRetrieve.mockResolvedValue({
+      id: 'sub_1',
+      metadata: { userId: 'u1' },
+      items: { data: [{ price: { id: 'price_x' } }] },
+    })
   })
 
   it('rejects events that fail signature verification with 400', async () => {
@@ -97,7 +125,7 @@ describe('Stripe webhook idempotency (atomic insert-first transaction)', () => {
   })
 
   it('records the event BEFORE processing so concurrent retries lose the race', async () => {
-    constructEvent.mockReturnValue(makeEvent('evt_race'))
+    constructEvent.mockReturnValue(makeInvoiceEvent('evt_race'))
 
     await jsonRes(await POST(makeRequest()))
 
@@ -109,13 +137,22 @@ describe('Stripe webhook idempotency (atomic insert-first transaction)', () => {
     )
   })
 
-  it('processes a fresh event exactly once on success', async () => {
-    constructEvent.mockReturnValue(makeEvent('evt_new'))
+  it('processes checkout and invoice events exactly once on success', async () => {
+    // Checkout maps role without granting double credits
+    constructEvent.mockReturnValue(makeEvent('evt_checkout'))
+    const res1 = await jsonRes(await POST(makeRequest()))
+    expect(res1.status).toBe(200)
+    expect(res1.body).toEqual({ received: true })
+    expect(userUpdate).toHaveBeenCalledTimes(1)
+    expect(creditTransactionCreate).not.toHaveBeenCalled()
 
-    const { status, body } = await jsonRes(await POST(makeRequest()))
-
-    expect(status).toBe(200)
-    expect(body).toEqual({ received: true })
+    // Invoice renewal grants credits and writes transaction
+    userUpdate.mockClear()
+    creditTransactionCreate.mockClear()
+    constructEvent.mockReturnValue(makeInvoiceEvent('evt_invoice'))
+    const res2 = await jsonRes(await POST(makeRequest()))
+    expect(res2.status).toBe(200)
+    expect(res2.body).toEqual({ received: true })
     expect(userUpdate).toHaveBeenCalledTimes(1)
     expect(creditTransactionCreate).toHaveBeenCalledTimes(1)
   })

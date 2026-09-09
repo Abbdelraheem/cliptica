@@ -116,3 +116,58 @@ Date format: YYYY-MM-DD. One entry per completed round (what was checked → wha
 **Notes / next**
 - Free proxies are flaky (die within minutes). For production reliability switch to a paid residential/rotating proxy and bake it into `YTDLP_PROXIES` env; keep the free-pool refresh as the pre-shared fallback.
 - `rm /opt/nology/*.cjs` scratch scripts on next housekeeping; `proxies.txt` is root-owned (`-rw-------`), readable by the root-run worker.
+
+## 2026-09-08 — Round 8: web app hang + "Invalid input" + broken clip playback
+
+**Scanned**
+- `src/app/api/projects/route.ts`, `src/app/api/projects/[id]/route.ts`, `src/app/api/projects/upload-url/route.ts`, `src/lib/r2.ts`, `src/lib/settings.ts`, `src/app/api/admin/motion-fx/route.ts`, dashboard/projects pages, `src/components/dashboard-layout.tsx`.
+
+**Findings**
+- CRITICAL (hang): `clip.videoUrl`/`thumbnailUrl`/`exportUrl` stored the RAW R2 storage endpoint (`https://<acct>.r2.cloudflarestorage.com/...`), which needs SigV4 — anonymous browser GET returns 400. The `<video src>` in the project detail page spun forever. Confirmed live: `curl -A 'Mozilla/5.0' <storage-url> → 400 (size 113B)`.
+- CRITICAL (405): `GET /api/projects` did not exist (only `POST`) — the projects list page AND dashboard overview both `fetch('/api/projects')` and got 405 → "Failed to load projects" on both.
+- Root hang cause #2: DB is remote Neon in `us-east-2` while the server is `eu-north-1` — every query ~1000ms (even `SELECT 1` measured 1017–1049ms across 3 runs). Every page load chains several queries (auth → settings → list).
+- MEDIUM: URL validation `z.string().url()` rejected bare/short links and pastes with trailing spaces → frequent "Invalid input" 400s.
+
+**Changes**
+- `src/app/api/projects/route.ts` — added `GET` handler (list by userId, take≤100); lenient URL (`normaliseUrl`: trim + prepend `https://` when missing), parallelized the min-credits/daily-cap gate queries.
+- `src/lib/r2.ts` — refactored into a shared `r2Presign()` (SigV4 GET/PUT, `UNSIGNED-PAYLOAD`) + new `r2PresignGet()`; kept `r2PresignPut()`.
+- `src/app/api/projects/[id]/route.ts` — signs every clip `videoUrl/thumbnailUrl/exportUrl` on read via `r2PresignGet(key)` (7200s).
+- `src/lib/settings.ts` — 30s TTL in-memory cache for settings (cuts repeated remote-DB reads); `invalidateSetting()` exported.
+- `src/app/api/admin/motion-fx/route.ts` — invalidates the `motion_fx` cache entry on PATCH.
+
+**Verified**
+- `npx tsc --noEmit` clean. Presigned GET live: previously 400, after fix `curl <presigned> → 200 size=6679008B`, `ffprobe` reads `12.007s` h264/aac. GET /api/projects (unauth) → 307 redirect to login (middleware) instead of 405.
+
+**Deploy/publish**
+- `f9e36ea` (web fixes) + `6e7f9d5` (presign GET UNSIGNED-PAYLOAD fix) pushed; server `git pull --ff-only`, `npm run build` OK, `pm2 reload nology-web`. Health healthy (new pid). Worker untouched.
+
+**Notes / decision needed**
+- The Neon ~1000ms/query latency is infra, not code — on the free plan it can't be dialed down (no "never suspend"/region move). Code-side mitigations shipped: settings cache + parallelized gates. Flagged to owner.
+
+## 2026-09-09 — Round 9: UX jeleza — request timeouts, stale copy, billing/delete buttons
+
+**Scanned**
+- `src/lib/utils.ts`, auth login/register pages, `new` project page, `billing/page.tsx`, `settings/page.tsx`, plus a full read-only sweep of remaining API routes (auth forgot/reset/verify/resend, admin users/payments/payouts/projects/settings/jobs-retry) for a technical audit.
+
+**Findings**
+- MEDIUM: no fetch abort/timeouts — a hung backend left login/register/new-project spinners spinning forever ("site hangs a lot").
+- LOW: stale "Preview build — accounts activate once the backend goes live" copy on login+register (backend is live now).
+- MEDIUM: `billing/page.tsx` called `POST /api/billing/checkout` but the route only defines `GET` → upgrade button broke with "Could not start checkout".
+- LOW: settings "Delete account" button had no handler (dead button). Honest-ified to a mailto "Request account deletion".
+- Audit of remaining auth/resend/verify/admin routes: clean (enumeration-safe responses, rate-limited, single-use hashed tokens, ownership checks, NaN-safe pagination, self-role-change guard on admin users/[id]/role).
+
+**Changes**
+- `src/lib/utils.ts` — new `fetchWithTimeout()` (AbortController, 15s default).
+- login/register/new-project — switched to `fetchWithTimeout()`; removed stale preview copy.
+- `billing/page.tsx` — checkout now navigates `window.location.href = /api/billing/checkout?plan=…` (server-side GET redirect).
+- `settings/page.tsx` — delete → mailto support request.
+
+**Verified**
+- `npx tsc --noEmit` clean. `npx vitest run`: 6 files, 57 passed / 2 failed (the 2 failures are `webhook-idempotency.test.ts` assertion-call-order + a mock that is unrelated to these changes — pre-existing).
+
+**Deploy/publish**
+- `cb5e4ad` pushed; server ff-pull + build + `pm2 reload nology-web`; health healthy.
+
+**Notes / decision needed**
+- Rate limiting (Upstash) still a NO-OP without `UPSTASH_REDIS_REST_URL/TOKEN` (carried from Round 3) — highest-value config step for launch.
+- `npm audit` flags `next` CRITICAL (RCE on Windows-hosted servers + image-optimizer AVIF RCE) + 6 HIGH — documented in AUDIT_REPORT.md, see Round 10.

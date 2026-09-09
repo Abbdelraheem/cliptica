@@ -787,30 +787,44 @@ async function processJob(job) {
     await prisma.project.update({ where: { id: project.id }, data: { status: 'COMPLETED' } })
 
     // Charge real usage on completion: 1 credit/min of source video, +2 flat when AI motion was actually applied.
-    // The user's balance is the hard floor — we charge what exists so a
-    // concurrent purchase can never drive credits below zero.
+    // minCredits was already reserved upfront at project creation.
     const creditsSpent = calcCredits(duration, fx)
+    const alreadyPaid = Math.max(0, project.creditsUsed ?? 0)
+    const diff = creditsSpent - alreadyPaid
+
     await prisma.$transaction(async (tx) => {
-      const owner = await tx.user.findUnique({ where: { id: project.userId }, select: { credits: true } })
-      const charged = Math.max(0, Math.min(creditsSpent, owner?.credits ?? 0))
-      if (charged > 0) {
-        await tx.user.update({ where: { id: project.userId }, data: { credits: { decrement: charged } } })
+      if (diff > 0) {
+        const owner = await tx.user.findUnique({ where: { id: project.userId }, select: { credits: true } })
+        const charged = Math.max(0, Math.min(diff, owner?.credits ?? 0))
+        if (charged > 0) {
+          await tx.user.update({ where: { id: project.userId }, data: { credits: { decrement: charged } } })
+          await tx.creditTransaction.create({
+            data: {
+              userId: project.userId,
+              amount: -charged,
+              type: 'usage',
+              description: `Clipping completion "${project.title}" (${Math.round(duration / 60)} min${fx ? ' · AI motion' : ''})`,
+              metadata: { projectId: project.id, totalCost: creditsSpent, reserved: alreadyPaid },
+            },
+          })
+        }
+      } else if (diff < 0) {
+        // Video cost less than upfront reservation -> refund difference
+        const refundAmount = Math.abs(diff)
+        await tx.user.update({ where: { id: project.userId }, data: { credits: { increment: refundAmount } } })
         await tx.creditTransaction.create({
           data: {
             userId: project.userId,
-            amount: -charged,
-            type: 'usage',
-            description: `Clipping "${project.title}" (${Math.round(duration / 60)} min${fx ? ' · AI motion' : ''})`,
-            metadata: { projectId: project.id },
+            amount: refundAmount,
+            type: 'refund',
+            description: `Adjustment refund for "${project.title}"`,
+            metadata: { projectId: project.id, totalCost: creditsSpent, reserved: alreadyPaid },
           },
         })
       }
-      if (charged < creditsSpent) {
-        console.log(`[worker] ${project.id}: balance covered ${charged}/${creditsSpent} credits`)
-      }
     })
     await prisma.project.update({ where: { id: project.id }, data: { creditsUsed: creditsSpent } })
-    console.log(`[worker] charged up to ${creditsSpent} credits for ${project.id}`)
+    console.log(`[worker] settled ${creditsSpent} total credits for ${project.id} (alreadyPaid=${alreadyPaid}, diff=${diff})`)
   } finally {
     await rm(dir, { recursive: true, force: true }).catch(() => {})
   }
@@ -827,6 +841,28 @@ async function recoverStale() {
     if (revived.count > 0) console.log(`[worker] requeued ${revived.count} stale job(s)`)
   } catch (e) {
     console.error('[worker] stale-job recovery failed:', e.message)
+  }
+}
+
+/** Remove abandoned nology-* directories in tmpdir older than 1 hour */
+async function cleanOrphanTempDirs() {
+  try {
+    const fs = await import('fs/promises')
+    const tDir = tmpdir()
+    const entries = await fs.readdir(tDir)
+    const now = Date.now()
+    for (const entry of entries) {
+      if (entry.startsWith('nology-')) {
+        const fullPath = path.join(tDir, entry)
+        const stat = await fs.stat(fullPath).catch(() => null)
+        if (stat && stat.isDirectory() && now - stat.mtimeMs > 60 * 60 * 1000) {
+          await fs.rm(fullPath, { recursive: true, force: true }).catch(() => {})
+          console.log(`[worker] cleaned orphan temp dir: ${entry}`)
+        }
+      }
+    }
+  } catch {
+    // Non-blocking
   }
 }
 
@@ -867,10 +903,11 @@ async function loop() {
     // time — refresh the live config each loop (cheap, 60s cache).
     await syncConfigInto()
 
-    // Periodic stale-job recovery: also rescues jobs abandoned since boot.
+    // Periodic stale-job recovery & orphan directory cleanup:
     if (Date.now() - lastSweep >= 5 * 60_000) {
       lastSweep = Date.now()
       await recoverStale()
+      await cleanOrphanTempDirs()
     }
 
     try {
@@ -886,6 +923,29 @@ async function loop() {
         console.error(e.stack ?? e)
         await prisma.processingJob.update({ where: { id: job.id }, data: { status: 'failed', error: e.message } }).catch(() => {})
         await prisma.project.update({ where: { id: job.projectId }, data: { status: 'FAILED' } }).catch(() => {})
+
+        // Refund any upfront reserved credits so a failed run never penalises the user
+        try {
+          const p = await prisma.project.findUnique({ where: { id: job.projectId }, select: { userId: true, creditsUsed: true, title: true } })
+          if (p && p.creditsUsed > 0) {
+            await prisma.$transaction([
+              prisma.user.update({ where: { id: p.userId }, data: { credits: { increment: p.creditsUsed } } }),
+              prisma.creditTransaction.create({
+                data: {
+                  userId: p.userId,
+                  amount: p.creditsUsed,
+                  type: 'refund',
+                  description: `Refund: Processing failed for "${p.title.slice(0, 50)}"`,
+                  metadata: { projectId: job.projectId },
+                },
+              }),
+              prisma.project.update({ where: { id: job.projectId }, data: { creditsUsed: 0 } }),
+            ])
+            console.log(`[worker] refunded ${p.creditsUsed} credits for failed project ${job.projectId}`)
+          }
+        } catch (refErr) {
+          console.error(`[worker] refund failed for ${job.projectId}:`, refErr.message)
+        }
       }
     } catch (e) {
       console.error('[worker] loop error:', e.message)

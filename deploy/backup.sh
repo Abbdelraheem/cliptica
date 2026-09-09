@@ -47,14 +47,11 @@ while [[ $# -gt 0 ]]; do
     shift
 done
 
-log_info() { echo -e "${BLUE}[INFO]${NC} $1"; }
-log_success() { echo -e "${GREEN}[OK]${NC} $1"; }
-log_warn() { echo -e "${YELLOW}[WARN]${NC} $1"; }
-log_error() { echo -e "${RED}[ERROR]${NC} $1"; }
-
 # Load environment
 if [[ -f /opt/nology/.env.production ]]; then
+    set +u
     source /opt/nology/.env.production
+    set -u
 fi
 
 # Create backup directory
@@ -63,10 +60,10 @@ mkdir -p /opt/nology-backups
 # List backups
 if [[ "$LIST_ONLY" == "true" ]]; then
     echo "Available backups:"
-    ls -dt /opt/nology-backups/nology-backup-* 2>/dev/null | while read backup; do
-        local size=$(du -sh "$backup" 2>/dev/null | cut -f1)
-        local date=$(stat -c %y "$backup" | cut -d' ' -f1)
-        echo "  $(basename "$backup") - $date - $size"
+    ls -dt /opt/nology-backups/nology-backup-* 2>/dev/null | while read -r backup; do
+        SIZE=$(du -sh "$backup" 2>/dev/null | cut -f1)
+        DATE=$(stat -c %y "$backup" | cut -d' ' -f1)
+        echo "  $(basename "$backup") - $DATE - $SIZE"
     done
     exit 0
 fi
@@ -90,15 +87,15 @@ if [[ -n "$RESTORE_NAME" ]]; then
     pm2 stop all 2>/dev/null || true
     
     # Restore database
-    if [[ -f "$RESTORE_NAME/database.sql" ]]; then
+    if [[ -f "$BACKUP_PATH/database.sql" ]]; then
         log_info "Restoring database..."
-        psql "$DATABASE_URL" < "$RESTORE_NAME/database.sql" 2>/dev/null || log_warn "Database restore had warnings"
+        psql "$DATABASE_URL" < "$BACKUP_PATH/database.sql" 2>/dev/null || log_warn "Database restore had warnings"
     fi
     
     # Restore files
-    if [[ -d "$RESTORE_NAME/app" ]]; then
+    if [[ -d "$BACKUP_PATH/app" ]]; then
         log_info "Restoring application files..."
-        rsync -a --delete "$RESTORE_NAME/app/" /opt/nology/ 2>/dev/null || true
+        rsync -a --delete "$BACKUP_PATH/app/" /opt/nology/ 2>/dev/null || true
     fi
     
     # Restart services
@@ -114,9 +111,9 @@ if [[ -n "$RESTORE_NAME" ]]; then
 fi
 
 # Create backup
-TIMESTAMP=$(date +%Y%m%d-%H%M%S)
+TS=$(date +%Y%m%d-%H%M%S)
 BACKUP_NAME="nology-backup-$TS"
-BACKUP_PATH="/opt/nology-backups/nology-backup-$TS"
+BACKUP_PATH="/opt/nology-backups/$BACKUP_NAME"
 
 echo "Creating backup: $BACKUP_NAME"
 mkdir -p "$BACKUP_PATH"
@@ -124,10 +121,14 @@ mkdir -p "$BACKUP_PATH"
 # Backup database
 if [[ "$MODE" != "files" ]]; then
     log_info "Backing up database..."
-    if pg_dump "$DATABASE_URL" > "/opt/nology-backups/nology-backup-$TS/database.sql" 2>/dev/null; then
-        log_success "Database backup completed"
+    if command -v pg_dump &>/dev/null && [[ -n "${DATABASE_URL:-}" ]]; then
+        if pg_dump "$DATABASE_URL" > "$BACKUP_PATH/database.sql" 2>/dev/null; then
+            log_success "Database backup completed"
+        else
+            log_warn "Database backup failed with pg_dump"
+        fi
     else
-        log_warn "Database backup failed (pg_dump not available or DATABASE_URL not set)"
+        log_warn "Database backup skipped (pg_dump not available or DATABASE_URL not set)"
     fi
 fi
 
@@ -145,14 +146,14 @@ if [[ "$MODE" != "database" ]]; then
 fi
 
 # Create manifest
-cat > "/opt/nology-backups/nology-backup-$TS/manifest.json" <<EOF
+cat > "$BACKUP_PATH/manifest.json" <<EOF
 {
   "timestamp": "$(date -Iseconds)",
   "hostname": "$(hostname)",
   "git_commit": "$(cd /opt/nology && git rev-parse HEAD 2>/dev/null || echo 'unknown')",
   "git_branch": "$(cd /opt/nology && git branch --show-current 2>/dev/null || echo 'unknown')",
   "mode": "$MODE",
-  "version": "$(cat /opt/nology/package.json | grep '"version"' | cut -d'"' -f4)"
+  "version": "$(cat /opt/nology/package.json 2>/dev/null | grep '"version"' | head -n1 | cut -d'"' -f4 || echo '0.1.0')"
 }
 EOF
 
@@ -160,7 +161,7 @@ EOF
 if [[ -n "$S3_BUCKET" ]]; then
     log_info "Uploading backup to S3..."
     if command -v aws &>/dev/null; then
-        aws s3 cp "/opt/nology-backups/nology-backup-$TS" "s3://$S3_BUCKET/nology-backups/nology-backup-$TS/" --recursive --storage-class STANDARD_IA
+        aws s3 cp "$BACKUP_PATH" "s3://$S3_BUCKET/nology-backups/$BACKUP_NAME/" --recursive --storage-class STANDARD_IA
         log_success "Backup uploaded to S3"
     else
         log_warn "AWS CLI not installed, skipping S3 upload"
@@ -172,13 +173,13 @@ log_info "Cleaning up old backups (keeping last 10)..."
 ls -dt /opt/nology-backups/nology-backup-* 2>/dev/null | tail -n +11 | xargs rm -rf 2>/dev/null || true
 
 # Show backup size
-BACKUP_SIZE=$(du -sh "/opt/nology-backups/nology-backup-$TS" | cut -f1)
+BACKUP_SIZE=$(du -sh "$BACKUP_PATH" | cut -f1)
 log_success "Backup completed: $BACKUP_NAME ($BACKUP_SIZE)"
 
 # List backups
 echo ""
 echo "Available backups:"
-ls -dt /opt/nology-backups/nology-backup-* 2>/dev/null | while read backup; do
+ls -dt /opt/nology-backups/nology-backup-* 2>/dev/null | while read -r backup; do
     SIZE=$(du -sh "$backup" 2>/dev/null | cut -f1)
     DATE=$(stat -c %y "$backup" | cut -d' ' -f1)
     echo "  $(basename "$backup") - $DATE - $SIZE"

@@ -5,6 +5,7 @@ import path from 'path'
 const isStaticExport = process.env.STATIC_EXPORT === '1'
 
 const nextConfig: NextConfig = {
+  poweredByHeader: false,
   reactStrictMode: true,
   outputFileTracingRoot: path.join(__dirname),
   ...(isStaticExport
@@ -56,6 +57,8 @@ const nextConfig: NextConfig = {
           { key: 'X-Frame-Options', value: 'DENY' },
           { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
           { key: 'Permissions-Policy', value: 'camera=(), microphone=(), geolocation=()' },
+          { key: 'Strict-Transport-Security', value: 'max-age=31536000; includeSubDomains' },
+          { key: 'X-DNS-Prefetch-Control', value: 'on' },
         ],
       },
       {

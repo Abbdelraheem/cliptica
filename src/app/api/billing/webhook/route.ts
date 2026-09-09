@@ -25,6 +25,20 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Webhook signature verification failed' }, { status: 400 })
     }
 
+    // Pre-retrieve subscription from Stripe API outside the DB transaction to avoid
+    // holding DB connection locks during external network calls.
+    let invoiceSubscription: Stripe.Subscription | null = null
+    if (event.type === 'invoice.payment_succeeded' || event.type === 'invoice.payment_failed') {
+      const invoice = event.data.object as Stripe.Invoice
+      if (invoice.subscription) {
+        try {
+          invoiceSubscription = await stripe.subscriptions.retrieve(invoice.subscription as string)
+        } catch (subErr) {
+          console.error('Failed to pre-retrieve subscription from Stripe:', subErr)
+        }
+      }
+    }
+
     try {
       await prisma.$transaction(async (tx) => {
         // Atomic idempotency lock. Recording the event FIRST means a
@@ -59,13 +73,13 @@ export async function POST(request: Request) {
 
           case 'invoice.payment_succeeded': {
             const invoice = event.data.object as Stripe.Invoice
-            await handleInvoicePaymentSucceeded(tx, invoice)
+            await handleInvoicePaymentSucceeded(tx, invoice, invoiceSubscription)
             break
           }
 
           case 'invoice.payment_failed': {
             const invoice = event.data.object as Stripe.Invoice
-            await handleInvoicePaymentFailed(tx, invoice)
+            await handleInvoicePaymentFailed(tx, invoice, invoiceSubscription)
             break
           }
         }
@@ -145,17 +159,46 @@ async function handleSubscriptionDeleted(tx: Tx, subscription: Stripe.Subscripti
   })
 }
 
-async function handleInvoicePaymentSucceeded(tx: Tx, invoice: Stripe.Invoice) {
+async function handleInvoicePaymentSucceeded(
+  tx: Tx,
+  invoice: Stripe.Invoice,
+  cachedSub: Stripe.Subscription | null
+) {
   const subscriptionId = invoice.subscription as string
   if (!subscriptionId) return
 
-  const subscription = await stripe.subscriptions.retrieve(subscriptionId)
-  const userId = subscription.metadata?.userId
-  if (!userId) return
+  let subscription = cachedSub
+  if (!subscription) {
+    try {
+      subscription = await stripe.subscriptions.retrieve(subscriptionId)
+    } catch {
+      subscription = null
+    }
+  }
+
+  let userId = subscription?.metadata?.userId
+  if (!userId) {
+    // Robust fallback: locate user by subscription ID or customer ID in database
+    const user = await tx.user.findFirst({
+      where: {
+        OR: [
+          { stripeSubscriptionId: subscriptionId },
+          ...(invoice.customer ? [{ stripeCustomerId: invoice.customer as string }] : []),
+        ],
+      },
+      select: { id: true },
+    })
+    userId = user?.id
+  }
+
+  if (!userId) {
+    console.error(`[webhook] No user found for invoice ${invoice.id} / sub ${subscriptionId}`)
+    return
+  }
 
   // Add credits for the new billing period
-  const priceId = subscription.items.data[0]?.price.id
-  const planKey = getPlanFromPriceId(priceId)
+  const priceId = subscription?.items?.data?.[0]?.price?.id ?? (invoice.lines?.data?.[0]?.price?.id as string | undefined)
+  const planKey = priceId ? getPlanFromPriceId(priceId) : null
   if (!planKey) return
 
   const plan = PLANS[planKey]
@@ -163,8 +206,12 @@ async function handleInvoicePaymentSucceeded(tx: Tx, invoice: Stripe.Invoice) {
   await tx.user.update({
     where: { id: userId },
     data: {
+      role: planKey.toUpperCase() as never,
       credits: { increment: plan.credits },
       subscriptionStatus: 'active',
+      stripeSubscriptionId: subscriptionId,
+      ...(invoice.customer ? { stripeCustomerId: invoice.customer as string } : {}),
+      ...(priceId ? { stripePriceId: priceId } : {}),
     },
   })
 
@@ -179,17 +226,43 @@ async function handleInvoicePaymentSucceeded(tx: Tx, invoice: Stripe.Invoice) {
   })
 }
 
-async function handleInvoicePaymentFailed(tx: Tx, invoice: Stripe.Invoice) {
+async function handleInvoicePaymentFailed(
+  tx: Tx,
+  invoice: Stripe.Invoice,
+  cachedSub: Stripe.Subscription | null
+) {
   const subscriptionId = invoice.subscription as string
   if (!subscriptionId) return
 
-  const subscription = await stripe.subscriptions.retrieve(subscriptionId)
-  const userId = subscription.metadata?.userId
+  let subscription = cachedSub
+  if (!subscription) {
+    try {
+      subscription = await stripe.subscriptions.retrieve(subscriptionId)
+    } catch {
+      subscription = null
+    }
+  }
+
+  let userId = subscription?.metadata?.userId
+  if (!userId) {
+    const user = await tx.user.findFirst({
+      where: {
+        OR: [
+          { stripeSubscriptionId: subscriptionId },
+          ...(invoice.customer ? [{ stripeCustomerId: invoice.customer as string }] : []),
+        ],
+      },
+      select: { id: true },
+    })
+    userId = user?.id
+  }
+
   if (!userId) return
 
   await tx.user.update({
     where: { id: userId },
     data: {
+      role: 'FREE', // Immediately degrade plan limits to FREE on payment failure
       subscriptionStatus: 'past_due',
     },
   })
