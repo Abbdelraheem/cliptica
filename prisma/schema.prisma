@@ -153,6 +153,7 @@ model Project {
   clipFrom     Int           @default(0) // start clipping at N seconds
   framing      String        @default("smart") // smart|face|center|blur|letter|variety
   language     String        @default("auto")
+  captionStyle String        @default("hormozi") // hormozi|clean_minimal|neon_highlight|bold_impact|classic_subtitle|highlighter
   motionFx     Boolean       @default(false) // AI motion graphics (+2 credits)
   creditsUsed  Int           @default(0)
   createdAt    DateTime      @default(now())

@@ -9,6 +9,7 @@ import { getSettingNumber } from '@/lib/settings'
 
 const FRAMINGS = ['smart', 'face', 'center', 'blur', 'letter', 'variety'] as const
 const LANGUAGES = ['auto', 'en', 'ar', 'es', 'fr', 'de', 'tr', 'hi', 'pt'] as const
+const CAPTION_STYLES = ['hormozi', 'clean_minimal', 'neon_highlight', 'bold_impact', 'classic_subtitle', 'highlighter'] as const
 
 const createSchema = z.object({
   sourceType: z.enum(['url', 'file']),
@@ -29,6 +30,7 @@ const createSchema = z.object({
   clipFrom: z.union([z.string().regex(/^\d{1,2}:\d{2}(:\d{2})?$/), z.number().int().min(0)]).optional(),
   framing: z.enum(FRAMINGS).default('smart'),
   language: z.enum(LANGUAGES).default('auto'),
+  captionStyle: z.enum(CAPTION_STYLES).default('hormozi'),
   motionFx: z.boolean().default(false),
 })
 
@@ -198,6 +200,7 @@ export async function POST(request: Request) {
           clipFrom: parseClipFrom(d.clipFrom),
           framing: d.framing,
           language: d.language,
+          captionStyle: d.captionStyle,
           motionFx,
           status: 'PENDING',
           creditsUsed: minCredits, // tracks reserved credits

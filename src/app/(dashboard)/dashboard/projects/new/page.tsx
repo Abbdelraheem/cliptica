@@ -24,6 +24,85 @@ const LANGS = [
   ['fr', 'French'], ['de', 'German'], ['tr', 'Turkish'],
 ] as const
 
+const CAPTION_PRESETS = [
+  {
+    id: 'hormozi',
+    name: 'Hormozi Pop',
+    desc: 'Kinetic 1-3 word cards with scale bounce.',
+    badge: 'Popular',
+    sample: 'STOP SCROLLING',
+    sampleStyle: {
+      color: '#FFFFFF',
+      textShadow: '0 2px 4px rgba(0,0,0,0.9), 0 0 2px #000',
+      fontWeight: 900,
+    },
+  },
+  {
+    id: 'clean_minimal',
+    name: 'Clean Minimal',
+    desc: 'Understated lower-third lines with smooth fade.',
+    badge: 'Clean',
+    sample: 'The simplest ideas win.',
+    sampleStyle: {
+      color: '#F3F4F6',
+      fontWeight: 400,
+      fontSize: '11px',
+    },
+  },
+  {
+    id: 'neon_highlight',
+    name: 'Neon Highlight',
+    desc: 'Electric cyan with glowing magenta shadow pulse.',
+    badge: 'Glow',
+    sample: 'PURE ENERGY',
+    sampleStyle: {
+      color: '#00FFFF',
+      textShadow: '0 0 8px rgba(255,0,128,0.9), 0 0 2px #FF0080',
+      fontWeight: 800,
+    },
+  },
+  {
+    id: 'bold_impact',
+    name: 'Bold Impact',
+    desc: 'Heavy uppercase gold text with deep shadow.',
+    badge: 'High Impact',
+    sample: 'MUST WATCH THIS',
+    sampleStyle: {
+      color: '#FFD700',
+      textShadow: '0 3px 6px rgba(0,0,0,1), 0 0 3px #000',
+      fontWeight: 900,
+      letterSpacing: '0.05em',
+    },
+  },
+  {
+    id: 'classic_subtitle',
+    name: 'Classic Subtitle',
+    desc: 'Documentary safe-zone lines at bottom edge.',
+    badge: 'Classic',
+    sample: 'Every detail planned ahead.',
+    sampleStyle: {
+      color: '#FFFFFF',
+      textShadow: '0 1px 2px rgba(0,0,0,0.8)',
+      fontWeight: 400,
+      fontSize: '11px',
+    },
+  },
+  {
+    id: 'highlighter',
+    name: 'Highlighter',
+    desc: 'Fluorescent yellow marker box with black text.',
+    badge: 'Marker',
+    sample: 'HIGHLIGHTED TRUTH',
+    sampleStyle: {
+      color: '#000000',
+      backgroundColor: '#FFE600',
+      fontWeight: 800,
+      padding: '2px 6px',
+      borderRadius: '2px',
+    },
+  },
+] as const
+
 const ALLOWED_TYPES = new Set([
   'video/mp4', 'video/quicktime', 'video/x-matroska', 'video/webm',
 ])
@@ -44,6 +123,7 @@ export default function NewProjectPage() {
   const [instructions, setInstructions] = useState('')
   const [clipFrom, setClipFrom] = useState('')
   const [framing, setFraming] = useState<(typeof FRAMINGS)[number]['id']>('smart')
+  const [captionStyle, setCaptionStyle] = useState<(typeof CAPTION_PRESETS)[number]['id']>('hormozi')
   const [language, setLanguage] = useState('auto')
   const [motionFx, setMotionFx] = useState(false)
   const [motionAvailable, setMotionAvailable] = useState(false)
@@ -134,6 +214,7 @@ export default function NewProjectPage() {
           clipFrom: clipFrom || undefined,
           framing,
           language,
+          captionStyle,
           motionFx: motionAvailable && motionFx,
         }),
       }, 20000)
@@ -301,6 +382,47 @@ export default function NewProjectPage() {
                 <f.icon className={`h-4 w-4 ${framing === f.id ? 'text-gold' : 'text-mist-2'}`} />
                 <p className={`mt-2 text-xs font-semibold ${framing === f.id ? 'text-pearl' : 'text-mist'}`}>{f.name}</p>
                 <p className="mt-1 text-[11px] leading-snug text-mist-2">{f.desc}</p>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Caption Style Preset Visual Picker */}
+        <div>
+          <div className="mb-3 flex items-center justify-between">
+            <p className="text-sm font-light text-mist">Caption Style Preset</p>
+            <span className="font-mono text-xs text-champagne">6 Styles Available</span>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {CAPTION_PRESETS.map((preset) => (
+              <button
+                key={preset.id}
+                type="button"
+                onClick={() => setCaptionStyle(preset.id)}
+                className={`group relative flex flex-col justify-between overflow-hidden rounded-xl border p-3.5 text-left transition-all ${
+                  captionStyle === preset.id
+                    ? 'border-champagne/70 bg-champagne/10 shadow-[0_0_20px_rgba(212,175,55,0.15)]'
+                    : 'border-hair/60 bg-black/25 hover:border-hair hover:bg-black/40'
+                }`}
+              >
+                {/* Visual Sample Card */}
+                <div className="mb-3 flex h-14 w-full items-center justify-center rounded-lg border border-hair/40 bg-black/60 px-2 text-center">
+                  <span style={preset.sampleStyle} className="transition-transform group-hover:scale-105">
+                    {preset.sample}
+                  </span>
+                </div>
+
+                <div>
+                  <div className="flex items-center justify-between gap-1">
+                    <p className={`text-xs font-semibold ${captionStyle === preset.id ? 'text-pearl' : 'text-mist'}`}>
+                      {preset.name}
+                    </p>
+                    <span className="rounded bg-white/5 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider text-mist-2">
+                      {preset.badge}
+                    </span>
+                  </div>
+                  <p className="mt-1 text-[11px] leading-snug text-mist-2">{preset.desc}</p>
+                </div>
               </button>
             ))}
           </div>

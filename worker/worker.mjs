@@ -19,6 +19,7 @@ import path from 'path'
 import { calcCredits, exceedsPlanMinutes, planMaxMinutes } from './credits.mjs'
 import { assertPublicHttpUrl } from './ssrf.mjs'
 import { ytProxyPool, recordProxyResult, redactProxy, categorizeDownloadError } from './proxy-pool.mjs'
+import { buildKaraokeAss, buildPhraseAss, CAPTION_STYLES } from './caption-styles.mjs'
 
 const run = promisify(execFile)
 
@@ -424,66 +425,7 @@ async function faceTrack(src, moment, dir, idx) {
 }
 
 /* ---------- captions ---------- */
-
-const tsAss = (s) =>
-  `${Math.floor(s / 3600)}:${String(Math.floor((s % 3600) / 60)).padStart(2, '0')}:${String(Math.floor(s % 60)).padStart(2, '0')}.${String(Math.floor((s % 1) * 100)).padStart(2, '0')}`
-
-const ASS_STYLE = (W, H) => `[Script Info]
-ScriptType: v4.00+
-PlayResX: ${W}
-PlayResY: ${H}
-
-[V4+ Styles]
-Format: Name, Fontname, Fontsize, PrimaryColour, OutlineColour, BackColour, Bold, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-Style: Pop,Arial Black,${Math.round(W * 0.085)},&H00FFFFFF,&H00000000,&HB4000000,-1,1,${Math.round(W * 0.012)},2,5,40,40,0,1
-
-[Events]
-Format: Layer, Start, End, Style, Text
-`
-
-/** Word-pop cards (Hormozi-style): 1-3 big words per card, pop-in animation. */
-function buildKaraokeAss(words, start, end, emoji) {
-  const W = CFG.outW, H = CFG.outH
-  const inWin = words.filter((w) => w.end > start && w.start < end && w.text)
-  if (!inWin.length) return null
-
-  const cards = []
-  let cur = []
-  for (const w of inWin) {
-    if (cur.length && w.start - cur[cur.length - 1].end > 0.6) { cards.push(cur); cur = [] }
-    cur.push(w)
-    if (cur.length >= CFG.wordsPerCard) { cards.push(cur); cur = [] }
-  }
-  if (cur.length) cards.push(cur)
-
-  let events = ''
-  if (emoji) {
-    events += `Dialogue: 1,${tsAss(start)},${tsAss(start + 0.8)},Pop,,0,0,0,,{\\fad(80,120)\\pos(${W / 2},${Math.round(H * 0.34)})}${emoji}\n`
-  }
-  cards.forEach((card, i) => {
-    const cs = Math.max(card[0].start, start)
-    let ce = i === cards.length - 1 ? Math.min(card[card.length - 1].end, end) : Math.min(card[card.length - 1].end, cards[i + 1][0]?.start ?? end)
-    if (ce <= cs) ce = cs + 0.35
-    const text = card.map((w) => w.text.replace(/[{}]/g, '')).join(' ')
-    events +=
-      `Dialogue: 0,${tsAss(cs)},${tsAss(ce)},Pop,,0,0,0,,` +
-      `{\\fad(50,50)\\t(0,90,\\fscx118\\fscy118)\\t(90,180,\\fscx100\\fscy100)` +
-      `\\pos(${W / 2},${Math.round(H * 0.74)})}${text}\n`
-  })
-  return ASS_STYLE(W, H) + events
-}
-
-/** v1 fallback: static phrase lines. */
-function buildPhraseAss(text, start, end) {
-  const W = CFG.outW, H = CFG.outH
-  const lines = text.match(/.{1,42}(\s|$)/g) ?? [text]
-  const per = (end - start) / lines.length
-  let events = ''
-  lines.forEach((l, i) => {
-    events += `Dialogue: 0,${tsAss(start + per * i)},${tsAss(start + per * (i + 1))},Pop,,0,0,0,,{\\pos(${W / 2},${Math.round(H * 0.74)})}${l.trim()}\n`
-  })
-  return ASS_STYLE(W, H) + events
-}
+// Preset styles & ASS generation are imported from ./caption-styles.mjs
 
 /* ---------- AI motion graphics ---------- */
 
@@ -543,14 +485,14 @@ function heuristicMotionPack(moment) {
 
 /* ---------- render ---------- */
 
-async function renderClip(src, moment, dir, idx, transcript, mode = 'smart', motion = null) {
+async function renderClip(src, moment, dir, idx, transcript, mode = 'smart', motion = null, captionStyle = 'hormozi') {
   const W = CFG.outW, H = CFG.outH
   const targetDur = moment.end - moment.start
 
   // captions
   const assPath = path.join(dir, `cap${idx}.ass`)
-  const karaoke = buildKaraokeAss(transcript.words ?? [], moment.start, moment.end, moment.emoji)
-  await writeFile(assPath, karaoke ?? buildPhraseAss(moment.text, moment.start, moment.end))
+  const karaoke = buildKaraokeAss(transcript.words ?? [], moment.start, moment.end, moment.emoji, captionStyle, W, H)
+  await writeFile(assPath, karaoke ?? buildPhraseAss(moment.text, moment.start, moment.end, captionStyle, W, H))
   const escAss = assPath.replace(/\\/g, '/').replace(/:/g, '\\:')
 
   // face-tracked crop commands
@@ -683,7 +625,7 @@ async function probeSize(file) {
 }
 
 /** Render all clips with bounded parallelism. */
-async function renderAll(src, moments, dir, transcript, framing = 'smart', pkgs = null) {
+async function renderAll(src, moments, dir, transcript, framing = 'smart', pkgs = null, captionStyle = 'hormozi') {
   const VARIETY = ['face', 'blur', 'center']
   const results = new Array(moments.length)
   let next = 0
@@ -692,8 +634,8 @@ async function renderAll(src, moments, dir, transcript, framing = 'smart', pkgs 
       const i = next++
       if (i >= moments.length) return
       const mode = framing === 'variety' ? VARIETY[i % VARIETY.length] : framing
-      console.log(`[worker] rendering clip ${i + 1}/${moments.length} [${mode}${pkgs?.[i] ? ' +motion' : ''}]`)
-      results[i] = await renderClip(src, moments[i], dir, i, transcript, mode, pkgs?.[i] ?? null)
+      console.log(`[worker] rendering clip ${i + 1}/${moments.length} [${mode}${pkgs?.[i] ? ' +motion' : ''}, style=${captionStyle}]`)
+      results[i] = await renderClip(src, moments[i], dir, i, transcript, mode, pkgs?.[i] ?? null, captionStyle)
     }
   }
   await Promise.all(Array.from({ length: Math.min(CFG.renderParallel, moments.length) }, lane))
@@ -778,9 +720,10 @@ async function processJob(job) {
       pkgs = moments.map((_, i) => llmPacks?.find((p) => p.index === i) ?? heuristicMotionPack({ ...moments[i], index: i }))
     }
 
-    console.log(`[worker] rendering ${moments.length} clips (premium=${CFG.premium}, framing=${project.framing}${fx ? ' +motion' : ''})`)
+    const captionStyle = project.captionStyle ?? 'hormozi'
+    console.log(`[worker] rendering ${moments.length} clips (premium=${CFG.premium}, framing=${project.framing}, style=${captionStyle}${fx ? ' +motion' : ''})`)
     await setP(58)
-    const files = await renderAll(src, moments, dir, transcript, project.framing ?? 'smart', pkgs)
+    const files = await renderAll(src, moments, dir, transcript, project.framing ?? 'smart', pkgs, captionStyle)
 
     for (let i = 0; i < moments.length; i++) {
       const m = moments[i]
@@ -809,7 +752,8 @@ async function processJob(job) {
           videoUrl: url,
           exportUrl: url,
           thumbnailUrl: thumbUrl,
-          captionData: { mode: 'karaoke', emoji: m.emoji ?? '', words: winWords },
+          captionStyle: captionStyle,
+          captionData: { mode: 'karaoke', emoji: m.emoji ?? '', words: winWords, style: captionStyle },
           motionGraphics: { ...(files[i].motion ?? { mode: 'none' }), cropMode: files[i].cropMode },
         },
       })
