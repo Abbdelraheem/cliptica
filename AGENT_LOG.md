@@ -209,3 +209,54 @@ Date format: YYYY-MM-DD. One entry per completed round (what was checked → wha
 - Vitest: 8 test files, 68 tests passing (100%), including new regression suite `tests/billing-redirects.test.ts`.
 - `npx tsc --noEmit` clean; `npm run build` clean (53/53 pages generated).
 - EC2 Live Verification: `curl -sI http://127.0.0.1:3000/api/billing/checkout?plan=clipper` correctly returns `HTTP 307 Temporary Redirect` to `/login?callbackUrl=/dashboard/billing`. Nginx port 80 verified. PM2 `nology-web` reloaded cleanly with zero downtime.
+
+## 2026-09-10 — Round 12: Blocker 1 (Legal Pages) & Blocker 2 (Vulnerability Remediation)
+
+### Part A: Blocker 1 — Legal Pages Resolution
+**Changes**
+- `src/app/(marketing)/terms/page.tsx`: Full Terms of Service covering service nature (AI clipping), explicit user content rights warranty, recurring subscription auto-renewal, credit consumption and 30-day rollover, acceptable use, and limitation of liability.
+- `src/app/(marketing)/privacy/page.tsx`: Detailed Privacy Policy itemizing collected data (email, media submissions, device fingerprints, Stripe payment metadata), operational usage, explicit naming of third-party subprocessors (**Stripe, Inc.**, **Cloudflare R2**, **Groq, Inc.**, **OpenAI, LLC**), 30-day retention policies for temporary render artifacts, and user data deletion request flows.
+- `src/app/(marketing)/refund-policy/page.tsx`: Clear Refund Policy specifying 14-day refund window for unused subscriptions (<15 credits consumed), non-refundable conditions for consumed compute, credit retention through end of billing period upon cancellation, and automated instant credit refunds on worker job failure.
+- `src/components/marketing-layout.tsx`: Updated footer links from placeholders (`#`) to `/terms`, `/privacy`, and `/refund-policy`.
+- `src/app/(dashboard)/dashboard/billing/page.tsx`: Added explicit consent line below upgrade buttons: "By continuing you agree to our Terms and Privacy Policy."
+- `src/app/sitemap.ts`: Added `/terms`, `/privacy`, and `/refund-policy` to search engine XML sitemap.
+
+**Verification**
+- Next.js production build succeeded with 56 static pages generated (`/terms`, `/privacy`, `/refund-policy`).
+- Live curl checks on EC2 via Nginx port 80 returned HTTP 200 OK for all three routes.
+- Staged and committed: `34a59a5` ("feat(legal): add terms, privacy policy, refund policy, footer links, and billing consent").
+
+---
+
+### Part B: Blocker 2 — Vulnerability Audit & Remediation
+
+**Initial npm audit output (Baseline):**
+```
+8 vulnerabilities (2 moderate, 6 high)
+- deepmerge-ts (<8.0.0, Severity: high, GHSA-ggr8-5vv4-36mx) via @prisma/config -> prisma
+- js-yaml (4.0.0 - 4.3.1, Severity: high, GHSA-2883-xcg3-v3hh)
+- postcss (<=8.5.22, Severity: high, GHSA-qx2v-qp2m-jg93, GHSA-6g55-p6wh-862q, GHSA-fxqj-rqcc-2cmp, GHSA-r28c-9q8g-f849) via next
+- qs (2.2.5 - 6.15.3, Severity: moderate, GHSA-x5fp-wj9c-mxmx, GHSA-4mjr-xmp4-gh2g)
+- sharp (<=0.35.4-rc.0, Severity: high, GHSA-f88m-g3jw-g9cj [libvips CVE-2026-33327, CVE-2026-33328, CVE-2026-35590, CVE-2026-35591], GHSA-rgj7-g3m4-5g8c [libheif GHSA-g89c-p67h-r497, GHSA-2jg2-4ch7-h545])
+```
+
+**Remediation Applied:**
+- Executed non-breaking `npm audit fix`:
+  - Updated `sharp` to safe release, completely eliminating libvips (CVE-2026-33327, CVE-2026-33328, CVE-2026-35590, CVE-2026-35591) and libheif (GHSA-g89c-p67h-r497, GHSA-2jg2-4ch7-h545).
+  - Updated `js-yaml` to patched release (GHSA-2883-xcg3-v3hh resolved).
+  - Updated `qs` to patched release (GHSA-x5fp-wj9c-mxmx, GHSA-4mjr-xmp4-gh2g resolved).
+
+**Remaining Vulnerabilities & Risk Acceptance:**
+1. `postcss` (<=8.5.22):
+   - CVEs: GHSA-qx2v-qp2m-jg93, GHSA-6g55-p6wh-862q, GHSA-fxqj-rqcc-2cmp, GHSA-r28c-9q8g-f849.
+   - Status: **Accepted, Monitored Risk**.
+   - Analysis: Bundled inside `next@15.5.25`. Upstream patch is only available in `next@16.3.4+`, which is a breaking major upgrade requiring React 19 canary and rewrites of core router APIs. The vulnerabilities relate to malicious CSS sourcemap parsing during build time, which is not reachable by untrusted end-user runtime inputs in production. Will be upgraded when Next.js releases an upstream backport for 15.5.x or when migration to Next 16 is scheduled.
+2. `deepmerge-ts` (<8.0.0):
+   - CVE: GHSA-ggr8-5vv4-36mx.
+   - Status: **Accepted, Monitored Risk**.
+   - Analysis: Development dependency inside `@prisma/config`. Only executes during local developer schema generation (`prisma generate`), never invoked in production runtime request handling.
+
+**Verification:**
+- `npx tsc --noEmit` clean (0 errors).
+- Vitest unit tests: 8 test suites, 68 tests passing (100%).
+- Production build: `npm run build` completed cleanly (56/56 pages).
