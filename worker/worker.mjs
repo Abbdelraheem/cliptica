@@ -18,6 +18,7 @@ import { tmpdir } from 'os'
 import path from 'path'
 import { calcCredits, exceedsPlanMinutes, planMaxMinutes } from './credits.mjs'
 import { assertPublicHttpUrl } from './ssrf.mjs'
+import { ytProxyPool, recordProxyResult, redactProxy, categorizeDownloadError } from './proxy-pool.mjs'
 
 const run = promisify(execFile)
 
@@ -126,56 +127,76 @@ function ytdlpArgs(extra) {
   return args.concat(extra)
 }
 
-/** Refreshable proxy pool for YouTube. Written by scripts/refresh-proxies.sh
- * (systemd timer); worker reads the file fresh on every download so a dead
- * proxy from minutes ago never blocks a job. Falls back to YTDLP_PROXIES env. */
-async function ytProxyPool() {
-  const envList = (process.env.YTDLP_PROXIES ?? '').split(',').map((p) => p.trim()).filter(Boolean)
-  try {
-    const fs = await import('fs/promises')
-    const fileList = (await fs.readFile(process.env.YTDLP_PROXIES_FILE ?? '/opt/nology/proxies.txt', 'utf8'))
-      .split('\n').map((l) => l.trim()).filter(Boolean)
-    return [...fileList, ...envList]
-  } catch {
-    return envList
-  }
-}
-
 /* ================= stages ================= */
 
 async function download(url, dir) {
   await assertPublicHttpUrl(url)
   const out = path.join(dir, 'source.%(ext)s')
 
-  const attempt = (proxy) => sh('/opt/nology-venv/bin/yt-dlp', ytdlpArgs([
-    ...(proxy ? ['--proxy', proxy] : []),
-    '-N', '8',
-    '-f', 'bv*[height<=1080]+ba/b[height<=1080]/b',
-    '--merge-output-format', 'mp4',
-    '--max-filesize', '2.5G',
-    '--match-filter', 'duration <= 7200',
-    '-o', out, url,
-  ]), { timeout: 1000 * 60 * 10 })
+  const attempt = (proxy) =>
+    sh(
+      '/opt/nology-venv/bin/yt-dlp',
+      ytdlpArgs([
+        ...(proxy ? ['--proxy', proxy] : []),
+        '--socket-timeout',
+        '20',
+        '-N',
+        '8',
+        '-f',
+        'bv*[height<=1080]+ba/b[height<=1080]/b',
+        '--merge-output-format',
+        'mp4',
+        '--max-filesize',
+        '2.5G',
+        '--match-filter',
+        'duration <= 7200',
+        '-o',
+        out,
+        url,
+      ]),
+      { timeout: 1000 * 60 * 10 }
+    )
 
   // Direct first — most stable when YouTube isn't flagging the IP.
+  const t0 = Date.now()
   try {
     await attempt(null)
+    const dur = Date.now() - t0
+    console.log(`[worker:download] proxy=direct duration_ms=${dur} outcome=success`)
     return await findFile(dir, /^source\./)
   } catch (e) {
-    console.warn(`[worker] direct download failed: ${e.message.split('\n')[0]} — trying proxies`)
+    const dur = Date.now() - t0
+    const errType = categorizeDownloadError(e)
+    console.warn(
+      `[worker:download] proxy=direct duration_ms=${dur} outcome=failure error_type=${errType} error="${e.message
+        .split('\n')[0]
+        .slice(0, 100)}" — trying proxies`
+    )
   }
 
-  // Rotate the refreshable proxy pool. Success is authoritative; on failure
+  // Rotate the prioritized proxy pool. Success is authoritative; on failure
   // keep the last non-network error (bot-wall etc.) for the job report.
   let lastErr = null
-  for (const proxy of await ytProxyPool()) {
+  const proxies = await ytProxyPool()
+  for (const proxy of proxies) {
+    const pStart = Date.now()
+    const redacted = redactProxy(proxy)
     try {
       await attempt(proxy)
-      console.log(`[worker] downloaded via proxy ${proxy}`)
+      const dur = Date.now() - pStart
+      recordProxyResult(proxy, true)
+      console.log(`[worker:download] proxy=${redacted} duration_ms=${dur} outcome=success`)
       return await findFile(dir, /^source\./)
     } catch (e) {
       lastErr = e
-      console.warn(`[worker] proxy ${proxy} failed: ${e.message.split('\n')[0]}`)
+      const dur = Date.now() - pStart
+      const errType = categorizeDownloadError(e)
+      recordProxyResult(proxy, false, e.message)
+      console.warn(
+        `[worker:download] proxy=${redacted} duration_ms=${dur} outcome=failure error_type=${errType} error="${e.message
+          .split('\n')[0]
+          .slice(0, 100)}"`
+      )
     }
   }
   throw lastErr ?? new Error('all download paths failed')
@@ -210,11 +231,20 @@ async function probeDuration(file) {
 async function probeUrlDuration(url) {
   await assertPublicHttpUrl(url)
   try {
-    const out = await sh('/opt/nology-venv/bin/yt-dlp', ytdlpArgs([
-    '-f', 'bv*[height<=1080]+ba/b[height<=1080]/b',
-      '--print', 'duration',
-      '--no-download', url,
-    ]), { timeout: 1000 * 60 * 2 })
+    const out = await sh(
+      '/opt/nology-venv/bin/yt-dlp',
+      ytdlpArgs([
+        '--socket-timeout',
+        '20',
+        '-f',
+        'bv*[height<=1080]+ba/b[height<=1080]/b',
+        '--print',
+        'duration',
+        '--no-download',
+        url,
+      ]),
+      { timeout: 1000 * 60 * 2 }
+    )
     const v = parseFloat(out.trim())
     return Number.isFinite(v) && v > 0 ? v : null
   } catch {
