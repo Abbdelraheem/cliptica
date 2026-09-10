@@ -123,8 +123,9 @@ export function MarketingLayout({ children }: { children: ReactNode }) {
                 links: [
                   ['About', '#'],
                   ['Contact', 'mailto:support@getnology.com'],
-                  ['Terms', '#'],
-                  ['Privacy', '#'],
+                  ['Terms', '/terms'],
+                  ['Privacy', '/privacy'],
+                  ['Refund Policy', '/refund-policy'],
                 ],
               },
             ].map((col) => (

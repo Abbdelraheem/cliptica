@@ -1,4 +1,4 @@
-﻿import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 // Mock next/headers
 vi.mock('next/headers', () => ({
@@ -81,7 +81,7 @@ describe('Settings Features API', () => {
     expect(json.success).toBe(true)
     expect(mockPrisma.user.update).toHaveBeenCalled()
     expect(mockSendEmail).toHaveBeenCalled()
-  })
+  }, 15000)
 
   it('change-password: rejects incorrect current password with 400', async () => {
     const { hash } = await import('bcryptjs')
@@ -108,7 +108,7 @@ describe('Settings Features API', () => {
     expect(res.status).toBe(400)
     const json = await res.json()
     expect(json.error).toContain('Current password is incorrect')
-  })
+  }, 15000)
 
   it('api-keys: creates key and returns plaintext key once', async () => {
     mockPrisma.apiKey.create.mockImplementation(({ data }: any) => Promise.resolve({

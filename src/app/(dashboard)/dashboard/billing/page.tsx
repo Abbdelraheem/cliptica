@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import Link from 'next/link'
 import { useSession } from 'next-auth/react'
 import { Check } from 'lucide-react'
 
@@ -123,13 +124,21 @@ export default function BillingPage() {
                   </a>
                 )
               ) : (
-                <button
-                  onClick={() => upgrade(plan.name.toLowerCase())}
-                  disabled={loading !== null}
-                  className={`btn-lux w-full ${plan.name === 'Clipper' ? 'btn-gold' : 'btn-outline'} disabled:opacity-60`}
-                >
-                  {loading === plan.name.toLowerCase() ? 'Redirecting…' : `Upgrade to ${plan.name}`}
-                </button>
+                <div className="space-y-2.5">
+                  <button
+                    onClick={() => upgrade(plan.name.toLowerCase())}
+                    disabled={loading !== null}
+                    className={`btn-lux w-full ${plan.name === 'Clipper' ? 'btn-gold' : 'btn-outline'} disabled:opacity-60`}
+                  >
+                    {loading === plan.name.toLowerCase() ? 'Redirecting…' : `Upgrade to ${plan.name}`}
+                  </button>
+                  <p className="text-center text-[11px] leading-tight text-mist-2">
+                    By continuing you agree to our{' '}
+                    <Link href="/terms" className="underline underline-offset-2 hover:text-white">Terms</Link>
+                    {' '}and{' '}
+                    <Link href="/privacy" className="underline underline-offset-2 hover:text-white">Privacy Policy</Link>.
+                  </p>
+                </div>
               )}
             </div>
           )
