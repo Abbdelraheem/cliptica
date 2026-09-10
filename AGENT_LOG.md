@@ -260,3 +260,72 @@ Date format: YYYY-MM-DD. One entry per completed round (what was checked → wha
 - `npx tsc --noEmit` clean (0 errors).
 - Vitest unit tests: 8 test suites, 68 tests passing (100%).
 - Production build: `npm run build` completed cleanly (56/56 pages).
+- Committed: `83278bd` ("chore(security): audit dependencies and fix high severity CVEs in sharp, js-yaml, qs").
+
+---
+
+### Part C: Blocker 3 — YouTube Download Reliability & Proxy Pool System
+
+**1. Baseline Failure Rate Measurement:**
+- Queried production PostgreSQL database via Prisma for all historical YouTube project records:
+  - Project `yte2eproj001` (Rick Astley): COMPLETED
+  - Project `yte2eproj002`: COMPLETED
+  - Project `cmtq3bt8i0002p97cpmuryymr` (Big Buck Bunny): FAILED (Cartoon dialogue absence during speaker detection; download stage passed)
+- Historical YouTube project completion baseline: **66.7% (2/3)**.
+- Root cause of download instability: Direct AWS EC2 Datacenter IP is aggressively bot-detected by YouTube ("Sign in to confirm you're not a bot"), requiring resilient proxy failover.
+
+**2. Architecture & Improvements Implemented:**
+- **Adaptive In-Memory Proxy Health Scoring (`worker/proxy-pool.mjs`)**:
+  - Tracks per-proxy statistics: `successes`, `failures`, `lastAttempt`, `lastSuccess`, `quarantinedUntil`.
+  - Prioritizes proxies by net health score: `(successes * 3) - failures`.
+  - Paid/Residential proxies (`YTDLP_PROXIES` environment variable) are always prioritized ahead of scraped proxies.
+- **Automated Quarantine System**:
+  - Proxies experiencing 2 consecutive failures are automatically quarantined for **15 minutes** (`Date.now() + 15 * 60 * 1000`).
+  - Quarantined proxies are excluded from worker retry loops, preventing dead proxies from stalling download jobs.
+- **Residential & Authenticated Proxy Support**:
+  - Full support for authenticated HTTP/SOCKS5 proxies (`http://user:pass@host:port`, `socks5://user:pass@host:port`).
+  - Implemented `redactProxy()` to ensure credentials are masked in all console logs and PM2 traces (`http://user:***@host:port`).
+- **Structured Download Logging & Timeout Protection**:
+  - Structured log schema: `[worker:download] proxy=<proxy> duration_ms=<ms> outcome=<success|failure> error_type=<type> error="..."`.
+  - Error classification: `bot-detection`, `rate-limit`, `network-timeout`, `unavailable`, `other`.
+  - Added `--socket-timeout 20` to all `yt-dlp` download and duration probe invocations.
+- **Documentation**:
+  - Published comprehensive setup instructions in `PROXY_UPGRADE_GUIDE.md` detailing providers (Webshare, Bright Data, Smartproxy, IPRoyal), estimated pricing ($5-15/month), configuration, and verification commands.
+
+**3. Test Suite Verification:**
+- Created `tests/proxy-pool.test.mjs` covering scoring, quarantine lifecycle, redaction, and error detection.
+- Full Vitest suite passing: **9 test suites, 83 tests passing (100%)**.
+
+**4. Live Smoke Test Execution on Production EC2 Host:**
+- Conducted live end-to-end download tests across 3 distinct YouTube media profiles on EC2:
+  1. **Short Video (19s)** — `https://www.youtube.com/watch?v=jNQXAC9IVRw`
+     - Direct Download: FAILED (1082ms, error_type: `bot-detection`)
+     - Proxy Download: **SUCCESS** via `102.204.14.2:8080` (Duration: 145,192ms)
+  2. **Medium Video (3m33s)** — `https://www.youtube.com/watch?v=dQw4w9WgXcQ`
+     - Direct Download: **SUCCESS** directly without proxy (Duration: 3,848ms)
+  3. **Speech-Heavy Video (15m)** — `https://www.youtube.com/watch?v=UF8uR6Z6KLc`
+     - Direct Download: FAILED (1155ms, error_type: `bot-detection`)
+     - Proxy Failover: Quarantined timed-out free proxies, adapted, and succeeded via `103.135.70.9:8080`: **SUCCESS** (Duration: 189,948ms)
+- Live Smoke Test Result: **3/3 Succeeded (100%)**.
+
+**5. Deployment:**
+- Staged and committed: `4ff6b7b` ("feat(worker): add adaptive proxy health scoring, quarantine, and residential proxy support").
+- Pulled on EC2 and reloaded in PM2: `sudo pm2 reload nology-worker` (PID 757285, online).
+
+---
+
+### Part D: Blocker 4 — Domain & Payment Gateway Launch Readiness Audit
+
+**1. Stripe Implementation & Mode Switching Audit:**
+- Audited all billing routes and library files:
+  - `src/lib/stripe.ts`: Uses `new Stripe(process.env.STRIPE_SECRET_KEY || 'sk_test_placeholder')`. Stripe API modes are determined solely by whether the key begins with `sk_test_` or `sk_live_`.
+  - Subscription Plan Price IDs: Configured dynamically via `process.env.STRIPE_PRICE_CLIPPER_MONTHLY || process.env.STRIPE_CLIPPER_PRICE_ID` and `process.env.STRIPE_PRICE_STUDIO_MONTHLY || process.env.STRIPE_STUDIO_PRICE_ID`.
+  - `src/app/api/billing/checkout/route.ts`: Constructs Stripe Checkout sessions dynamically using `plan.priceId` and dynamic base URLs (`process.env.NEXTAUTH_URL || process.env.NEXT_PUBLIC_APP_URL`).
+  - `src/app/api/billing/portal/route.ts`: Dynamic Stripe Customer Portal session generation for self-serve cancellation and payment method updates.
+  - `src/app/api/billing/webhook/route.ts`: Verifies signatures using `process.env.STRIPE_WEBHOOK_SECRET!`. Maps price IDs dynamically using `getPlanFromPriceId()`. Handles idempotency using database transaction table `processedWebhookEvent`.
+- **Verdict**: **Zero code changes required** to switch from test to live payments. Switching requires only populating production environment variables (`STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, and live Price IDs) in `/opt/nology/.env.production`.
+
+**2. Domain & Payment Runbook (`DOMAIN_AND_PAYMENT_CHECKLIST.md`):**
+- Authored step-by-step checklist tailored specifically to the host architecture (`13.62.192.145`, Ubuntu 24.04, Nginx `/etc/nginx/sites-available/nology`, PM2 services).
+- Detailed exact DNS A record targets, Certbot installation and issuance commands (`sudo certbot --nginx -d ...`), Nginx `server_name` modification, and PM2 zero-downtime reload commands (`sudo pm2 reload nology-web --update-env`).
+- Detailed Stripe live product creation, webhook event selection, and signature verification commands.

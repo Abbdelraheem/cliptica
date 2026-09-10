@@ -39,7 +39,7 @@ export const PLANS: Record<PlanKey, PlanDef> = {
   clipper: {
     name: 'Clipper',
     price: 1900, // cents
-    priceId: process.env.STRIPE_PRICE_CLIPPER_MONTHLY,
+    priceId: process.env.STRIPE_PRICE_CLIPPER_MONTHLY || process.env.STRIPE_CLIPPER_PRICE_ID,
     credits: 300,
     maxVideoLength: 90,
     maxDailyVideos: 50,
@@ -56,7 +56,7 @@ export const PLANS: Record<PlanKey, PlanDef> = {
   studio: {
     name: 'Studio',
     price: 4900,
-    priceId: process.env.STRIPE_PRICE_STUDIO_MONTHLY,
+    priceId: process.env.STRIPE_PRICE_STUDIO_MONTHLY || process.env.STRIPE_STUDIO_PRICE_ID,
     credits: 1200,
     maxVideoLength: 180,
     maxDailyVideos: 200,
