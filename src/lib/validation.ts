@@ -42,3 +42,39 @@ export function parseClipFrom(v?: string | number): number {
   const parts = v.split(':').map(Number)
   return parts.length === 3 ? parts[0] * 3600 + parts[1] * 60 + parts[2] : parts[0] * 60 + parts[1]
 }
+
+export const VALID_CAPTION_STYLES = [
+  'hormozi',
+  'clean_minimal',
+  'neon_highlight',
+  'bold_impact',
+  'classic_subtitle',
+  'highlighter',
+] as const
+
+export const clipAdjustSchema = z
+  .object({
+    start: z.number().min(0, 'Start time must be >= 0'),
+    end: z.number().min(0, 'End time must be > start time'),
+    captionStyle: z.enum(VALID_CAPTION_STYLES).optional(),
+  })
+  .refine((data) => data.end > data.start, {
+    message: 'End time must be greater than start time',
+    path: ['end'],
+  })
+  .refine((data) => data.end - data.start >= 15, {
+    message: 'Clip duration must be at least 15 seconds',
+    path: ['end'],
+  })
+  .refine((data) => data.end - data.start <= 120, {
+    message: 'Clip duration cannot exceed 120 seconds',
+    path: ['end'],
+  })
+
+export const CLIP_ADJUST_FREE_WINDOW_MS = 15 * 60 * 1000 // 15 minutes
+
+export function calcClipAdjustCost(clipCreatedAt: Date | string | number, now = Date.now()): number {
+  const createdTime = new Date(clipCreatedAt).getTime()
+  return now - createdTime <= CLIP_ADJUST_FREE_WINDOW_MS ? 0 : 1
+}
+

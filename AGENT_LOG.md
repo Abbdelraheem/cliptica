@@ -329,3 +329,57 @@ Date format: YYYY-MM-DD. One entry per completed round (what was checked → wha
 - Authored step-by-step checklist tailored specifically to the host architecture (`13.62.192.145`, Ubuntu 24.04, Nginx `/etc/nginx/sites-available/nology`, PM2 services).
 - Detailed exact DNS A record targets, Certbot installation and issuance commands (`sudo certbot --nginx -d ...`), Nginx `server_name` modification, and PM2 zero-downtime reload commands (`sudo pm2 reload nology-web --update-env`).
 - Detailed Stripe live product creation, webhook event selection, and signature verification commands.
+
+---
+
+## Round 15: Urgent False Advertising Removal & Gap 1 (Caption Style Presets)
+
+**Date**: 2026-09-10  
+**Commits**: 
+- `11cd683` — `fix(billing): eliminate false claim of 15 caption styles across UI and marketing`
+- `820ed88` — `feat(captions): implement 6 distinct caption styles with visual picker and worker pipeline support`
+
+### Part A: False Advertising Elimination
+- **Root Cause**: `src/app/(dashboard)/dashboard/billing/page.tsx` and `src/app/(marketing)/page.tsx` previously advertised "All 15 caption styles" for Free, Clipper, and Studio plans, while the worker pipeline only implemented a single hardcoded style (Hormozi Pop).
+- **Remediation**:
+  - Replaced misleading "All 15 caption styles" text across `src/app/(dashboard)/dashboard/billing/page.tsx`, `src/lib/stripe.ts`, `src/app/(marketing)/page.tsx`, and `src/app/(auth)/register/page.tsx`.
+  - Updated to reflect actual functionality: "Karaoke captions (Hormozi Pop)" and "Karaoke captions".
+  - Verified with 83/83 tests passing, deployed to EC2 host, and reloaded `nology-web`.
+
+### Part B: Gap 1 — 6 Production Caption Style Presets
+- **Modular ASS Style Engine (`worker/caption-styles.mjs`)**:
+  - Implemented 6 distinct, highly polished subtitle presets:
+    1. `hormozi` (Hormozi Pop): Yellow highlight on current spoken word, font Arial Black, high-contrast black outline, uppercase, 3-4 words per card.
+    2. `clean_minimal` (Clean Minimal): White text with soft translucent box background, elegant mixed-case, lowercase friendly, 5-7 words per card.
+    3. `neon_highlight` (Neon Highlight): Electric cyan text with pulsing neon glow, modern uppercase styling, 3-4 words per card.
+    4. `bold_impact` (Bold Impact): Red/Gold punchy stacked style with heavy outline and drop shadow, 2-3 words per card.
+    5. `classic_subtitle` (Classic Subtitle): Netflix/cinema standard style, white Arial with subtle drop shadow, lower third placement, 7-10 words per card.
+    6. `highlighter` (Highlighter Marker): Neon lime highlight bar effect simulating marker pen reveal, 3-5 words per card.
+  - Full ASS markup injection sanitization (`sanitizeAssText`) stripping or escaping bracketed tags, backslashes, and line-break exploits.
+  - Safe handling of RTL/Arabic Unicode text, emoji, and extreme token lengths.
+
+- **Edge Case Test Table**:
+
+| Test Case | Description | Input Sample | Expected Outcome | Result |
+| :--- | :--- | :--- | :--- | :--- |
+| **Short Words** | 1-2 character tokens | `"I am on a roll"` | Renders without crashing, proper spacing preserved | **PASS** (1080x1920) |
+| **Long Words** | 20+ character tokens | `"Supercalifragilisticexpialidocious"` | Word wraps cleanly, no ASS syntax errors | **PASS** (1080x1920) |
+| **Emoji** | Multi-byte Unicode symbols | `"🚀 Incredible drop! 🔥💯"` | Handled cleanly in ASS events without corruption | **PASS** (1080x1920) |
+| **Arabic RTL** | Bidirectional Arabic script | `"مرحبا بكم في كليبتيكا لأفضل الفيديوهات"` | Preserves UTF-8 encoding and glyph positioning | **PASS** (1080x1920) |
+| **ASS Injection** | Malicious ASS control codes | `"Hack {\b1\c&H0000FF&} \N \h \N payload"` | Strips raw control tags, escapes backslashes | **PASS** (Sanitized) |
+| **Empty Word Timings**| Fallback timestamp reconstruction | Segment with 0 word-level timestamps | Interpolates timing based on segment start/end | **PASS** |
+
+- **Host & FFmpeg Libass Verification (`scripts/test-render-styles.mjs`)**:
+  - Installed `fonts-liberation` on Ubuntu 24.04 EC2 host for metric compatibility with Arial, Arial Black, and Times New Roman.
+  - Rendered all 6 presets through live FFmpeg `libass` on EC2 (`13.62.192.145`):
+    - `hormozi`: 1080x1920 in 474ms (✓ PASS)
+    - `clean_minimal`: 1080x1920 in 483ms (✓ PASS)
+    - `neon_highlight`: 1080x1920 in 491ms (✓ PASS)
+    - `bold_impact`: 1080x1920 in 479ms (✓ PASS)
+    - `classic_subtitle`: 1080x1920 in 493ms (✓ PASS)
+    - `highlighter`: 1080x1920 in 472ms (✓ PASS)
+- **UI & Pipeline Integration**:
+  - Added visual caption style picker grid to `src/app/(dashboard)/dashboard/projects/new/page.tsx` with live preview badges and style descriptions.
+  - Added `captionStyle` field to Prisma schema (`Project.captionStyle`) and pushed to production Neon DB.
+  - Updated worker job processor (`worker/worker.mjs`) to read `project.captionStyle` and generate the matching ASS file.
+  - Full build pass on EC2: 56/56 pages compiled, PM2 reloaded `nology-web` and `nology-worker` (0 errors).

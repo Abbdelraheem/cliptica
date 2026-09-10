@@ -13,7 +13,7 @@
 import { PrismaClient } from '@prisma/client'
 import { execFile } from 'child_process'
 import { promisify } from 'util'
-import { mkdtemp, rm, writeFile, readFile } from 'fs/promises'
+import { mkdtemp, rm, writeFile, readFile, mkdir, copyFile, stat } from 'fs/promises'
 import { tmpdir } from 'os'
 import path from 'path'
 import { calcCredits, exceedsPlanMinutes, planMaxMinutes } from './credits.mjs'
@@ -671,7 +671,129 @@ async function ensureWithinPlan(project) {
   }
 }
 
+async function processClipAdjust(job) {
+  const setP = (p) => prisma.processingJob.update({ where: { id: job.id }, data: { progress: p } })
+  const { clipId, start, end, captionStyle: reqStyle } = job.result || {}
+  if (!clipId || start == null || end == null) {
+    throw new Error('Invalid clip adjust parameters')
+  }
+
+  const project = await prisma.project.findUnique({ where: { id: job.projectId } })
+  if (!project) throw new Error(`Project ${job.projectId} not found`)
+
+  const clip = await prisma.clip.findUnique({ where: { id: clipId } })
+  if (!clip) throw new Error(`Clip ${clipId} not found`)
+
+  console.log(`[worker] [clip_adjust] ${job.id}: adjusting clip ${clipId} to [${start}s, ${end}s]`)
+  await setP(10)
+
+  const dir = await mkdtemp(path.join(tmpdir(), 'nology-adj-'))
+  try {
+    // 1. Acquire source video: check persistent cache first, else download
+    const cacheDir = path.join(tmpdir(), 'nology-sources')
+    await mkdir(cacheDir, { recursive: true }).catch(() => {})
+    const cachedSrc = path.join(cacheDir, `${project.id}.mp4`)
+
+    let src = null
+    try {
+      const st = await stat(cachedSrc)
+      if (st.size > 1000) {
+        console.log(`[worker] [clip_adjust] using cached source video: ${cachedSrc}`)
+        src = cachedSrc
+      }
+    } catch {
+      // not in cache
+    }
+
+    if (!src) {
+      console.log(`[worker] [clip_adjust] fetching source (${project.sourceFile ? 'upload' : 'url'})`)
+      await setP(20)
+      src = project.sourceFile
+        ? await downloadFromR2(project.sourceFile, dir)
+        : await download(project.sourceUrl, dir)
+
+      // save to cache for subsequent adjustments
+      await copyFile(src, cachedSrc).catch(() => {})
+    }
+
+    await setP(40)
+
+    // 2. Transcript words: read from cached project.transcript or clip.captionData
+    let transcript = project.transcript
+    if (!transcript || !Array.isArray(transcript.words)) {
+      if (clip.captionData && Array.isArray(clip.captionData.words)) {
+        transcript = { words: clip.captionData.words }
+      } else {
+        transcript = { words: [] }
+      }
+    }
+
+    const captionStyle = reqStyle || clip.captionStyle || project.captionStyle || 'hormozi'
+    const moment = {
+      start,
+      end,
+      title: clip.title,
+      text: clip.title,
+      emoji: clip.captionData?.emoji || '',
+      score: clip.viralScore,
+    }
+
+    console.log(`[worker] [clip_adjust] rendering clip ${clipId} [${start}s-${end}s, style=${captionStyle}]`)
+    await setP(60)
+
+    const motion = clip.motionGraphics?.mode === 'ai-motion' ? clip.motionGraphics : null
+    const rendered = await renderClip(
+      src,
+      moment,
+      dir,
+      `adj_${Date.now()}`,
+      transcript,
+      project.framing ?? 'smart',
+      motion,
+      captionStyle
+    )
+
+    await setP(85)
+    console.log(`[worker] [clip_adjust] uploading adjusted clip to R2`)
+
+    const base = `${project.userId}/${project.id}`
+    const timestamp = Date.now()
+    const url = await uploadToR2(rendered.file, `${base}/clip-${clip.id}-adj-${timestamp}.mp4`)
+    const thumbUrl = await uploadToR2(rendered.thumb, `${base}/thumb-${clip.id}-adj-${timestamp}.jpg`, 'image/jpeg')
+
+    const winWords = (transcript.words ?? []).filter((w) => w.end > start && w.start < end)
+
+    await prisma.clip.update({
+      where: { id: clip.id },
+      data: {
+        sourceStart: Math.round(start),
+        sourceEnd: Math.round(end),
+        duration: Math.round(end - start),
+        status: 'READY',
+        videoUrl: url,
+        exportUrl: url,
+        thumbnailUrl: thumbUrl,
+        captionStyle,
+        captionData: {
+          mode: 'karaoke',
+          emoji: moment.emoji ?? '',
+          words: winWords,
+          style: captionStyle,
+        },
+      },
+    })
+
+    console.log(`[worker] [clip_adjust] clip ${clipId} updated successfully to [${start}s-${end}s]`)
+  } finally {
+    await rm(dir, { recursive: true, force: true }).catch(() => {})
+  }
+}
+
 async function processJob(job) {
+  if (job.type === 'clip_adjust') {
+    return processClipAdjust(job)
+  }
+
   const project = await prisma.project.findUnique({ where: { id: job.projectId } })
   if (!project || (!project.sourceUrl && !project.sourceFile)) throw new Error('project has no source')
 
@@ -685,6 +807,13 @@ async function processJob(job) {
     const src = project.sourceFile
       ? await downloadFromR2(project.sourceFile, dir)
       : (await ensureWithinPlan(project), await download(project.sourceUrl, dir))
+
+    // Cache source video for fast subsequent clip adjustments
+    try {
+      const cacheDir = path.join(tmpdir(), 'nology-sources')
+      await mkdir(cacheDir, { recursive: true })
+      await copyFile(src, path.join(cacheDir, `${project.id}.mp4`))
+    } catch {}
 
     // Probe BEFORE transcribing — a too-long source must fail fast and
     // cheaply instead of paying for transcription of an out-of-plan video.
@@ -700,6 +829,9 @@ async function processJob(job) {
     console.log('[worker] transcribing')
     await setP(30)
     const transcript = await transcribe(src, dir, project.language ?? 'auto')
+    await prisma.project.update({ where: { id: project.id }, data: { transcript } }).catch((e) => {
+      console.warn('[worker] failed to cache transcript to project:', e.message)
+    })
 
     console.log('[worker] scoring moments')
     await setP(52)
@@ -820,7 +952,7 @@ async function recoverStale() {
   }
 }
 
-/** Remove abandoned nology-* directories in tmpdir older than 1 hour */
+/** Remove abandoned nology-* directories and cached sources in tmpdir older than 2-4 hours */
 async function cleanOrphanTempDirs() {
   try {
     const fs = await import('fs/promises')
@@ -828,13 +960,23 @@ async function cleanOrphanTempDirs() {
     const entries = await fs.readdir(tDir)
     const now = Date.now()
     for (const entry of entries) {
-      if (entry.startsWith('nology-')) {
+      if (entry.startsWith('nology-') && entry !== 'nology-sources') {
         const fullPath = path.join(tDir, entry)
         const stat = await fs.stat(fullPath).catch(() => null)
         if (stat && stat.isDirectory() && now - stat.mtimeMs > 60 * 60 * 1000) {
           await fs.rm(fullPath, { recursive: true, force: true }).catch(() => {})
           console.log(`[worker] cleaned orphan temp dir: ${entry}`)
         }
+      }
+    }
+    // Clean old cached source files
+    const cacheDir = path.join(tDir, 'nology-sources')
+    const cacheFiles = await fs.readdir(cacheDir).catch(() => [])
+    for (const file of cacheFiles) {
+      const p = path.join(cacheDir, file)
+      const st = await fs.stat(p).catch(() => null)
+      if (st && now - st.mtimeMs > 4 * 60 * 60 * 1000) {
+        await fs.rm(p, { force: true }).catch(() => {})
       }
     }
   } catch {
@@ -898,29 +1040,65 @@ async function loop() {
         console.error(`[worker] ${job.id} FAILED:`, e.message)
         console.error(e.stack ?? e)
         await prisma.processingJob.update({ where: { id: job.id }, data: { status: 'failed', error: e.message } }).catch(() => {})
-        await prisma.project.update({ where: { id: job.projectId }, data: { status: 'FAILED' } }).catch(() => {})
 
-        // Refund any upfront reserved credits so a failed run never penalises the user
-        try {
-          const p = await prisma.project.findUnique({ where: { id: job.projectId }, select: { userId: true, creditsUsed: true, title: true } })
-          if (p && p.creditsUsed > 0) {
-            await prisma.$transaction([
-              prisma.user.update({ where: { id: p.userId }, data: { credits: { increment: p.creditsUsed } } }),
-              prisma.creditTransaction.create({
-                data: {
-                  userId: p.userId,
-                  amount: p.creditsUsed,
-                  type: 'refund',
-                  description: `Refund: Processing failed for "${p.title.slice(0, 50)}"`,
-                  metadata: { projectId: job.projectId },
-                },
-              }),
-              prisma.project.update({ where: { id: job.projectId }, data: { creditsUsed: 0 } }),
-            ])
-            console.log(`[worker] refunded ${p.creditsUsed} credits for failed project ${job.projectId}`)
+        if (job.type === 'clip_adjust') {
+          const clipId = job.result?.clipId
+          if (clipId) {
+            const clip = await prisma.clip.findUnique({ where: { id: clipId }, select: { videoUrl: true } }).catch(() => null)
+            await prisma.clip.update({
+              where: { id: clipId },
+              data: { status: clip?.videoUrl ? 'READY' : 'FAILED' },
+            }).catch(() => {})
           }
-        } catch (refErr) {
-          console.error(`[worker] refund failed for ${job.projectId}:`, refErr.message)
+
+          const charged = job.result?.chargedCredits
+          if (charged > 0) {
+            try {
+              const project = await prisma.project.findUnique({ where: { id: job.projectId }, select: { userId: true, title: true } })
+              if (project) {
+                await prisma.$transaction([
+                  prisma.user.update({ where: { id: project.userId }, data: { credits: { increment: charged } } }),
+                  prisma.creditTransaction.create({
+                    data: {
+                      userId: project.userId,
+                      amount: charged,
+                      type: 'refund',
+                      description: `Refund: Clip adjustment failed for "${project.title.slice(0, 50)}"`,
+                      metadata: { projectId: job.projectId, clipId },
+                    },
+                  }),
+                ])
+                console.log(`[worker] refunded ${charged} credit for failed clip adjustment on ${job.projectId}`)
+              }
+            } catch (refErr) {
+              console.error(`[worker] refund failed for clip adjust ${job.projectId}:`, refErr.message)
+            }
+          }
+        } else {
+          await prisma.project.update({ where: { id: job.projectId }, data: { status: 'FAILED' } }).catch(() => {})
+
+          // Refund any upfront reserved credits so a failed run never penalises the user
+          try {
+            const p = await prisma.project.findUnique({ where: { id: job.projectId }, select: { userId: true, creditsUsed: true, title: true } })
+            if (p && p.creditsUsed > 0) {
+              await prisma.$transaction([
+                prisma.user.update({ where: { id: p.userId }, data: { credits: { increment: p.creditsUsed } } }),
+                prisma.creditTransaction.create({
+                  data: {
+                    userId: p.userId,
+                    amount: p.creditsUsed,
+                    type: 'refund',
+                    description: `Refund: Processing failed for "${p.title.slice(0, 50)}"`,
+                    metadata: { projectId: job.projectId },
+                  },
+                }),
+                prisma.project.update({ where: { id: job.projectId }, data: { creditsUsed: 0 } }),
+              ])
+              console.log(`[worker] refunded ${p.creditsUsed} credits for failed project ${job.projectId}`)
+            }
+          } catch (refErr) {
+            console.error(`[worker] refund failed for ${job.projectId}:`, refErr.message)
+          }
         }
       }
     } catch (e) {

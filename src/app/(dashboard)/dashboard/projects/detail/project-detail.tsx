@@ -5,13 +5,15 @@ import { useCallback, useEffect, useState } from 'react'
 import {
   ArrowLeft, Loader2, AlertTriangle, Download, Sparkles,
   Captions, ScanFace, Clock, Flame, Clapperboard,
-  Copy, Check, Share2,
+  Copy, Check, Share2, Scissors, SlidersHorizontal, Zap,
 } from 'lucide-react'
 
 type Clip = {
   id: string
   title: string
   description: string | null
+  sourceStart: number
+  sourceEnd: number
   viralScore: number
   hookScore: number | null
   duration: number
@@ -19,8 +21,10 @@ type Clip = {
   videoUrl: string | null
   exportUrl: string | null
   thumbnailUrl: string | null
-  captionData: { mode?: string; emoji?: string } | null
+  captionStyle: string
+  captionData: { mode?: string; emoji?: string; words?: Array<{ start: number; end: number; word: string }> } | null
   motionGraphics: { mode?: string; headline?: string; kicker?: string } | null
+  createdAt: string
 }
 
 type Project = {
@@ -30,6 +34,7 @@ type Project = {
   sourceUrl: string | null
   framing: string
   language: string
+  captionStyle?: string
   instructions: string | null
   duration: number
   createdAt: string
@@ -44,6 +49,15 @@ const STAGE_COPY: Record<string, string> = {
   failed: 'Processing failed',
 }
 
+const CAPTION_PRESET_OPTIONS = [
+  { id: 'hormozi', name: 'Hormozi Pop (Yellow High-Impact)' },
+  { id: 'clean_minimal', name: 'Clean Minimal (Soft Subtitle)' },
+  { id: 'neon_highlight', name: 'Neon Highlight (Electric Cyan)' },
+  { id: 'bold_impact', name: 'Bold Impact (Punchy Red/Gold)' },
+  { id: 'classic_subtitle', name: 'Classic Subtitle (Cinema Standard)' },
+  { id: 'highlighter', name: 'Highlighter Marker (Neon Lime)' },
+] as const
+
 function mmss(s: number) {
   return `${Math.floor(s / 60)}:${String(Math.round(s % 60)).padStart(2, '0')}`
 }
@@ -53,6 +67,77 @@ export default function ProjectDetail({ projectId }: { projectId: string }) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [copiedId, setCopiedId] = useState<string | null>(null)
+
+  const [editingClipId, setEditingClipId] = useState<string | null>(null)
+  const [adjustState, setAdjustState] = useState<{ start: number; end: number; captionStyle: string }>({
+    start: 0,
+    end: 30,
+    captionStyle: 'hormozi',
+  })
+  const [adjusting, setAdjusting] = useState(false)
+  const [adjustError, setAdjustError] = useState<string | null>(null)
+
+  const openAdjust = (c: Clip) => {
+    if (editingClipId === c.id) {
+      setEditingClipId(null)
+      return
+    }
+    setEditingClipId(c.id)
+    setAdjustState({
+      start: c.sourceStart ?? 0,
+      end: c.sourceEnd ?? (c.sourceStart ?? 0) + (c.duration || 30),
+      captionStyle: c.captionStyle || project?.captionStyle || 'hormozi',
+    })
+    setAdjustError(null)
+  }
+
+  const nudgeStart = (delta: number) => {
+    setAdjustState((prev) => {
+      const nextStart = Math.max(0, prev.start + delta)
+      return nextStart < prev.end ? { ...prev, start: nextStart } : prev
+    })
+  }
+
+  const nudgeEnd = (delta: number) => {
+    setAdjustState((prev) => {
+      const maxDur = project?.duration || 999999
+      const nextEnd = Math.min(maxDur, Math.max(prev.start + 15, prev.end + delta))
+      return { ...prev, end: nextEnd }
+    })
+  }
+
+  const handleReRender = async (clipId: string) => {
+    setAdjusting(true)
+    setAdjustError(null)
+    try {
+      const res = await fetch(`/api/projects/${projectId}/clips/${clipId}/adjust`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          start: adjustState.start,
+          end: adjustState.end,
+          captionStyle: adjustState.captionStyle,
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to adjust clip')
+      }
+      setProject((cur) => {
+        if (!cur) return cur
+        return {
+          ...cur,
+          clips: cur.clips.map((c) => (c.id === clipId ? { ...c, status: 'GENERATING' } : c)),
+        }
+      })
+      setEditingClipId(null)
+      load()
+    } catch (e: any) {
+      setAdjustError(e.message || 'Failed to adjust clip')
+    } finally {
+      setAdjusting(false)
+    }
+  }
 
   const copySocialKit = async (c: Clip) => {
     const hook = c.description || (c.motionGraphics?.headline ? `${c.motionGraphics.headline} — ${c.motionGraphics.kicker}` : 'Watch this viral highlight.')
@@ -92,14 +177,17 @@ export default function ProjectDetail({ projectId }: { projectId: string }) {
 
   useEffect(() => {
     load().finally(() => setLoading(false))
-    // Live-refresh while the pipeline is working.
+    // Live-refresh while the pipeline is working or any clip is adjusting.
     const t = setInterval(() => {
       setProject((cur) => {
-        if (cur && cur.status !== 'PENDING' && cur.status !== 'PROCESSING') return cur
-        load()
+        const hasWorkingClip = cur?.clips.some((c) => c.status === 'GENERATING')
+        const isProjectWorking = cur && (cur.status === 'PENDING' || cur.status === 'PROCESSING')
+        if (isProjectWorking || hasWorkingClip) {
+          load()
+        }
         return cur
       })
-    }, 10_000)
+    }, 4_000)
     return () => clearInterval(t)
   }, [load])
 
@@ -198,7 +286,17 @@ export default function ProjectDetail({ projectId }: { projectId: string }) {
           {project.clips.map((c) => (
             <div key={c.id} className="glass-card group !p-0 overflow-hidden transition-transform duration-300 hover:-translate-y-1">
               <div className="relative aspect-[9/13] bg-black">
-                {c.videoUrl ? (
+                {c.status === 'GENERATING' ? (
+                  <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/85 p-4 text-center z-10">
+                    <Loader2 className="h-8 w-8 animate-spin text-gold" />
+                    <p className="mt-3 font-display text-sm font-semibold text-white">Re-trimming clip…</p>
+                    <p className="mt-1 text-xs font-light text-champagne">Fast render: ~10-20s</p>
+                    <p className="mt-0.5 text-[10px] text-mist-2">Reusing transcript & face tracking</p>
+                    <div className="mt-4 h-1.5 w-3/4 overflow-hidden rounded-full bg-white/10">
+                      <div className="h-full w-2/3 animate-pulse rounded-full bg-gradient-to-r from-gold to-champagne" />
+                    </div>
+                  </div>
+                ) : c.videoUrl ? (
                   <video src={c.videoUrl} poster={c.thumbnailUrl ?? undefined} controls preload="metadata" className="h-full w-full object-cover" />
                 ) : (
                   <div className={`absolute inset-0 flex items-center justify-center ${working ? 'animate-pulse' : ''}`}>
@@ -210,7 +308,7 @@ export default function ProjectDetail({ projectId }: { projectId: string }) {
                     )}
                   </div>
                 )}
-                <div className="absolute right-2.5 top-2.5 flex items-center gap-1.5 rounded-lg border border-gold/40 bg-black/75 px-2.5 py-1 font-display text-xs backdrop-blur shadow-sm">
+                <div className="absolute right-2.5 top-2.5 flex items-center gap-1.5 rounded-lg border border-gold/40 bg-black/75 px-2.5 py-1 font-display text-xs backdrop-blur shadow-sm z-20">
                   {c.viralScore >= 90 ? (
                     <span className="flex items-center gap-1 text-gold font-bold">
                       <Flame className="h-3.5 w-3.5 fill-gold/30" /> {c.viralScore}% VIRAL
@@ -224,7 +322,7 @@ export default function ProjectDetail({ projectId }: { projectId: string }) {
                   )}
                 </div>
                 {c.motionGraphics?.mode === 'ai-motion' && (
-                  <span className="absolute left-2.5 top-2.5 flex items-center gap-1 rounded-lg border border-champagne/40 bg-black/70 px-2 py-0.5 font-mono text-[10px] uppercase tracking-wider text-champagne backdrop-blur">
+                  <span className="absolute left-2.5 top-2.5 flex items-center gap-1 rounded-lg border border-champagne/40 bg-black/70 px-2 py-0.5 font-mono text-[10px] uppercase tracking-wider text-champagne backdrop-blur z-20">
                     <Clapperboard className="h-3 w-3" /> AI motion
                   </span>
                 )}
@@ -233,7 +331,12 @@ export default function ProjectDetail({ projectId }: { projectId: string }) {
                 <div>
                   <h3 className="line-clamp-2 text-sm font-semibold text-white group-hover:text-gold transition-colors">{c.title}</h3>
                   <div className="mt-2 flex items-center justify-between text-xs font-light text-mist-2">
-                    <span className="flex items-center gap-1"><Clock className="h-3 w-3" /> {mmss(c.duration)}</span>
+                    <span className="flex items-center gap-1">
+                      <Clock className="h-3 w-3" /> {mmss(c.duration)}
+                      {c.sourceStart != null && c.sourceEnd != null && (
+                        <span className="font-mono text-[11px] text-champagne/80">({mmss(c.sourceStart)} - {mmss(c.sourceEnd)})</span>
+                      )}
+                    </span>
                     {c.hookScore != null && <span className="rounded bg-white/5 px-1.5 py-0.5 font-mono">hook: {c.hookScore}</span>}
                   </div>
                   {c.description && (
@@ -247,20 +350,27 @@ export default function ProjectDetail({ projectId }: { projectId: string }) {
                   <div className="flex gap-2">
                     <button
                       type="button"
+                      onClick={() => openAdjust(c)}
+                      disabled={c.status === 'GENERATING'}
+                      className={`btn-lux btn-outline flex-1 !py-1.5 !px-2 !text-xs !font-normal ${
+                        editingClipId === c.id ? '!border-gold !text-gold' : ''
+                      }`}
+                      title="Adjust clip start/end timestamps and caption style"
+                    >
+                      <Scissors className="h-3.5 w-3.5 text-champagne" />
+                      <span>{editingClipId === c.id ? 'Close' : 'Adjust Trim'}</span>
+                    </button>
+
+                    <button
+                      type="button"
                       onClick={() => copySocialKit(c)}
-                      className="btn-lux btn-outline flex-1 !py-1.5 !px-2 !text-xs !font-normal"
+                      className="btn-lux btn-outline !py-1.5 !px-2.5 !text-xs !font-normal"
                       title="Copy viral title, hook, and trending hashtags for TikTok/Shorts/Reels"
                     >
                       {copiedId === `kit-${c.id}` ? (
-                        <>
-                          <Check className="h-3.5 w-3.5 text-emerald-400" />
-                          <span className="text-emerald-400 font-medium">Copied!</span>
-                        </>
+                        <Check className="h-3.5 w-3.5 text-emerald-400" />
                       ) : (
-                        <>
-                          <Copy className="h-3.5 w-3.5 text-champagne" />
-                          <span>Copy Social Kit</span>
-                        </>
+                        <Copy className="h-3.5 w-3.5 text-champagne" />
                       )}
                     </button>
 
@@ -279,6 +389,166 @@ export default function ProjectDetail({ projectId }: { projectId: string }) {
                       </button>
                     )}
                   </div>
+
+                  {editingClipId === c.id && (
+                    <div className="mt-3 space-y-3 rounded-xl border border-gold/30 bg-black/60 p-3 text-xs">
+                      <div className="flex items-center justify-between border-b border-white/10 pb-2">
+                        <span className="flex items-center gap-1.5 font-semibold text-gold">
+                          <Scissors className="h-3.5 w-3.5" /> Adjust Clip Bounds
+                        </span>
+                        <span
+                          className={`rounded px-1.5 py-0.5 font-mono text-[10px] ${
+                            adjustState.end - adjustState.start >= 15 && adjustState.end - adjustState.start <= 120
+                              ? 'bg-emerald-500/20 text-emerald-300'
+                              : 'bg-red-500/20 text-red-300'
+                          }`}
+                        >
+                          {adjustState.end - adjustState.start}s (15s-120s)
+                        </span>
+                      </div>
+
+                      {/* Start Time */}
+                      <div>
+                        <div className="flex items-center justify-between text-[11px] text-mist">
+                          <span>Start Time</span>
+                          <span className="font-mono font-medium text-white">{mmss(adjustState.start)} ({adjustState.start}s)</span>
+                        </div>
+                        <div className="mt-1.5 flex gap-1">
+                          <button
+                            type="button"
+                            onClick={() => nudgeStart(-5)}
+                            className="flex-1 rounded border border-white/10 bg-white/5 py-1 text-[10px] hover:bg-white/10 text-mist hover:text-white"
+                          >
+                            -5s
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => nudgeStart(-1)}
+                            className="flex-1 rounded border border-white/10 bg-white/5 py-1 text-[10px] hover:bg-white/10 text-mist hover:text-white"
+                          >
+                            -1s
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => nudgeStart(1)}
+                            className="flex-1 rounded border border-white/10 bg-white/5 py-1 text-[10px] hover:bg-white/10 text-mist hover:text-white"
+                          >
+                            +1s
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => nudgeStart(5)}
+                            className="flex-1 rounded border border-white/10 bg-white/5 py-1 text-[10px] hover:bg-white/10 text-mist hover:text-white"
+                          >
+                            +5s
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* End Time */}
+                      <div>
+                        <div className="flex items-center justify-between text-[11px] text-mist">
+                          <span>End Time</span>
+                          <span className="font-mono font-medium text-white">{mmss(adjustState.end)} ({adjustState.end}s)</span>
+                        </div>
+                        <div className="mt-1.5 flex gap-1">
+                          <button
+                            type="button"
+                            onClick={() => nudgeEnd(-5)}
+                            className="flex-1 rounded border border-white/10 bg-white/5 py-1 text-[10px] hover:bg-white/10 text-mist hover:text-white"
+                          >
+                            -5s
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => nudgeEnd(-1)}
+                            className="flex-1 rounded border border-white/10 bg-white/5 py-1 text-[10px] hover:bg-white/10 text-mist hover:text-white"
+                          >
+                            -1s
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => nudgeEnd(1)}
+                            className="flex-1 rounded border border-white/10 bg-white/5 py-1 text-[10px] hover:bg-white/10 text-mist hover:text-white"
+                          >
+                            +1s
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => nudgeEnd(5)}
+                            className="flex-1 rounded border border-white/10 bg-white/5 py-1 text-[10px] hover:bg-white/10 text-mist hover:text-white"
+                          >
+                            +5s
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Caption Style */}
+                      <div>
+                        <label className="text-[11px] text-mist block mb-1">Caption Preset</label>
+                        <select
+                          value={adjustState.captionStyle}
+                          onChange={(e) => setAdjustState((prev) => ({ ...prev, captionStyle: e.target.value }))}
+                          className="w-full rounded border border-white/15 bg-black/80 px-2 py-1.5 text-xs text-white focus:border-gold focus:outline-none"
+                        >
+                          {CAPTION_PRESET_OPTIONS.map((opt) => (
+                            <option key={opt.id} value={opt.id}>
+                              {opt.name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      {/* Cost notice */}
+                      <div className="flex items-center gap-1.5 rounded bg-gold/10 px-2 py-1.5 text-[11px] text-champagne">
+                        <Zap className="h-3 w-3 text-gold flex-shrink-0" />
+                        <span>
+                          {Date.now() - new Date(c.createdAt).getTime() <= 15 * 60 * 1000
+                            ? 'Free re-render (within 15m edit window)'
+                            : 'Re-render costs 1 credit'}
+                          {' · ~10-20s'}
+                        </span>
+                      </div>
+
+                      {adjustError && (
+                        <p className="rounded bg-red-500/10 p-1.5 text-[11px] text-red-300">
+                          {adjustError}
+                        </p>
+                      )}
+
+                      <div className="flex gap-2 pt-1">
+                        <button
+                          type="button"
+                          onClick={() => setEditingClipId(null)}
+                          className="btn-lux btn-outline flex-1 !py-1.5 !text-xs"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleReRender(c.id)}
+                          disabled={
+                            adjusting ||
+                            adjustState.end - adjustState.start < 15 ||
+                            adjustState.end - adjustState.start > 120
+                          }
+                          className="btn-lux btn-primary flex-1 !py-1.5 !text-xs disabled:opacity-50"
+                        >
+                          {adjusting ? (
+                            <>
+                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                              <span>Queuing…</span>
+                            </>
+                          ) : (
+                            <>
+                              <Zap className="h-3.5 w-3.5" />
+                              <span>Re-render</span>
+                            </>
+                          )}
+                        </button>
+                      </div>
+                    </div>
+                  )}
 
                   {(c.exportUrl || c.videoUrl) && (
                     <a
