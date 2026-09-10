@@ -383,3 +383,86 @@ Date format: YYYY-MM-DD. One entry per completed round (what was checked → wha
   - Added `captionStyle` field to Prisma schema (`Project.captionStyle`) and pushed to production Neon DB.
   - Updated worker job processor (`worker/worker.mjs`) to read `project.captionStyle` and generate the matching ASS file.
   - Full build pass on EC2: 56/56 pages compiled, PM2 reloaded `nology-web` and `nology-worker` (0 errors).
+
+---
+
+## Round 16: Gap 2 (Fast In-Product Clip Trim Adjustment & Lightweight Re-Render)
+
+**Date**: 2026-09-11  
+**Commits**:
+- `6a19fd0` — `feat(editor): add fast clip trim adjustment and lightweight re-render`
+- `ab1f2f0` — `fix(editor): resolve ESLint unused variable and type warnings in project detail and worker`
+
+### Implementation Summary
+1. **Lightweight Trim Pipeline**:
+   - Added `transcript Json?` to Prisma schema `Project` model and synced to production Neon PostgreSQL.
+   - Saved full Whisper word timestamps to `project.transcript` upon initial processing.
+   - Implemented persistent media caching in `tmpdir/nology-sources/[projectId].mp4` with automatic 4-hour stale cleanup.
+   - Added `processClipAdjust(job)` to `worker/worker.mjs` which:
+     - Bypasses Groq Whisper transcription and LLM scoring completely.
+     - Filters cached word-level timestamps to the new `[start, end]` window.
+     - Generates updated ASS subtitles with the chosen caption preset.
+     - Renders 1080x1920 MP4 through FFmpeg with `loudnorm` audio normalization.
+     - Uploads new MP4 and thumbnail to Cloudflare R2 and updates `Clip` in database.
+2. **API Endpoint (`POST /api/projects/[id]/clips/[clipId]/adjust`)**:
+   - Validates `start >= 0`, `end > start`, duration 15s–120s, and `end <= source duration`.
+   - Checks project and clip ownership with session authentication and rate limiting.
+   - Enforces credit policy: **Free within 15 minutes of creation**; **1 credit thereafter**.
+   - Graceful failure recovery: auto-refunds charged credit and restores clip state if re-trim fails.
+3. **Creator UI Controls (`project-detail.tsx`)**:
+   - Added "Adjust Trim" toggle button on each clip card.
+   - Inline trim panel with:
+     - Start / End time display in `mm:ss` format.
+     - Dedicated `[-5s]`, `[-1s]`, `[+1s]`, `[+5s]` nudge buttons.
+     - Allowed duration badge (15s–120s).
+     - Caption preset dropdown selector.
+     - Real-time cost notification (Free vs 1 credit).
+     - "Re-render Clip (~10-20s)" button.
+   - Active status overlay on clip preview card during re-render with animated progress bar.
+   - Reactive 4s polling automatically picks up completed renders.
+4. **Verification & Performance Evidence (`scripts/test-clip-adjust.mjs`)**:
+   - Executed live pipeline test on EC2 host (`13.62.192.145`):
+     - Trimmed 30s source to [5s, 22s] (17s duration) with `neon_highlight` caption preset.
+     - Retained 13/21 synchronized words in window.
+     - Probe verified: 1080x1920 vertical video at exactly 17.00 seconds.
+     - Total execution time: **7,995ms** (7.99 seconds, beating the <20s SLA by 60%).
+   - Unit tests: 11 tests in `tests/clip-adjust.test.ts` passing (100%).
+
+---
+
+## Round 17: Gap 3 (Pricing Rebuild & Unit Economics Verification)
+
+**Date**: 2026-09-11  
+**Commit**: `36818a7` — `feat(pricing): rebuild subscription tiers with verified unit economics`
+
+### Implementation Summary
+1. **Direct Infrastructure Cost Modeling**:
+   - Groq Whisper Large v3 Turbo: **$0.001850 / minute**.
+   - Groq Llama 3.3 70B Moment Scoring: **$0.000600 / minute**.
+   - Cloudflare R2 Media Storage (15MB/clip, 0 egress): **$0.000135 / minute-month**.
+   - AWS EC2 Compute (c6i.xlarge @ $0.17/hr, 0.25 encoding ratio): **$0.000708 / minute**.
+   - **Total Fully Loaded Infra COGS**: **$0.003293 / minute** (~$0.0033).
+2. **Tier Unit Economics & Margin Verification**:
+   - **Free Tier (40 credits)**: Maximum lifetime cost exposure is strictly capped at **$0.1317** per user, protected by hardware device fingerprinting (`Device.fingerprintHash`).
+   - **Clipper Tier ($19 / month, 300 minutes)**:
+     - Revenue: $19.00 ($0.0633/min).
+     - Stripe fee: $0.851.
+     - Maximum infra COGS: $0.988.
+     - Total COGS: $1.839.
+     - Net Gross Profit: **+$17.161 / month**.
+     - **Gross Margin**: **90.3%** (exceeds >=60% target).
+   - **Studio Tier ($49 / month, 1,200 minutes)**:
+     - Revenue: $49.00 ($0.0408/min).
+     - Stripe fee: $1.721.
+     - Maximum infra COGS: $3.952.
+     - Total COGS: $5.673.
+     - Net Gross Profit: **+$43.327 / month**.
+     - **Gross Margin**: **88.4%** (exceeds >=60% target).
+3. **Fast Clip Adjustment Economics**:
+   - Re-trim technical COGS: **$0.00041** (< 0.05¢).
+   - Paid re-trims (1 credit = ~$0.04 - $0.06 value) generate **>99.2% gross margin**.
+4. **Market Benchmarking & Documentation**:
+   - Authored complete financial model: `PRICING_MODEL.md`.
+   - Created unit tests in `tests/pricing-model.test.ts` (5 tests passing).
+   - Updated `COMPETITIVE_GAP_ANALYSIS.md` and created `GAP_CLOSURE_REPORT.md`.
+   - All 12 test suites passing (144/144 tests) on both local environment and EC2 production host.
