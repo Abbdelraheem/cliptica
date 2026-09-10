@@ -12,7 +12,7 @@ const PLANS = [
     price: '$0',
     period: '/ forever',
     credits: '40 credits to start',
-    items: ['All 15 caption styles', '720p exports with mark', 'Up to 3 videos / day'],
+    items: ['Karaoke captions (Hormozi Pop)', '720p exports with mark', 'Up to 3 videos / day'],
   },
   {
     name: 'Clipper',

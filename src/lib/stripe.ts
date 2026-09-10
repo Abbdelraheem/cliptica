@@ -31,7 +31,7 @@ export const PLANS: Record<PlanKey, PlanDef> = {
     maxResolution: '720p',
     features: [
       '40 credits to start',
-      'All 15 caption styles',
+      'Karaoke captions (Hormozi Pop)',
       '720p exports with watermark',
       'Up to 3 videos/day',
     ],

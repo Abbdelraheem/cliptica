@@ -70,7 +70,7 @@ export default function RegisterPage() {
             A week of clips from <span className="italic-accent gold-text">one paste.</span>
           </h2>
           <ul className="mt-8 space-y-3.5">
-            {['40 free credits — no card required', 'All 15 caption styles unlocked', 'Campaign ledger from day one'].map(
+            {['40 free credits — no card required', 'Karaoke captions unlocked', 'Campaign ledger from day one'].map(
               (item) => (
                 <li key={item} className="flex items-center gap-3 text-sm font-light text-mist">
                   <span className="flex h-5 w-5 items-center justify-center rounded-full border border-hair text-champagne">
