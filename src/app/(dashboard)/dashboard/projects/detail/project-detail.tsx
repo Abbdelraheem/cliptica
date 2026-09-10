@@ -5,7 +5,7 @@ import { useCallback, useEffect, useState } from 'react'
 import {
   ArrowLeft, Loader2, AlertTriangle, Download, Sparkles,
   Captions, ScanFace, Clock, Flame, Clapperboard,
-  Copy, Check, Share2, Scissors, SlidersHorizontal, Zap,
+  Copy, Check, Share2, Scissors, Zap,
 } from 'lucide-react'
 
 type Clip = {
@@ -132,8 +132,8 @@ export default function ProjectDetail({ projectId }: { projectId: string }) {
       })
       setEditingClipId(null)
       load()
-    } catch (e: any) {
-      setAdjustError(e.message || 'Failed to adjust clip')
+    } catch (e: unknown) {
+      setAdjustError(e instanceof Error ? e.message : 'Failed to adjust clip')
     } finally {
       setAdjusting(false)
     }

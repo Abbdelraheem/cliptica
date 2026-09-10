@@ -19,7 +19,7 @@ import path from 'path'
 import { calcCredits, exceedsPlanMinutes, planMaxMinutes } from './credits.mjs'
 import { assertPublicHttpUrl } from './ssrf.mjs'
 import { ytProxyPool, recordProxyResult, redactProxy, categorizeDownloadError } from './proxy-pool.mjs'
-import { buildKaraokeAss, buildPhraseAss, CAPTION_STYLES } from './caption-styles.mjs'
+import { buildKaraokeAss, buildPhraseAss } from './caption-styles.mjs'
 
 const run = promisify(execFile)
 
