@@ -41,6 +41,12 @@ enum PayoutStatus {
   PAID
 }
 
+enum SocialPlatform {
+  TIKTOK
+  YOUTUBE
+  INSTAGRAM
+}
+
 model User {
   id                   String    @id @default(cuid())
   email                String    @unique
@@ -72,6 +78,8 @@ model User {
   creditTransactions      CreditTransaction[]
   passwordResetTokens     PasswordResetToken[]
   emailVerificationTokens EmailVerificationToken[]
+  socialConnections       SocialConnection[]
+  socialPublishLogs       SocialPublishLog[]
 
   @@index([stripeCustomerId])
   @@index([stripeSubscriptionId])
@@ -216,6 +224,7 @@ model Clip {
   user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
   campaignLinks CampaignClip[]
   payouts       Payout[]
+  publishLogs   SocialPublishLog[]
 
   @@index([projectId, viralScore])
   @@index([projectId, sourceStart])
@@ -343,4 +352,39 @@ model EmailVerificationToken {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
+}
+
+model SocialConnection {
+  id                  String         @id @default(cuid())
+  userId              String
+  user                User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  platform            SocialPlatform
+  accessToken         String         @db.Text
+  refreshToken        String?        @db.Text
+  tokenExpiresAt      DateTime?
+  platformAccountId   String?
+  platformAccountName String?
+  connectedAt         DateTime       @default(now())
+  updatedAt           DateTime       @updatedAt
+
+  @@unique([userId, platform])
+  @@index([userId])
+}
+
+model SocialPublishLog {
+  id             String         @id @default(cuid())
+  userId         String
+  clipId         String
+  platform       SocialPlatform
+  externalPostId String?
+  externalUrl    String?
+  status         String         @default("PUBLISHED") // PUBLISHED, FAILED, PROCESSING
+  errorMessage   String?
+  publishedAt    DateTime       @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  clip Clip @relation(fields: [clipId], references: [id], onDelete: Cascade)
+
+  @@index([userId, clipId])
+  @@index([clipId])
 }

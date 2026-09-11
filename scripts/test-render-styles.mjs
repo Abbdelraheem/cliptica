@@ -13,7 +13,6 @@ async function sh(cmd, args, opts = {}) {
 
 async function runRenderTests() {
   const tmp = await fs.mkdtemp(path.join(os.tmpdir(), 'style-render-'))
-  const baseVideo = path.join(tmp, 'base.mp4')
 
   console.log('Generating test base 9:16 video...')
   await sh('ffmpeg', [

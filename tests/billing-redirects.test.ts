@@ -39,7 +39,6 @@ vi.mock('@/lib/stripe', () => ({
 
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { stripe } from '@/lib/stripe'
 import { GET as checkoutGET } from '@/app/api/billing/checkout/route'
 import { GET as portalGET } from '@/app/api/billing/portal/route'
 
@@ -92,7 +91,7 @@ describe('Billing Redirects and Error Safe URLs', () => {
     vi.mocked(prisma.user.findUnique).mockResolvedValue({
       id: 'u1',
       stripeCustomerId: null,
-    } as any)
+    } as unknown as Awaited<ReturnType<typeof prisma.user.findUnique>>)
 
     const req = new Request('http://localhost:3000/api/billing/portal')
     const res = await portalGET(req)

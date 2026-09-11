@@ -12,10 +12,16 @@ import {
   Loader2,
   Lock,
   Plus,
+  Share2,
+  ExternalLink,
+  Unlink,
+  AlertCircle,
+  CheckCircle2,
   ShieldAlert,
   ShieldCheck,
   Trash2,
 } from 'lucide-react'
+import { ConnectionSummary } from '@/lib/social/types'
 
 interface ApiKeyItem {
   id: string
@@ -82,6 +88,12 @@ export default function SettingsPage() {
   const [loadingNotifs, setLoadingNotifs] = useState(true)
   const [savingNotifs, setSavingNotifs] = useState(false)
 
+  // Social Connections state
+  const [connections, setConnections] = useState<ConnectionSummary[]>([])
+  const [loadingConnections, setLoadingConnections] = useState(true)
+  const [disconnectingPlatform, setDisconnectingPlatform] = useState<string | null>(null)
+  const [socialBanner, setSocialBanner] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
+
   // Admin-only AI motion graphics kill switch
   const isAdmin = session?.user?.role === 'ADMIN'
   const [motionOn, setMotionOn] = useState<boolean | null>(null)
@@ -118,6 +130,29 @@ export default function SettingsPage() {
       .catch(() => {})
       .finally(() => setLoadingNotifs(false))
 
+    fetch('/api/social/connections')
+      .then((r) => (r.ok ? r.json() : { connections: [] }))
+      .then((d) => setConnections(d.connections || []))
+      .catch(() => setConnections([]))
+      .finally(() => setLoadingConnections(false))
+
+    if (typeof window !== 'undefined') {
+      const urlParams = new URLSearchParams(window.location.search)
+      const connected = urlParams.get('socialConnected')
+      const err = urlParams.get('error')
+      if (connected) {
+        setSocialBanner({
+          type: 'success',
+          message: `Successfully connected ${connected.toUpperCase()}! You can now publish clips directly to your account.`,
+        })
+      } else if (err) {
+        setSocialBanner({
+          type: 'error',
+          message: decodeURIComponent(err),
+        })
+      }
+    }
+
     if (isAdmin) {
       fetch('/api/admin/motion-fx')
         .then(async (r) => (r.ok ? r.json() : { enabled: false }))
@@ -125,6 +160,30 @@ export default function SettingsPage() {
         .catch(() => setMotionOn(false))
     }
   }, [isAdmin])
+
+  async function handleDisconnectSocial(platform: string) {
+    setDisconnectingPlatform(platform)
+    try {
+      const res = await fetch(`/api/social/connections?platform=${platform}`, { method: 'DELETE' })
+      if (res.ok) {
+        setConnections((prev) =>
+          prev.map((c) =>
+            c.platform === platform
+              ? {
+                  ...c,
+                  connected: false,
+                  accountName: null,
+                  accountId: null,
+                  status: 'not_connected',
+                }
+              : c
+          )
+        )
+      }
+    } finally {
+      setDisconnectingPlatform(null)
+    }
+  }
 
   async function toggleMotion() {
     if (motionOn === null) return
@@ -594,6 +653,140 @@ export default function SettingsPage() {
                 className="h-5 w-5 rounded accent-[#ff5a1f] cursor-pointer mt-0.5"
               />
             </label>
+          </div>
+        )}
+      </section>
+
+      {/* Social Accounts & Direct Publishing */}
+      <section className="mt-8 rounded-3xl border border-hair bg-onyx/40 p-8 backdrop-blur-xl">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="flex items-center gap-2 font-display text-2xl font-semibold">
+              <Share2 className="h-5 w-5 text-gold" /> Connected Accounts & Direct Publishing
+            </h2>
+            <p className="mt-1 text-sm font-light text-mist">
+              Connect your TikTok, YouTube, and Instagram accounts to publish viral clips directly from your dashboard.
+            </p>
+          </div>
+        </div>
+
+        {socialBanner && (
+          <div
+            className={`mt-4 flex items-center gap-2 rounded-xl border p-3.5 text-xs ${
+              socialBanner.type === 'success'
+                ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300'
+                : 'border-red-500/30 bg-red-500/10 text-red-300'
+            }`}
+          >
+            {socialBanner.type === 'success' ? (
+              <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-400" />
+            ) : (
+              <AlertCircle className="h-4 w-4 shrink-0 text-red-400" />
+            )}
+            <span>{socialBanner.message}</span>
+          </div>
+        )}
+
+        {loadingConnections ? (
+          <div className="mt-6 flex justify-center py-8">
+            <Loader2 className="h-6 w-6 animate-spin text-champagne" />
+          </div>
+        ) : (
+          <div className="mt-6 grid gap-4 sm:grid-cols-3">
+            {connections.map((c) => {
+              const isConnected = c.connected && c.status !== 'not_connected'
+              const isExpired = c.status === 'expired'
+              const isDisconnecting = disconnectingPlatform === c.platform
+
+              return (
+                <div
+                  key={c.platform}
+                  className={`flex flex-col justify-between rounded-2xl border p-5 transition-all ${
+                    isConnected
+                      ? 'border-champagne/40 bg-champagne/[0.04]'
+                      : 'border-hair/60 bg-black/20 hover:border-hair'
+                  }`}
+                >
+                  <div>
+                    <div className="flex items-center justify-between">
+                      <span className="font-semibold text-pearl">{c.name}</span>
+                      <span
+                        className={`inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[10px] font-medium ${
+                          isConnected
+                            ? isExpired
+                              ? 'bg-amber-400/10 text-amber-300 border border-amber-400/20'
+                              : 'bg-emerald-400/10 text-emerald-400 border border-emerald-400/20'
+                            : 'bg-white/5 text-mist-2 border border-white/10'
+                        }`}
+                      >
+                        <span
+                          className={`h-1.5 w-1.5 rounded-full ${
+                            isConnected
+                              ? isExpired
+                                ? 'bg-amber-400'
+                                : 'bg-emerald-400'
+                              : 'bg-mist-2'
+                          }`}
+                        />
+                        {isConnected ? (isExpired ? 'Expired' : 'Active') : 'Not Connected'}
+                      </span>
+                    </div>
+
+                    <p className="mt-2 text-xs text-mist">
+                      {isConnected
+                        ? `Connected as ${c.accountName ? `@${c.accountName}` : 'Account linked'}`
+                        : c.platform === 'TIKTOK'
+                        ? 'Publish clips directly to TikTok Content Posting API.'
+                        : c.platform === 'YOUTUBE'
+                        ? 'Direct upload to YouTube Shorts via Data API v3.'
+                        : 'Auto-publish to Instagram Reels via Meta Graph API.'}
+                    </p>
+
+                    {!c.configured && (
+                      <p className="mt-2 rounded bg-amber-400/10 p-2 text-[10px] text-amber-300/90 leading-relaxed border border-amber-400/20">
+                        Requires developer credentials: <code className="font-mono font-semibold">{c.missingVars[0]}</code>
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="mt-5 pt-3 border-t border-hair-soft">
+                    {isConnected ? (
+                      <button
+                        type="button"
+                        onClick={() => handleDisconnectSocial(c.platform)}
+                        disabled={isDisconnecting}
+                        className="btn-lux btn-outline w-full !py-1.5 !text-xs !border-red-400/30 text-red-300 hover:!bg-red-400/10 flex items-center justify-center gap-1.5"
+                      >
+                        {isDisconnecting ? (
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        ) : (
+                          <Unlink className="h-3.5 w-3.5" />
+                        )}
+                        <span>Disconnect</span>
+                      </button>
+                    ) : (
+                      <a
+                        href={c.configured ? `/api/social/${c.platform.toLowerCase()}/connect?returnUrl=/dashboard/settings` : '#'}
+                        onClick={(e) => {
+                          if (!c.configured) {
+                            e.preventDefault()
+                            alert(`${c.name} credentials are not yet configured in environment variables (${c.missingVars.join(', ')}).`)
+                          }
+                        }}
+                        className={`btn-lux w-full !py-1.5 !text-xs flex items-center justify-center gap-1.5 ${
+                          c.configured
+                            ? 'btn-champagne'
+                            : 'cursor-not-allowed opacity-50 !bg-white/5 !text-mist !border-hair'
+                        }`}
+                      >
+                        <ExternalLink className="h-3.5 w-3.5" />
+                        <span>{c.configured ? 'Connect' : 'Setup Required'}</span>
+                      </a>
+                    )}
+                  </div>
+                </div>
+              )
+            })}
           </div>
         )}
       </section>

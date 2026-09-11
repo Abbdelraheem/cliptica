@@ -582,3 +582,63 @@ Executed `scripts/test-render-styles.mjs` rendering 1080x1920 video with burned-
 - `COMPETITIVE_GAP_ANALYSIS.md`:
   - Added required top comment.
   - Updated Caption Styles row from 6 to 15 (Parity achieved with market leader Opus Clip).
+
+---
+
+## Round 19 — Part 2: Direct Publishing Pipeline (TikTok, YouTube, Instagram)
+**Date**: 2026-09-11  
+**Status**: Code-Complete, Credential-Gated & Verified  
+**Test Suite**: 14 test suites, 230 tests passing (100%), including 20 tests in `tests/social-publish.test.ts`  
+
+### 1. Security Architecture & Encryption at Rest
+- **AES-256-GCM Authenticated Encryption (`src/lib/crypto.ts`)**:
+  - All access and refresh tokens are encrypted at rest using AES-256-GCM.
+  - Format: `ivHex:authTagHex:cipherHex` with a fresh 12-byte random initialization vector per encryption.
+  - 32-byte encryption key is derived via SHA-256 from `process.env.ENCRYPTION_SECRET` (falling back to `process.env.NEXTAUTH_SECRET`).
+  - Integrity verification: Tampered ciphertexts or wrong secrets trigger authenticated tag verification failure.
+  - Tokens are never logged and never exposed in client API responses.
+- **HMAC-SHA256 OAuth CSRF State Protection**:
+  - Stateless, signed OAuth state payload containing `userId`, `platform`, `returnUrl`, and millisecond timestamp `ts`.
+  - Signed using HMAC-SHA256 with timing-safe comparison (`crypto.timingSafeEqual`).
+  - Stale (>15 minutes) or tampered state tokens are rejected with HTTP redirect errors.
+
+### 2. Data Model & Prisma Schema
+- Updated `prisma/schema.prisma`:
+  - `enum SocialPlatform { TIKTOK, YOUTUBE, INSTAGRAM }`
+  - `model SocialConnection`: Stores encrypted `accessToken`, `refreshToken`, `tokenExpiresAt`, `platformAccountId`, `platformAccountName`, with `@@unique([userId, platform])` and cascade deletion on `User`.
+  - `model SocialPublishLog`: Records publication history per clip (`userId`, `clipId`, `platform`, `externalPostId`, `externalUrl`, `status`, `errorMessage`, `publishedAt`).
+  - Added reverse relations to `User` and `Clip`.
+  - Local client generated via `npx prisma generate`.
+
+### 3. Direct Publishing Adapters & Platform Integrations
+- **TikTok (`src/lib/social/tiktok.ts`)**:
+  - Scopes: `user.info.basic,video.publish,video.upload`.
+  - OAuth flow with authorization code exchange and token refresh grant.
+  - Content Posting API integration (`https://open.tiktokapis.com/v2/post/publish/video/init/`) utilizing `PULL_FROM_URL` directly from Cloudflare R2 storage.
+- **YouTube (`src/lib/social/youtube.ts`)**:
+  - Scopes: `https://www.googleapis.com/auth/youtube.upload, https://www.googleapis.com/auth/userinfo.profile`.
+  - Google OAuth token exchange and auto-refresh.
+  - Google Data API v3 Resumable Upload protocol (`uploadType=resumable`) with video binary streaming and metadata snippet mapping.
+- **Instagram Reels (`src/lib/social/instagram.ts`)**:
+  - Scopes: `instagram_basic,instagram_content_publish,pages_show_list,pages_read_engagement`.
+  - Meta short-lived to 60-day long-lived token exchange (`fb_exchange_token`).
+  - 3-step Reels container flow: create media container (`POST /{ig-user-id}/media`), readiness polling loop (`GET /{container-id}`), and final publish (`POST /{ig-user-id}/media_publish`).
+- **Format Validation (`src/lib/social/validation.ts`)**:
+  - Enforces platform duration bounds (TikTok: 3–600s; YouTube Shorts: 60s advisory; Instagram Reels: 3–90s).
+  - Validates 9:16 vertical orientation requirements before initiating external upload sessions.
+
+### 4. API Routes & UI Surfaces
+- **API Endpoints**:
+  - `GET /api/social/[platform]/connect`: Initiates OAuth flow with signed state; gracefully returns `{ error: 'not_configured' }` if developer credentials are unset.
+  - `GET /api/social/[platform]/callback`: Verifies state signature and timestamp, exchanges code, encrypts tokens, and upserts `SocialConnection`.
+  - `GET /api/social/connections`: Returns safe summaries for Settings UI without exposing token secrets.
+  - `DELETE /api/social/connections`: Disconnects social account.
+  - `POST /api/projects/[id]/clips/[clipId]/publish`: Verifies ownership, validates clip specs, transparently refreshes tokens if within 5 minutes of expiry, calls platform adapter, and records to `SocialPublishLog`.
+- **UI Surfaces**:
+  - **Settings (`/dashboard/settings`)**: Added "Connected Accounts & Direct Publishing" card with live status badges, connected usernames, and connect/disconnect buttons.
+  - **Clip Detail (`/dashboard/projects/detail`)**: Added "Publish" button and comprehensive modal with platform selector, pre-filled hook copy/hashtags, privacy selector, and live progress indicators.
+
+### 5. Documentation & Developer Tooling
+- Authored `PLATFORM_APPROVAL_CHECKLIST.md`: Detailed registration guides for TikTok Developer Portal, Google Cloud Console, and Meta for Developers with exact redirect URIs, scopes, and app review screencast guidelines.
+- Authored `MOCK_TESTING_GUIDE.md`: Step-by-step developer testing guide for running unit tests and mocking local credentials without live API keys.
+- Updated `.env.example`: Added placeholders for `ENCRYPTION_SECRET` and all TikTok, YouTube, and Instagram OAuth keys.

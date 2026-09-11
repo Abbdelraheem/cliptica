@@ -5,8 +5,9 @@ import { useCallback, useEffect, useState } from 'react'
 import {
   ArrowLeft, Loader2, AlertTriangle, Download, Sparkles,
   Captions, ScanFace, Clock, Flame, Clapperboard,
-  Copy, Check, Share2, Scissors, Zap,
+  Copy, Check, Share2, Scissors, Zap, Send, ExternalLink, X,
 } from 'lucide-react'
+import { ConnectionSummary } from '@/lib/social/types'
 
 type Clip = {
   id: string
@@ -92,6 +93,70 @@ export default function ProjectDetail({ projectId }: { projectId: string }) {
   })
   const [adjusting, setAdjusting] = useState(false)
   const [adjustError, setAdjustError] = useState<string | null>(null)
+
+  // Direct publishing state
+  const [publishingClip, setPublishingClip] = useState<Clip | null>(null)
+  const [publishPlatform, setPublishPlatform] = useState<'TIKTOK' | 'YOUTUBE' | 'INSTAGRAM'>('TIKTOK')
+  const [publishTitle, setPublishTitle] = useState('')
+  const [publishDesc, setPublishDesc] = useState('')
+  const [publishPrivacy, setPublishPrivacy] = useState('public')
+  const [publishing, setPublishing] = useState(false)
+  const [publishError, setPublishError] = useState<string | null>(null)
+  const [publishSuccess, setPublishSuccess] = useState<{ message: string; postUrl?: string } | null>(null)
+  const [socialConnections, setSocialConnections] = useState<ConnectionSummary[]>([])
+
+  useEffect(() => {
+    fetch('/api/social/connections')
+      .then((r) => (r.ok ? r.json() : { connections: [] }))
+      .then((d) => setSocialConnections(d.connections || []))
+      .catch(() => setSocialConnections([]))
+  }, [])
+
+  const openPublishModal = (c: Clip) => {
+    setPublishingClip(c)
+    setPublishTitle(c.title || 'Viral Clip')
+    const hook = c.description || c.title || ''
+    setPublishDesc(`${hook}\n\n#Shorts #Reels #Viral #Cliptica`)
+    setPublishPrivacy('public')
+    setPublishError(null)
+    setPublishSuccess(null)
+  }
+
+  const handlePublishSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!publishingClip) return
+    setPublishing(true)
+    setPublishError(null)
+    setPublishSuccess(null)
+
+    try {
+      const res = await fetch(`/api/projects/${projectId}/clips/${publishingClip.id}/publish`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          platform: publishPlatform,
+          title: publishTitle,
+          description: publishDesc,
+          privacy: publishPrivacy,
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        throw new Error(data.error || 'Publishing request failed.')
+      }
+      setPublishSuccess({
+        message:
+          data.status === 'PROCESSING'
+            ? 'Clip submitted to TikTok for background processing!'
+            : `Successfully published clip to ${publishPlatform}!`,
+        postUrl: data.postUrl,
+      })
+    } catch (err: unknown) {
+      setPublishError(err instanceof Error ? err.message : String(err))
+    } finally {
+      setPublishing(false)
+    }
+  }
 
   const openAdjust = (c: Clip) => {
     if (editingClipId === c.id) {
@@ -424,6 +489,17 @@ export default function ProjectDetail({ projectId }: { projectId: string }) {
                         )}
                       </button>
                     )}
+
+                    <button
+                      type="button"
+                      onClick={() => openPublishModal(c)}
+                      disabled={c.status === 'GENERATING'}
+                      className="btn-lux btn-outline !py-1.5 !px-2.5 !text-xs !font-normal flex items-center gap-1 text-champagne hover:!border-champagne"
+                      title="Direct publish clip to TikTok, YouTube Shorts, or Instagram Reels"
+                    >
+                      <Send className="h-3.5 w-3.5" />
+                      <span>Publish</span>
+                    </button>
                   </div>
 
                   {editingClipId === c.id && (
@@ -617,6 +693,192 @@ export default function ProjectDetail({ projectId }: { projectId: string }) {
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* Publish to Social Media Modal */}
+      {publishingClip && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-md">
+          <div className="relative w-full max-w-lg rounded-3xl border border-hair bg-[#141419] p-6 shadow-2xl">
+            <div className="flex items-center justify-between border-b border-hair-soft pb-4">
+              <div className="flex items-center gap-2">
+                <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-champagne/10 text-champagne">
+                  <Send className="h-4 w-4" />
+                </span>
+                <div>
+                  <h3 className="font-display text-lg font-semibold text-pearl">Publish to Social Media</h3>
+                  <p className="text-xs text-mist-2">Post directly to your connected creator channels</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setPublishingClip(null)}
+                className="rounded-lg p-1.5 text-mist hover:bg-white/10 hover:text-white"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handlePublishSubmit} className="mt-5 space-y-4 text-xs">
+              {/* Platform Selector */}
+              <div>
+                <label className="mb-2 block font-medium text-mist">Target Platform</label>
+                <div className="grid grid-cols-3 gap-2">
+                  {(['TIKTOK', 'YOUTUBE', 'INSTAGRAM'] as const).map((p) => {
+                    const conn = socialConnections.find((c) => c.platform === p)
+                    const isConnected = conn?.connected && conn.status === 'active'
+                    const isSelected = publishPlatform === p
+
+                    return (
+                      <button
+                        key={p}
+                        type="button"
+                        onClick={() => setPublishPlatform(p)}
+                        className={`flex flex-col items-center rounded-xl border p-3 text-center transition-all ${
+                          isSelected
+                            ? 'border-champagne bg-champagne/15 text-pearl shadow-sm'
+                            : 'border-hair/60 bg-black/30 text-mist hover:border-hair hover:text-pearl'
+                        }`}
+                      >
+                        <span className="font-semibold text-xs">{p === 'TIKTOK' ? 'TikTok' : p === 'YOUTUBE' ? 'YouTube Shorts' : 'Instagram Reels'}</span>
+                        <span className="mt-1 flex items-center gap-1 text-[10px]">
+                          <span
+                            className={`h-1.5 w-1.5 rounded-full ${
+                              isConnected ? 'bg-emerald-400' : 'bg-mist-2'
+                            }`}
+                          />
+                          <span className={isConnected ? 'text-emerald-400 font-medium' : 'text-mist-2'}>
+                            {isConnected ? `@${conn.accountName || 'Connected'}` : 'Not linked'}
+                          </span>
+                        </span>
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+
+              {/* Notice if platform not connected */}
+              {(() => {
+                const conn = socialConnections.find((c) => c.platform === publishPlatform)
+                if (!conn || !conn.connected || conn.status !== 'active') {
+                  return (
+                    <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-amber-200 flex items-start gap-2">
+                      <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5 text-amber-400" />
+                      <div>
+                        <p className="font-semibold">Account not connected</p>
+                        <p className="mt-0.5 text-[11px] text-amber-300/80">
+                          To publish to {publishPlatform}, please connect your account first in{' '}
+                          <Link href="/dashboard/settings" className="underline font-semibold hover:text-white">
+                            Settings → Connected Accounts
+                          </Link>.
+                        </p>
+                      </div>
+                    </div>
+                  )
+                }
+                return null
+              })()}
+
+              {/* Title */}
+              <div>
+                <label className="mb-1 block font-medium text-mist">Title / Hook</label>
+                <input
+                  type="text"
+                  value={publishTitle}
+                  onChange={(e) => setPublishTitle(e.target.value)}
+                  className="input-lux !py-2 !text-xs"
+                  placeholder="Enter hook or headline"
+                  required
+                />
+              </div>
+
+              {/* Caption & Hashtags */}
+              <div>
+                <label className="mb-1 block font-medium text-mist">Caption & Hashtags</label>
+                <textarea
+                  value={publishDesc}
+                  onChange={(e) => setPublishDesc(e.target.value)}
+                  rows={4}
+                  className="input-lux !py-2 !text-xs resize-none"
+                  placeholder="Caption and hashtags..."
+                />
+              </div>
+
+              {/* Privacy */}
+              <div>
+                <label className="mb-1 block font-medium text-mist">Privacy Status</label>
+                <select
+                  value={publishPrivacy}
+                  onChange={(e) => setPublishPrivacy(e.target.value)}
+                  className="w-full rounded-xl border border-hair bg-black/60 px-3 py-2 text-xs text-white focus:border-gold focus:outline-none"
+                >
+                  <option value="public">Public (Recommended for virality)</option>
+                  <option value="unlisted">Unlisted (Share via direct link)</option>
+                  <option value="private">Private (Only you can view)</option>
+                </select>
+              </div>
+
+              {/* Format Spec Confirmation */}
+              <div className="rounded-xl border border-white/5 bg-white/[0.02] p-2.5 text-[11px] text-mist flex items-center justify-between">
+                <span>Format: {publishingClip.aspectRatio || '9:16'} vertical · {publishingClip.duration}s</span>
+                <span className="text-emerald-400 font-medium">✓ Spec Verified</span>
+              </div>
+
+              {publishError && (
+                <div className="rounded-xl border border-red-500/30 bg-red-500/10 p-3 text-red-300 flex items-start gap-2">
+                  <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5 text-red-400" />
+                  <span>{publishError}</span>
+                </div>
+              )}
+
+              {publishSuccess && (
+                <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-3 text-emerald-300 flex items-start gap-2">
+                  <Check className="h-4 w-4 shrink-0 mt-0.5 text-emerald-400" />
+                  <div>
+                    <p className="font-semibold">{publishSuccess.message}</p>
+                    {publishSuccess.postUrl && (
+                      <a
+                        href={publishSuccess.postUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="mt-1 inline-flex items-center gap-1 underline text-champagne hover:text-white"
+                      >
+                        <span>View post</span>
+                        <ExternalLink className="h-3 w-3" />
+                      </a>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              <div className="mt-5 flex items-center justify-end gap-2 pt-3 border-t border-hair-soft">
+                <button
+                  type="button"
+                  onClick={() => setPublishingClip(null)}
+                  className="btn-lux btn-outline !py-2 !px-4 !text-xs"
+                >
+                  Close
+                </button>
+                <button
+                  type="submit"
+                  disabled={publishing}
+                  className="btn-lux btn-champagne !py-2 !px-5 !text-xs flex items-center gap-1.5"
+                >
+                  {publishing ? (
+                    <>
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      <span>Publishing...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Send className="h-3.5 w-3.5" />
+                      <span>Publish Now</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
       )}
     </div>

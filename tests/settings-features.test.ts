@@ -17,7 +17,7 @@ vi.mock('@/lib/auth', () => ({
 // Mock email
 const mockSendEmail = vi.fn().mockResolvedValue(undefined)
 vi.mock('@/lib/email', () => ({
-  sendEmail: (opts: any) => mockSendEmail(opts),
+  sendEmail: (opts: Record<string, unknown>) => mockSendEmail(opts),
   passwordChangedEmailHtml: () => '<p>Password changed</p>',
 }))
 
@@ -111,7 +111,7 @@ describe('Settings Features API', () => {
   }, 15000)
 
   it('api-keys: creates key and returns plaintext key once', async () => {
-    mockPrisma.apiKey.create.mockImplementation(({ data }: any) => Promise.resolve({
+    mockPrisma.apiKey.create.mockImplementation(({ data }: { data: { name: string; key: string } }) => Promise.resolve({
       id: 'key_1',
       name: data.name,
       key: data.key,
