@@ -350,7 +350,7 @@ export default function NewProjectPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          sourceType: tab,
+          sourceType: tab === 'link' ? 'url' : 'file',
           url: tab === 'link' ? cleanUrlString(url) : undefined,
           fileKey: tab === 'upload' ? uploadedKey : undefined,
           fileName: tab === 'upload' ? file?.name : undefined,

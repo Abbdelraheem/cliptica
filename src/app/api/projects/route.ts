@@ -1,53 +1,13 @@
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { NextResponse } from 'next/server'
-import { z } from 'zod'
 import { apiMutationLimiter, enforceRateLimit } from '@/lib/rate-limit'
-import { parseClipFrom, cleanUrlString, normaliseVideoUrl } from '@/lib/validation'
+import { parseClipFrom, normaliseVideoUrl, projectCreateSchema } from '@/lib/validation'
 import { planForRole } from '@/lib/stripe'
 import { getSettingNumber } from '@/lib/settings'
 
-const FRAMINGS = ['smart', 'face', 'center', 'blur', 'letter', 'variety'] as const
-const LANGUAGES = ['auto', 'en', 'ar', 'es', 'fr', 'de', 'tr', 'hi', 'pt'] as const
-const CAPTION_STYLES = [
-  'hormozi',
-  'bold_impact',
-  'bounce_side',
-  'pill_box',
-  'tiktok_classic',
-  'clean_minimal',
-  'classic_subtitle',
-  'slow_fade',
-  'cinematic_caps',
-  'podcast_soft',
-  'neon_highlight',
-  'highlighter',
-  'typewriter',
-  'two_tone',
-  'glitch_flicker',
-] as const
-const ASPECT_RATIOS = ['9:16', '1:1', '16:9'] as const
+const createSchema = projectCreateSchema
 
-const createSchema = z.object({
-  sourceType: z.enum(['url', 'file']),
-  // Lenient: clean whitespace and hidden unicode markers (LRM/RLM) so pasted links never fail
-  url: z
-    .string()
-    .max(1000)
-    .transform((v) => cleanUrlString(v))
-    .optional(),
-  fileKey: z.string().max(300).optional(),
-  fileName: z.string().max(200).optional(),
-  title: z.string().trim().min(1).max(120).optional(),
-  instructions: z.string().max(2000).optional(),
-  /** "mm:ss" or seconds — start clipping here */
-  clipFrom: z.union([z.string().regex(/^\d{1,2}:\d{2}(:\d{2})?$/), z.number().int().min(0)]).optional(),
-  framing: z.enum(FRAMINGS).default('smart'),
-  language: z.enum(LANGUAGES).default('auto'),
-  captionStyle: z.enum(CAPTION_STYLES).default('hormozi'),
-  aspectRatio: z.enum(ASPECT_RATIOS).default('9:16'),
-  motionFx: z.boolean().default(false),
-})
 
 
 export async function GET(request: Request) {

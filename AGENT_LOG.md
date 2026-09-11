@@ -642,3 +642,88 @@ Executed `scripts/test-render-styles.mjs` rendering 1080x1920 video with burned-
 - Authored `PLATFORM_APPROVAL_CHECKLIST.md`: Detailed registration guides for TikTok Developer Portal, Google Cloud Console, and Meta for Developers with exact redirect URIs, scopes, and app review screencast guidelines.
 - Authored `MOCK_TESTING_GUIDE.md`: Step-by-step developer testing guide for running unit tests and mocking local credentials without live API keys.
 - Updated `.env.example`: Added placeholders for `ENCRYPTION_SECRET` and all TikTok, YouTube, and Instagram OAuth keys.
+
+## 2026-09-11 — Round 16: Video URL Sanitization, Admin Plan Grants, Referral Funnel System, & Per-Video Pricing
+
+### 1. Video URL Validation Fix ("Invalid Input" Elimination)
+- **Root Cause**: Pasting video links copied from mobile devices or Arabic operating systems/browsers frequently includes zero-width spaces (`\u200B`, `\uFEFF`) and invisible RTL/LTR direction marks (`\u200E`, `\u200F`), or complex query parameters. The previous rigid regex `/^[0-9a-zA-Z.\-/?:&=+%_~#@]+$/` rejected these, and the API returned a generic `{ error: 'Invalid input' }`.
+- **Remediation**:
+  - Implemented `cleanUrlString(input)` and `normaliseVideoUrl(input)` in `src/lib/validation.ts`.
+  - Automatically strips hidden directional formatting, zero-width characters, and extraneous whitespace.
+  - Automatically handles bare domains without protocol (`youtu.be/xyz`, `youtube.com/shorts/...`) by prepending `https://`.
+  - Replaced generic `'Invalid input'` with descriptive error reporting (`parsed.error.errors[0]?.message`).
+  - Integrated into both `src/app/api/projects/route.ts` and `src/app/(dashboard)/dashboard/projects/new/page.tsx`.
+  - Verified with 18 unit tests in `tests/validation.test.ts`.
+
+### 2. Admin Dashboard Grants (Free Subscriptions & Quick Credits)
+- **Backend**: Created `POST /api/admin/users/[id]/plan` allowing administrators to grant complimentary `CLIPPER`, `STUDIO`, or `FREE` subscriptions without Stripe checkout.
+  - Automatically sets `subscriptionStatus: 'active'` and updates `role`.
+  - Provides option to deposit plan credits immediately (+100 for Clipper, +400 for Studio) with an auditable `CreditTransaction` ledger entry.
+- **Frontend UI (`/admin/users`)**:
+  - Added dedicated **"Plan"** grant button with a modal featuring visual tier selection (Clipper, Studio, Free), credit deposit checkbox, and custom note field.
+  - Added quick preset buttons (+10, +25, +50, +100, +500) to the **"Adjust Credits"** modal for instant credit grants.
+
+### 3. Referral & Influencer Marketing System (with Drop-Off Funnel)
+- **Data Models**:
+  - `model Affiliate`: Custom slug/code, influencer name, commission rate (default 20%), contact email, notes, active status.
+  - `model ReferralClick`: Records click timestamp, hashed visitor IP, user agent, referer.
+  - `model ReferralConversion`: Tracks milestones across the customer lifecycle (`SIGNUP`, `FIRST_PROJECT`, `SUBSCRIPTION`), gross revenue generated, and affiliate commission.
+  - Added `referredByAffiliateId` and `referredAt` to `model User`.
+  - Synced to Neon PostgreSQL database via `prisma db push`.
+- **Attribution & Conversion Tracking**:
+  - `GET /r/[code]`: Records click, sets 30-day attribution cookie `cliptica_ref`, and redirects to `/register?ref=code`.
+  - `POST /api/auth/register`: Links user to affiliate and records `SIGNUP` conversion.
+  - `POST /api/projects`: Records `FIRST_PROJECT` milestone when referred user runs their first clipping job.
+  - `POST /api/billing/webhook`: On `invoice.payment_succeeded`, calculates influencer commission (% of invoice total) and records `SUBSCRIPTION` conversion.
+- **Admin Management & Funnel Visualization (`/admin/referrals`)**:
+  - Visual 4-stage funnel showing traffic from **Visits → Signups → First Project → Paid Subscriptions**.
+  - Explicit drop-off percentage calculations ("Where users got stuck") identifying friction points in creator onboarding.
+  - Comprehensive table with 1-click link copying (`cliptica.com/r/...`), performance metrics, commission totals, and active/paused toggle.
+  - Added "Referrals" to Admin sidebar navigation in `src/components/admin-layout.tsx`.
+
+### 4. Per-Video Credit Transition & Unit Economics
+- **Pricing Transition**: Replaced minute-based billing with **1 video clip = 1 credit**.
+  - `worker/credits.mjs`: Added `calcClipCredits(clipCount, fx)` charging 1 credit per successfully extracted clip (+2 flat if AI motion graphics applied).
+  - `worker/worker.mjs`: Updated settlement transaction to charge based on `moments.length` (actual clips rendered).
+  - `src/app/api/projects/route.ts`: Lowered upfront reservation gate from 10 credits to 1 credit.
+- **Unit Economics Breakdown**:
+  - Groq Whisper Large v3 Turbo (source audio): ~$0.002 / clip.
+  - Groq LLaMA 3.3-70B moment scoring: ~$0.0007 / clip.
+  - EC2 FFmpeg libass rendering & face tracking: ~$0.0001 / clip.
+  - Cloudflare R2 storage & zero-egress bandwidth: ~$0.0003 / clip.
+  - **Total COGS per generated clip**: **~$0.004 – $0.005** (half a cent!).
+  - **Clipper Plan ($19/mo, 100 clips)**: $0.50 COGS → **97.4% gross margin**.
+  - **Studio Plan ($49/mo, 400 clips)**: $2.00 COGS → **95.9% gross margin**.
+
+### 5. Verification & Live Deployment
+- **Tests**: 15 test files, 243 tests passing (100%), including new `tests/referrals.test.ts`.
+- **Build**: Local and EC2 Next.js production build succeeded with all 59 routes generated.
+- **PM2**: `nology-web` (PID 1085997) and `nology-worker` reloaded cleanly with zero downtime.
+- **Live Health**: `http://127.0.0.1:3000/api/health` and `https://cliptica.com` returning HTTP 200 OK.
+
+---
+
+## 2026-09-11: Video URL Submission Fix ("Invalid enum value. Expected 'url' | 'file', received 'link'")
+
+### 1. Root Cause Analysis
+- **Symptom**: User saw error `Invalid enum value. Expected 'url' | 'file', received 'link'` when submitting a video URL on `/dashboard/projects/new`.
+- **Root Cause**:
+  - In `src/app/(dashboard)/dashboard/projects/new/page.tsx`, the tab state was typed as `'upload' | 'link'`.
+  - In `handleSubmit`, the payload passed `sourceType: tab` (sending `'link'` or `'upload'`).
+  - In `src/app/api/projects/route.ts`, `createSchema` had `sourceType: z.enum(['url', 'file'])`.
+  - Because our previous fix replaced the generic `"Invalid input"` with the specific Zod validation error (`parsed.error.errors[0]?.message`), the exact enum mismatch surfaced to the user.
+
+### 2. Changes Applied
+- **Backend (`src/lib/validation.ts`, `src/app/api/projects/route.ts`)**:
+  - Exported canonical `projectCreateSchema` accepting both legacy and UI formats: `z.enum(['url', 'file', 'link', 'upload']).transform(v => v === 'link' ? 'url' : v === 'upload' ? 'file' : v)`.
+  - Exported `PROJECT_FRAMINGS`, `PROJECT_LANGUAGES`, and `PROJECT_ASPECT_RATIOS` constants.
+  - Cleaned unused imports in `src/app/api/projects/route.ts`.
+- **Frontend (`src/app/(dashboard)/dashboard/projects/new/page.tsx`)**:
+  - Updated `handleSubmit` to map `sourceType: tab === 'link' ? 'url' : 'file'` for double safety.
+- **Unit Tests (`tests/validation.test.ts`)**:
+  - Added 5 unit tests for `projectCreateSchema` covering `sourceType` mapping (`link` -> `url`, `upload` -> `file`), unicode stripping, and rejection of invalid values.
+
+### 3. Verification
+- **Unit Tests**: All 15 test files, 248 tests passed (100%).
+- **TypeScript**: `npx tsc --noEmit` exited 0 with zero errors.
+- **Build**: `npm run build` compiled 59 routes cleanly with zero warnings/errors.

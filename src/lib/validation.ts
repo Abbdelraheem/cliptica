@@ -119,3 +119,31 @@ export function normaliseVideoUrl(input?: string | null): string | null {
   }
 }
 
+export const PROJECT_FRAMINGS = ['smart', 'face', 'center', 'blur', 'letter', 'variety'] as const
+export const PROJECT_LANGUAGES = ['auto', 'en', 'ar', 'es', 'fr', 'de', 'tr', 'hi', 'pt'] as const
+export const PROJECT_ASPECT_RATIOS = ['9:16', '1:1', '16:9'] as const
+
+export const projectCreateSchema = z.object({
+  sourceType: z
+    .enum(['url', 'file', 'link', 'upload'])
+    .transform((v) => (v === 'link' ? 'url' : v === 'upload' ? 'file' : v)),
+  // Lenient: clean whitespace and hidden unicode markers (LRM/RLM) so pasted links never fail
+  url: z
+    .string()
+    .max(1000)
+    .transform((v) => cleanUrlString(v))
+    .optional(),
+  fileKey: z.string().max(300).optional(),
+  fileName: z.string().max(200).optional(),
+  title: z.string().trim().min(1).max(120).optional(),
+  instructions: z.string().max(2000).optional(),
+  /** "mm:ss" or seconds — start clipping here */
+  clipFrom: z.union([z.string().regex(/^\d{1,2}:\d{2}(:\d{2})?$/), z.number().int().min(0)]).optional(),
+  framing: z.enum(PROJECT_FRAMINGS).default('smart'),
+  language: z.enum(PROJECT_LANGUAGES).default('auto'),
+  captionStyle: z.enum(VALID_CAPTION_STYLES).default('hormozi'),
+  aspectRatio: z.enum(PROJECT_ASPECT_RATIOS).default('9:16'),
+  motionFx: z.boolean().default(false),
+})
+
+

@@ -8,6 +8,7 @@ import {
   MAX_PAYOUT_AMOUNT,
   cleanUrlString,
   normaliseVideoUrl,
+  projectCreateSchema,
 } from '@/lib/validation'
 
 describe('registerSchema', () => {
@@ -127,3 +128,64 @@ describe('cleanUrlString & normaliseVideoUrl', () => {
     expect(normaliseVideoUrl('not-a-domain')).toBe(null)
   })
 })
+
+describe('projectCreateSchema', () => {
+  it('accepts sourceType: link and transforms to url', () => {
+    const res = projectCreateSchema.safeParse({
+      sourceType: 'link',
+      url: 'https://youtube.com/watch?v=123',
+    })
+    expect(res.success).toBe(true)
+    if (res.success) {
+      expect(res.data.sourceType).toBe('url')
+      expect(res.data.url).toBe('https://youtube.com/watch?v=123')
+    }
+  })
+
+  it('accepts sourceType: upload and transforms to file', () => {
+    const res = projectCreateSchema.safeParse({
+      sourceType: 'upload',
+      fileKey: 'uploads/test.mp4',
+    })
+    expect(res.success).toBe(true)
+    if (res.success) {
+      expect(res.data.sourceType).toBe('file')
+    }
+  })
+
+  it('accepts canonical url and file directly', () => {
+    const res1 = projectCreateSchema.safeParse({
+      sourceType: 'url',
+      url: 'https://youtube.com/watch?v=456',
+    })
+    expect(res1.success).toBe(true)
+    if (res1.success) expect(res1.data.sourceType).toBe('url')
+
+    const res2 = projectCreateSchema.safeParse({
+      sourceType: 'file',
+      fileKey: 'uploads/sample.mp4',
+    })
+    expect(res2.success).toBe(true)
+    if (res2.success) expect(res2.data.sourceType).toBe('file')
+  })
+
+  it('cleans invisible Unicode marks from url', () => {
+    const dirty = '\u200Ehttps://youtube.com/watch?v=abc\u200F  '
+    const res = projectCreateSchema.safeParse({
+      sourceType: 'link',
+      url: dirty,
+    })
+    expect(res.success).toBe(true)
+    if (res.success) {
+      expect(res.data.url).toBe('https://youtube.com/watch?v=abc')
+    }
+  })
+
+  it('rejects invalid sourceType values', () => {
+    const res = projectCreateSchema.safeParse({
+      sourceType: 'invalid_source',
+    })
+    expect(res.success).toBe(false)
+  })
+})
+
