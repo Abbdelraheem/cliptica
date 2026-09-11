@@ -31,7 +31,7 @@ export async function sendEmail(opts: { to: string; subject: string; html: strin
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      from: process.env.EMAIL_FROM ?? 'NOLOGY <noreply@getnology.com>',
+      from: process.env.EMAIL_FROM ?? 'Cliptica <noreply@cliptica.com>',
       to: [opts.to],
       subject: opts.subject,
       html: opts.html,
@@ -98,7 +98,7 @@ ${preheader ? `<div style="display:none;max-height:0;overflow:hidden;opacity:0;m
           <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
             <tr>
               <td align="left">
-                <span style="font-family:${EMAIL.fontDisplay};font-weight:800;font-size:17px;letter-spacing:.32em;color:${EMAIL.ink}">NOLOGY</span>
+                <span style="font-family:${EMAIL.fontDisplay};font-weight:800;font-size:17px;letter-spacing:.32em;color:${EMAIL.ink}">CLIPTICA</span>
               </td>
               <td align="right">
                 <span style="display:inline-block;width:10px;height:10px;border-radius:3px;background:${EMAIL.accent};box-shadow:0 0 0 4px rgba(255,90,31,.18)"></span>
@@ -150,7 +150,7 @@ ${preheader ? `<div style="display:none;max-height:0;overflow:hidden;opacity:0;m
       <tr>
         <td bgcolor="${EMAIL.bg}" style="padding:20px 36px 24px 36px">
           <p style="margin:0;font-size:11px;line-height:1.6;color:${EMAIL.muted}">
-            &copy; ${new Date().getFullYear()} NOLOGY &middot; AI Clipping Platform<br>
+            &copy; ${new Date().getFullYear()} Cliptica &middot; AI Video Clipping Platform<br>
             If you didn't request this email, you can safely ignore it.
           </p>
         </td>
@@ -166,10 +166,10 @@ ${preheader ? `<div style="display:none;max-height:0;overflow:hidden;opacity:0;m
 
 export function verificationEmailHtml(link: string) {
   return emailLayout({
-    preheader: 'One click to activate your NOLOGY account and start clipping.',
-    title: 'Confirm your NOLOGY email',
+    preheader: 'One click to activate your Cliptica account and start clipping.',
+    title: 'Confirm your Cliptica email',
     headline: 'One click to verify',
-    body: 'Welcome to NOLOGY. Confirm your email address to activate your account and start turning any video into finished clips.',
+    body: 'Welcome to Cliptica. Confirm your email address to activate your account and start turning any video into finished clips.',
     cta: { label: 'Verify my email', href: link },
     meta: 'This link expires in 24 hours and can only be used once.',
   })
@@ -177,10 +177,10 @@ export function verificationEmailHtml(link: string) {
 
 export function passwordResetEmailHtml(link: string) {
   return emailLayout({
-    preheader: 'We received a request to reset your NOLOGY password.',
-    title: 'Reset your NOLOGY password',
+    preheader: 'We received a request to reset your Cliptica password.',
+    title: 'Reset your Cliptica password',
     headline: 'Reset your password',
-    body: 'We received a request to reset the password for your NOLOGY account. Use the button below to choose a new one.',
+    body: 'We received a request to reset the password for your Cliptica account. Use the button below to choose a new one.',
     cta: { label: 'Choose a new password', href: link },
     meta: 'This link expires in one hour and can only be used once.',
     note: "If you didn't request this, you can safely ignore this email — your password won't change.",
@@ -189,11 +189,11 @@ export function passwordResetEmailHtml(link: string) {
 
 export function passwordChangedEmailHtml() {
   return emailLayout({
-    preheader: 'Your NOLOGY password was changed successfully.',
-    title: 'Your NOLOGY password was changed',
+    preheader: 'Your Cliptica password was changed successfully.',
+    title: 'Your Cliptica password was changed',
     headline: 'Password changed',
-    body: 'Your NOLOGY password was updated successfully. If this was you, you\u2019re all set — nothing else to do.',
-    note: "If you didn't make this change, reset your password right away and contact support at support@getnology.com.",
+    body: 'Your Cliptica password was updated successfully. If this was you, you\u2019re all set — nothing else to do.',
+    note: "If you didn't make this change, reset your password right away and contact support at support@cliptica.com.",
   })
 }
 
@@ -207,7 +207,7 @@ export interface CreditsRenewedEmailParams {
 export function creditsRenewedEmailHtml(p: CreditsRenewedEmailParams) {
   return emailLayout({
     preheader: 'Your monthly credits are here — ready to keep clipping.',
-    title: 'NOLOGY credits renewed',
+    title: 'Cliptica credits renewed',
     headline: 'Your monthly credits have been renewed',
     body: `Thanks for being a ${p.planName} subscriber. Your ${p.credits} monthly credits were just added to your balance.`,
     rows: [
@@ -222,9 +222,9 @@ export function creditsRenewedEmailHtml(p: CreditsRenewedEmailParams) {
 
 export function welcomeEmailHtml({ name, credits, dashboardUrl }: { name: string; credits: number; dashboardUrl: string }) {
   return emailLayout({
-    preheader: 'Your NOLOGY account is ready — start clipping.',
-    title: 'Welcome to NOLOGY',
-    headline: 'Welcome to NOLOGY',
+    preheader: 'Your Cliptica account is ready — start clipping.',
+    title: 'Welcome to Cliptica',
+    headline: 'Welcome to Cliptica',
     body: `Hi ${name}, your account is verified and ready to go. You\u2019ve got ${credits} credits to start turning videos into finished clips.`,
     cta: { label: 'Start clipping', href: dashboardUrl },
     note: 'This email confirms your account is active. Questions? Reply to this email and a human will get back to you.',
@@ -233,8 +233,8 @@ export function welcomeEmailHtml({ name, credits, dashboardUrl }: { name: string
 
 export function creditsLowEmailHtml({ credits, billingUrl }: { credits: number; billingUrl: string }) {
   return emailLayout({
-    preheader: `You have ${credits} credits left in your NOLOGY balance.`,
-    title: 'NOLOGY credits running low',
+    preheader: `You have ${credits} credits left in your Cliptica balance.`,
+    title: 'Cliptica credits running low',
     headline: 'Credits running low',
     body: `You have ${credits} credits left in your balance. Top up before you run out so your video flow never stalls.`,
     cta: { label: 'Add credits', href: billingUrl },
@@ -245,7 +245,7 @@ export function creditsLowEmailHtml({ credits, billingUrl }: { credits: number; 
 export function paymentFailedEmailHtml({ planName, billingUrl }: { planName: string; billingUrl: string }) {
   return emailLayout({
     preheader: `Your ${planName} payment didn\u2019t go through.`,
-    title: 'NOLOGY payment failed',
+    title: 'Cliptica payment failed',
     headline: 'Payment failed — action needed',
     body: `We couldn\u2019t charge your card for the ${planName} plan. To keep your credits renewing, update your payment details.`,
     cta: { label: 'Update payment details', href: billingUrl },

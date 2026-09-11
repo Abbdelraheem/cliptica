@@ -37,7 +37,7 @@ export async function POST(request: Request) {
         return NextResponse.json(
           {
             error: 'DEVICE_LIMIT',
-            message: 'This device already has a Nology account. One account per device.',
+            message: 'This device already has a Cliptica account. One account per device.',
           },
           { status: 403 }
         )
@@ -74,7 +74,7 @@ export async function POST(request: Request) {
       const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'
       await sendEmail({
         to: user.email,
-        subject: 'Confirm your NOLOGY email',
+        subject: 'Confirm your Cliptica email',
         html: verificationEmailHtml(`${appUrl}/verify-email?token=${token}`),
       })
     } catch (err) {

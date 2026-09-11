@@ -19,7 +19,7 @@ export function Wordmark({ size = 26 }: { size?: number }) {
     <span className="flex items-center gap-2.5">
       <NologyMark size={size} />
       <span className="font-display text-lg font-extrabold tracking-[0.08em] text-white">
-        NOLOGY
+        CLIPTICA
       </span>
     </span>
   )

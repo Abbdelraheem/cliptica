@@ -1,10 +1,10 @@
-﻿import { Metadata } from 'next'
+import { Metadata } from 'next'
 import Link from 'next/link'
 import { MarketingLayout } from '@/components/marketing-layout'
 
 export const metadata: Metadata = {
   title: 'Privacy Policy',
-  description: 'Privacy Policy and data processing disclosures for NOLOGY AI video clipping platform.',
+  description: 'Privacy Policy and data processing disclosures for Cliptica AI video clipping platform.',
 }
 
 export default function PrivacyPage() {

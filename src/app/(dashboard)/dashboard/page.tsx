@@ -158,7 +158,7 @@ export default function DashboardPage() {
             href="/dashboard/projects/new"
             className="block rounded-2xl border border-dashed border-hair/50 px-6 py-16 text-center text-sm font-light text-mist transition-colors hover:border-champagne hover:text-gold"
           >
-            No projects yet — drop in your first long video and let NOLOGY find the moments worth posting.
+            No projects yet — drop in your first long video and let Cliptica find the moments worth posting.
           </Link>
         ) : (
           <div className="overflow-hidden rounded-2xl border border-hair/50 bg-onyx-2/50 backdrop-blur-sm">

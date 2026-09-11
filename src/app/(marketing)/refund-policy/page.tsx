@@ -1,10 +1,10 @@
-﻿import { Metadata } from 'next'
+import { Metadata } from 'next'
 import Link from 'next/link'
 import { MarketingLayout } from '@/components/marketing-layout'
 
 export const metadata: Metadata = {
   title: 'Refund Policy',
-  description: 'Refund Policy, cancellation terms, and credit rules for NOLOGY subscriptions.',
+  description: 'Refund Policy, cancellation terms, and credit rules for Cliptica subscriptions.',
 }
 
 export default function RefundPolicyPage() {
@@ -19,7 +19,7 @@ export default function RefundPolicyPage() {
           <section className="space-y-3">
             <h2 className="text-xl font-semibold text-pearl">1. Subscription Refunds (14-Day Window)</h2>
             <p>
-              We want you to be completely satisfied with NOLOGY. We offer a full refund on your initial subscription purchase within{' '}
+              We want you to be completely satisfied with Cliptica. We offer a full refund on your initial subscription purchase within{' '}
               <strong className="text-pearl">14 days</strong> of the billing transaction, provided that you have consumed fewer than{' '}
               <strong className="text-pearl">15 credits</strong> from your plan allowance.
             </p>

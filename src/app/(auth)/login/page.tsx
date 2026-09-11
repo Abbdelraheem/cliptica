@@ -40,7 +40,7 @@ export default function LoginPage() {
       })
       if (check.status === 403) {
         const data = await check.json().catch(() => null)
-        setError(data?.message ?? 'This device already has another Nology account.')
+        setError(data?.message ?? 'This device already has another Cliptica account.')
         return
       }
 

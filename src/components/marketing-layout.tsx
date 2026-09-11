@@ -146,7 +146,7 @@ export function MarketingLayout({ children }: { children: ReactNode }) {
             ))}
           </div>
           <div className="mt-14 border-t border-hair/40 pt-8 text-sm text-mist-2">
-            © {new Date().getFullYear()} NOLOGY. All rights reserved.
+            © {new Date().getFullYear()} Cliptica. All rights reserved.
           </div>
         </div>
       </footer>

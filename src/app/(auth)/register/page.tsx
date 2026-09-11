@@ -36,7 +36,7 @@ export default function RegisterPage() {
         const data = await res.json().catch(() => null)
         setError(
           data?.error === 'DEVICE_LIMIT'
-            ? (data?.message ?? 'This device already has a Nology account. One account per device.')
+            ? (data?.message ?? 'This device already has a Cliptica account. One account per device.')
             : (data?.error === 'Email already registered'
                 ? 'This email is already registered.'
                 : (data?.error ?? 'Something went wrong. Try again.'))

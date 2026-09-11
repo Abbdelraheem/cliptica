@@ -1,10 +1,10 @@
-﻿import { Metadata } from 'next'
+import { Metadata } from 'next'
 import Link from 'next/link'
 import { MarketingLayout } from '@/components/marketing-layout'
 
 export const metadata: Metadata = {
   title: 'Terms of Service',
-  description: 'Terms of Service and acceptable use rules for NOLOGY AI video clipping platform.',
+  description: 'Terms of Service and acceptable use rules for Cliptica AI video clipping platform.',
 }
 
 export default function TermsPage() {
@@ -19,7 +19,7 @@ export default function TermsPage() {
           <section className="space-y-3">
             <h2 className="text-xl font-semibold text-pearl">1. Acceptance of Terms</h2>
             <p>
-              By accessing, browsing, registering for, or using the NOLOGY platform (&quot;Service&quot;, &quot;we&quot;, &quot;our&quot;, or &quot;us&quot;),
+              By accessing, browsing, registering for, or using the Cliptica platform (&quot;Service&quot;, &quot;we&quot;, &quot;our&quot;, or &quot;us&quot;),
               you agree to be bound by these Terms of Service. If you do not agree to these terms, you may not access or use our services.
             </p>
           </section>
@@ -27,7 +27,7 @@ export default function TermsPage() {
           <section className="space-y-3">
             <h2 className="text-xl font-semibold text-pearl">2. Nature of the Service</h2>
             <p>
-              NOLOGY is an AI-powered media processing software tool. We provide automated audio transcription, virality scoring, facial tracking reframing,
+              Cliptica is an AI-powered media processing software tool. We provide automated audio transcription, virality scoring, facial tracking reframing,
               caption animation, and short-form video clip generation. Output results depend on user input and source media characteristics.
             </p>
           </section>
@@ -73,7 +73,7 @@ export default function TermsPage() {
               disrupt our worker infrastructure, bypass rate limiting mechanisms, or introduce malicious payloads.
             </p>
             <p>
-              NOLOGY reserves the right to immediately suspend or terminate any account, without liability or refund, if we determine in our sole discretion that
+              Cliptica reserves the right to immediately suspend or terminate any account, without liability or refund, if we determine in our sole discretion that
               the account has violated these Terms or engaged in abuse of our infrastructure.
             </p>
           </section>
@@ -82,7 +82,7 @@ export default function TermsPage() {
             <h2 className="text-xl font-semibold text-pearl">7. Limitation of Liability</h2>
             <p>
               The Service is provided on an &quot;AS IS&quot; and &quot;AS AVAILABLE&quot; basis without warranties of any kind, whether express or implied.
-              In no event shall NOLOGY, its founders, or affiliates be liable for any indirect, incidental, consequential, or punitive damages, including loss of profits,
+              In no event shall Cliptica, its founders, or affiliates be liable for any indirect, incidental, consequential, or punitive damages, including loss of profits,
               views, or data. Our total cumulative liability arising from any claim related to the Service shall not exceed the amount paid by you in the 12 months preceding the claim.
             </p>
           </section>

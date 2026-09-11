@@ -134,7 +134,7 @@ export default function ProjectsPage() {
 
       {!loading && !error && projects.length === 0 && (
         <p className="mt-10 rounded-2xl border border-dashed border-hair/50 px-6 py-16 text-center text-sm font-light text-mist">
-          No projects yet — drop in your first long video and let NOLOGY find the moments worth posting.
+          No projects yet — drop in your first long video and let Cliptica find the moments worth posting.
         </p>
       )}
     </div>

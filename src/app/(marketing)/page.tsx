@@ -223,7 +223,7 @@ function Hero() {
             A week of <span className="gold-text">clips</span> out.
           </h1>
           <p className="mt-6 max-w-lg text-lg leading-relaxed text-mist">
-            Paste a YouTube link. Nology finds the viral moments, cuts them vertical with
+            Paste a YouTube link. Cliptica finds the viral moments, cuts them vertical with
             face-tracking, burns word-perfect captions, and hands you ready-to-post shorts —
             with a score explaining why each one will pop.
           </p>
@@ -357,7 +357,7 @@ const STEPS = [
   {
     icon: Youtube,
     title: 'Paste your link',
-    body: 'Drop any YouTube URL or upload a file. Nology pulls the video and builds a transcription within seconds.',
+    body: 'Drop any YouTube URL or upload a file. Cliptica pulls the video and builds a transcription within seconds.',
     tag: 'STEP 01',
   },
   {
@@ -505,7 +505,7 @@ function TimeCompare() {
             </h2>
             <p className="mt-5 max-w-md leading-relaxed text-mist">
               One podcast episode. The old way, you scrub, cut, reframe, and caption until
-              midnight — for maybe two clips. Nology returns six scored, captioned, vertical
+              midnight — for maybe two clips. Cliptica returns six scored, captioned, vertical
               clips before your coffee gets cold.
             </p>
             <Link
@@ -538,7 +538,7 @@ function TimeCompare() {
             </div>
             <div className="space-y-3 rounded-2xl border border-[#ff5a1f]/40 bg-[#ff5a1f]/[0.06] p-6">
               <p className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.2em] text-[#ffb27a]">
-                <Zap className="h-3.5 w-3.5" /> With Nology
+                <Zap className="h-3.5 w-3.5" /> With Cliptica
               </p>
               {['You paste the link', 'Engine does the rest'].map((task, i) => (
                 <div key={task}>
