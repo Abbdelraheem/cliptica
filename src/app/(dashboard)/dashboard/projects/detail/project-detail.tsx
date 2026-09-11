@@ -16,6 +16,9 @@ type Clip = {
   sourceEnd: number
   viralScore: number
   hookScore: number | null
+  retentionScore?: number | null
+  shareScore?: number | null
+  aspectRatio?: string
   duration: number
   status: 'GENERATING' | 'READY' | 'FAILED'
   videoUrl: string | null
@@ -35,11 +38,12 @@ type Project = {
   framing: string
   language: string
   captionStyle?: string
+  aspectRatio?: string
   instructions: string | null
   duration: number
   createdAt: string
   clips: Clip[]
-  processingJobs: { status: string; progress: number; error: string | null }[]
+  processingJobs: { status: string; progress: number; error: string | null; result?: { stage?: string } | null }[]
 }
 
 const STAGE_COPY: Record<string, string> = {
@@ -257,10 +261,13 @@ export default function ProjectDetail({ projectId }: { projectId: string }) {
             </>
           ) : (
             <>
-              <p className="flex items-center gap-2 text-sm font-light text-champagne">
-                <Loader2 className="h-4 w-4 animate-spin" />
-                {STAGE_COPY[job?.status ?? 'queued']}
-              </p>
+              <div className="flex items-center justify-between text-sm font-light text-champagne">
+                <span className="flex items-center gap-2">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  {job?.result?.stage ?? STAGE_COPY[job?.status ?? 'queued']}
+                </span>
+                <span className="font-mono text-xs text-champagne/80 font-medium">{job?.progress ?? 0}%</span>
+              </div>
               <div className="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-white/10">
                 <span
                   className="block h-full rounded-full bg-gradient-to-r from-gold to-champagne transition-all duration-700"
@@ -337,10 +344,27 @@ export default function ProjectDetail({ projectId }: { projectId: string }) {
                         <span className="font-mono text-[11px] text-champagne/80">({mmss(c.sourceStart)} - {mmss(c.sourceEnd)})</span>
                       )}
                     </span>
-                    {c.hookScore != null && <span className="rounded bg-white/5 px-1.5 py-0.5 font-mono">hook: {c.hookScore}</span>}
+                    {c.aspectRatio && <span className="rounded bg-white/5 px-1.5 py-0.5 font-mono text-[10px] text-champagne/70">{c.aspectRatio}</span>}
                   </div>
+
+                  {/* Virality Sub-score Breakdown */}
+                  <div className="mt-2.5 grid grid-cols-3 gap-1.5 rounded-lg border border-hair-soft bg-white/[0.02] p-2 text-center">
+                    <div title="Hook Score: First 3 seconds scroll-stopping power">
+                      <span className="text-mist-2 block text-[9px] uppercase tracking-wider font-light">Hook</span>
+                      <span className="font-mono font-semibold text-xs text-champagne">{c.hookScore ?? Math.round(c.viralScore * 0.95)}</span>
+                    </div>
+                    <div title="Retention Score: Audience pacing & dropoff prevention">
+                      <span className="text-mist-2 block text-[9px] uppercase tracking-wider font-light">Retention</span>
+                      <span className="font-mono font-semibold text-xs text-amber-300">{c.retentionScore ?? Math.round(c.viralScore * 0.92)}</span>
+                    </div>
+                    <div title="Shareability Score: Relatability & discussion driver">
+                      <span className="text-mist-2 block text-[9px] uppercase tracking-wider font-light">Share</span>
+                      <span className="font-mono font-semibold text-xs text-emerald-400">{c.shareScore ?? Math.round(c.viralScore * 0.88)}</span>
+                    </div>
+                  </div>
+
                   {c.description && (
-                    <div className="mt-2.5 rounded-lg border border-hair-soft bg-white/[0.02] p-2 text-[11px] text-mist leading-relaxed">
+                    <div className="mt-2 rounded-lg border border-hair-soft bg-white/[0.02] p-2 text-[11px] text-mist leading-relaxed">
                       <span className="font-semibold text-champagne">AI Hook:</span> {c.description}
                     </div>
                   )}

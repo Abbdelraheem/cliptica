@@ -53,7 +53,7 @@ export async function GET(
         processingJobs: {
           orderBy: { createdAt: 'desc' },
           take: 1,
-          select: { status: true, progress: true, error: true },
+          select: { status: true, progress: true, error: true, result: true },
         },
       },
     })

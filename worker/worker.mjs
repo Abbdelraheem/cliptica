@@ -275,6 +275,7 @@ async function transcribeGroq(mp3, language) {
     method: 'POST',
     headers: { Authorization: `Bearer ${CFG.groqKey}` },
     body: form,
+    signal: AbortSignal.timeout(90_000),
   })
   if (!res.ok) throw new Error(`Groq ${res.status}: ${(await res.text()).slice(0, 200)}`)
   const d = await res.json()
@@ -335,7 +336,12 @@ async function llmScoreMoments(candidates, instructions) {
 
   let system =
     'You are a short-form virality expert ranking podcast/video moments for TikTok/Reels/Shorts. ' +
-    'Return strict JSON {"moments":[{"index":<int>,"score":<0-100>,"title":"<=6 punchy words",' +
+    'For each moment evaluate three distinct sub-scores from 0 to 100:\n' +
+    '- hookScore: Power of the first 3 seconds to halt scrolling (question, shock, pattern interrupt).\n' +
+    '- retentionScore: Pacing and narrative structure preventing audience dropoff.\n' +
+    '- shareScore: Relatability, quote-worthiness, or emotional controversy.\n' +
+    '- score: Overall weighted viral potential (0-100).\n' +
+    'Return strict JSON {"moments":[{"index":<int>,"score":<0-100>,"hookScore":<0-100>,"retentionScore":<0-100>,"shareScore":<0-100>,"title":"<=6 punchy words",' +
     '"reason":"one sentence why it performs","emoji":"one fitting emoji"}]}. ' +
     `Return exactly the ${CFG.clipsPerVideo} strongest moments, best first.`
   if (instructions?.trim()) {
@@ -347,6 +353,7 @@ async function llmScoreMoments(candidates, instructions) {
       const res = await fetch(p.url, {
         method: 'POST',
         headers: { Authorization: `Bearer ${p.key}`, 'Content-Type': 'application/json' },
+        signal: AbortSignal.timeout(45_000),
         body: JSON.stringify({
           model: p.model,
           response_format: { type: 'json_object' },
@@ -365,6 +372,9 @@ async function llmScoreMoments(candidates, instructions) {
         .map((m) => ({
           ...candidates[m.index],
           score: Math.max(0, Math.min(100, Math.round(m.score))),
+          hookScore: Math.max(0, Math.min(100, Math.round(m.hookScore ?? m.score))),
+          retentionScore: Math.max(0, Math.min(100, Math.round(m.retentionScore ?? m.score))),
+          shareScore: Math.max(0, Math.min(100, Math.round(m.shareScore ?? m.score))),
           title: String(m.title ?? '').slice(0, 80),
           reason: String(m.reason ?? ''),
           emoji: String(m.emoji ?? '').slice(0, 4),
@@ -380,13 +390,27 @@ async function llmScoreMoments(candidates, instructions) {
 function heuristicScoreMoments(candidates) {
   const HOOKS = /\b(secret|never|nobody|mistake|million|why|how|best|worst|stop|truth)\b/gi
   return candidates
-    .map((c) => ({
-      ...c,
-      score: Math.min(96, 40 + (c.text.match(HOOKS)?.length ?? 0) * 9 + Math.min(15, c.text.split('?').length * 7)),
-      title: c.text.split(/\s+/).slice(0, 5).join(' '),
-      reason: 'High keyword & question density',
-      emoji: '',
-    }))
+    .map((c) => {
+      const hookCount = c.text.match(HOOKS)?.length ?? 0
+      const questionCount = c.text.split('?').length - 1
+      const wordCount = c.text.split(/\s+/).filter(Boolean).length
+
+      const hookScore = Math.min(98, Math.max(45, 50 + hookCount * 12 + questionCount * 8))
+      const retentionScore = Math.min(95, Math.max(40, 48 + Math.min(30, Math.round(wordCount * 0.4))))
+      const shareScore = Math.min(96, Math.max(35, 42 + hookCount * 8 + (c.text.includes('!') ? 10 : 0)))
+      const overallScore = Math.round(hookScore * 0.4 + retentionScore * 0.35 + shareScore * 0.25)
+
+      return {
+        ...c,
+        score: overallScore,
+        hookScore,
+        retentionScore,
+        shareScore,
+        title: c.text.split(/\s+/).slice(0, 5).join(' '),
+        reason: 'High keyword & question density',
+        emoji: '🔥',
+      }
+    })
     .sort((a, b) => b.score - a.score)
     .slice(0, CFG.clipsPerVideo)
 }
@@ -447,6 +471,7 @@ async function llmMotionPackages(moments) {
       const res = await fetch(p.url, {
         method: 'POST',
         headers: { Authorization: `Bearer ${p.key}`, 'Content-Type': 'application/json' },
+        signal: AbortSignal.timeout(45_000),
         body: JSON.stringify({
           model: p.model,
           response_format: { type: 'json_object' },
@@ -485,8 +510,15 @@ function heuristicMotionPack(moment) {
 
 /* ---------- render ---------- */
 
-async function renderClip(src, moment, dir, idx, transcript, mode = 'smart', motion = null, captionStyle = 'hormozi') {
-  const W = CFG.outW, H = CFG.outH
+async function renderClip(src, moment, dir, idx, transcript, mode = 'smart', motion = null, captionStyle = 'hormozi', aspectRatio = '9:16') {
+  let W = CFG.outW, H = CFG.outH
+  if (aspectRatio === '1:1') {
+    W = 1080
+    H = 1080
+  } else if (aspectRatio === '16:9') {
+    W = 1920
+    H = 1080
+  }
   const targetDur = moment.end - moment.start
 
   // captions
@@ -516,7 +548,7 @@ async function renderClip(src, moment, dir, idx, transcript, mode = 'smart', mot
   }
 
   // framing filters (cliptica-style modes)
-  const centerCrop = `crop='min(ih*${H}/${W},iw)':ih`
+  const centerCrop = `crop='min(iw,ih*${W}/${H})':'min(ih,iw*${H}/${W})'`
   const faceCrop = cmdPath
     ? `sendcmd=f='${cmdPath.replace(/\\/g, '/').replace(/:/g, '\\:')}',crop=${cropW}:${cropH}:x:y`
     : centerCrop
@@ -625,7 +657,7 @@ async function probeSize(file) {
 }
 
 /** Render all clips with bounded parallelism. */
-async function renderAll(src, moments, dir, transcript, framing = 'smart', pkgs = null, captionStyle = 'hormozi') {
+async function renderAll(src, moments, dir, transcript, framing = 'smart', pkgs = null, captionStyle = 'hormozi', aspectRatio = '9:16') {
   const VARIETY = ['face', 'blur', 'center']
   const results = new Array(moments.length)
   let next = 0
@@ -634,8 +666,8 @@ async function renderAll(src, moments, dir, transcript, framing = 'smart', pkgs 
       const i = next++
       if (i >= moments.length) return
       const mode = framing === 'variety' ? VARIETY[i % VARIETY.length] : framing
-      console.log(`[worker] rendering clip ${i + 1}/${moments.length} [${mode}${pkgs?.[i] ? ' +motion' : ''}, style=${captionStyle}]`)
-      results[i] = await renderClip(src, moments[i], dir, i, transcript, mode, pkgs?.[i] ?? null, captionStyle)
+      console.log(`[worker] rendering clip ${i + 1}/${moments.length} [${mode}${pkgs?.[i] ? ' +motion' : ''}, style=${captionStyle}, ratio=${aspectRatio}]`)
+      results[i] = await renderClip(src, moments[i], dir, i, transcript, mode, pkgs?.[i] ?? null, captionStyle, aspectRatio)
     }
   }
   await Promise.all(Array.from({ length: Math.min(CFG.renderParallel, moments.length) }, lane))
@@ -672,7 +704,15 @@ async function ensureWithinPlan(project) {
 }
 
 async function processClipAdjust(job) {
-  const setP = (p) => prisma.processingJob.update({ where: { id: job.id }, data: { progress: p } })
+  const setP = (p, stage = null) =>
+    prisma.processingJob.update({
+      where: { id: job.id },
+      data: {
+        progress: p,
+        ...(stage ? { result: { ...(job.result || {}), stage } } : {}),
+      },
+    }).catch(() => {})
+
   const { clipId, start, end, captionStyle: reqStyle } = job.result || {}
   if (!clipId || start == null || end == null) {
     throw new Error('Invalid clip adjust parameters')
@@ -685,7 +725,7 @@ async function processClipAdjust(job) {
   if (!clip) throw new Error(`Clip ${clipId} not found`)
 
   console.log(`[worker] [clip_adjust] ${job.id}: adjusting clip ${clipId} to [${start}s, ${end}s]`)
-  await setP(10)
+  await setP(10, 'Initializing clip re-trim workspace...')
 
   const dir = await mkdtemp(path.join(tmpdir(), 'nology-adj-'))
   try {
@@ -707,7 +747,7 @@ async function processClipAdjust(job) {
 
     if (!src) {
       console.log(`[worker] [clip_adjust] fetching source (${project.sourceFile ? 'upload' : 'url'})`)
-      await setP(20)
+      await setP(20, 'Loading source video media...')
       src = project.sourceFile
         ? await downloadFromR2(project.sourceFile, dir)
         : await download(project.sourceUrl, dir)
@@ -716,7 +756,7 @@ async function processClipAdjust(job) {
       await copyFile(src, cachedSrc).catch(() => {})
     }
 
-    await setP(40)
+    await setP(40, 'Aligning transcript timing & karaoke subtitles...')
 
     // 2. Transcript words: read from cached project.transcript or clip.captionData
     let transcript = project.transcript
@@ -739,9 +779,10 @@ async function processClipAdjust(job) {
     }
 
     console.log(`[worker] [clip_adjust] rendering clip ${clipId} [${start}s-${end}s, style=${captionStyle}]`)
-    await setP(60)
+    await setP(60, 'Re-rendering adjusted clip & subtitle burn-in...')
 
     const motion = clip.motionGraphics?.mode === 'ai-motion' ? clip.motionGraphics : null
+    const aspectRatio = project.aspectRatio ?? '9:16'
     const rendered = await renderClip(
       src,
       moment,
@@ -750,10 +791,11 @@ async function processClipAdjust(job) {
       transcript,
       project.framing ?? 'smart',
       motion,
-      captionStyle
+      captionStyle,
+      aspectRatio
     )
 
-    await setP(85)
+    await setP(85, 'Uploading adjusted clip to Cloudflare R2...')
     console.log(`[worker] [clip_adjust] uploading adjusted clip to R2`)
 
     const base = `${project.userId}/${project.id}`
@@ -797,13 +839,21 @@ async function processJob(job) {
   const project = await prisma.project.findUnique({ where: { id: job.projectId } })
   if (!project || (!project.sourceUrl && !project.sourceFile)) throw new Error('project has no source')
 
-  const setP = (p) => prisma.processingJob.update({ where: { id: job.id }, data: { progress: p } })
+  const setP = (p, stage = null) =>
+    prisma.processingJob.update({
+      where: { id: job.id },
+      data: {
+        progress: p,
+        ...(stage ? { result: { ...(job.result || {}), stage } } : {}),
+      },
+    }).catch(() => {})
+
   await prisma.project.update({ where: { id: project.id }, data: { status: 'PROCESSING' } })
 
   const dir = await mkdtemp(path.join(tmpdir(), 'nology-'))
   try {
     console.log(`[worker] ${job.id}: fetching source (${project.sourceFile ? 'upload' : 'youtube'})`)
-    await setP(8)
+    await setP(8, 'Fetching video source media...')
     const src = project.sourceFile
       ? await downloadFromR2(project.sourceFile, dir)
       : (await ensureWithinPlan(project), await download(project.sourceUrl, dir))
@@ -827,14 +877,14 @@ async function processJob(job) {
     }
 
     console.log('[worker] transcribing')
-    await setP(30)
+    await setP(30, 'Transcribing speech audio with AI Whisper model...')
     const transcript = await transcribe(src, dir, project.language ?? 'auto')
     await prisma.project.update({ where: { id: project.id }, data: { transcript } }).catch((e) => {
       console.warn('[worker] failed to cache transcript to project:', e.message)
     })
 
     console.log('[worker] scoring moments')
-    await setP(52)
+    await setP(52, 'Scoring viral moments, hooks, retention & shareability...')
     const moments = await scoreMoments(transcript, duration, project.clipFrom ?? 0, project.instructions)
     if (!moments.length) throw new Error('no viable moments found')
 
@@ -847,15 +897,16 @@ async function processJob(job) {
     let pkgs = null
     if (fx) {
       console.log('[worker] designing AI motion packages')
-      await setP(56)
+      await setP(56, 'Generating AI motion graphics title cards...')
       const llmPacks = await llmMotionPackages(moments).catch(() => null)
       pkgs = moments.map((_, i) => llmPacks?.find((p) => p.index === i) ?? heuristicMotionPack({ ...moments[i], index: i }))
     }
 
     const captionStyle = project.captionStyle ?? 'hormozi'
-    console.log(`[worker] rendering ${moments.length} clips (premium=${CFG.premium}, framing=${project.framing}, style=${captionStyle}${fx ? ' +motion' : ''})`)
-    await setP(58)
-    const files = await renderAll(src, moments, dir, transcript, project.framing ?? 'smart', pkgs, captionStyle)
+    const aspectRatio = project.aspectRatio ?? '9:16'
+    console.log(`[worker] rendering ${moments.length} clips (premium=${CFG.premium}, framing=${project.framing}, style=${captionStyle}, ratio=${aspectRatio}${fx ? ' +motion' : ''})`)
+    await setP(58, 'Reframing vertical layout & rendering karaoke captions...')
+    const files = await renderAll(src, moments, dir, transcript, project.framing ?? 'smart', pkgs, captionStyle, aspectRatio)
 
     for (let i = 0; i < moments.length; i++) {
       const m = moments[i]
@@ -880,6 +931,9 @@ async function processJob(job) {
           sourceStart: m.start, sourceEnd: m.end,
           duration: Math.round(m.end - m.start),
           viralScore: Math.round(m.score),
+          hookScore: Math.round(m.hookScore ?? m.score),
+          retentionScore: Math.round(m.retentionScore ?? m.score),
+          shareScore: Math.round(m.shareScore ?? m.score),
           status: 'READY',
           videoUrl: url,
           exportUrl: url,
@@ -889,10 +943,11 @@ async function processJob(job) {
           motionGraphics: { ...(files[i].motion ?? { mode: 'none' }), cropMode: files[i].cropMode },
         },
       })
-      await setP(62 + Math.round(((i + 1) / moments.length) * 36))
+      await setP(62 + Math.round(((i + 1) / moments.length) * 36), `Uploading clip ${i + 1} of ${moments.length} to Cloudflare R2...`)
     }
 
     await prisma.project.update({ where: { id: project.id }, data: { status: 'COMPLETED' } })
+    await setP(100, 'Processing complete! All clips ready.')
 
     // Charge real usage on completion: 1 credit/min of source video, +2 flat when AI motion was actually applied.
     // minCredits was already reserved upfront at project creation.
