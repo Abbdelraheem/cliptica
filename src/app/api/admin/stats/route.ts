@@ -4,9 +4,16 @@ import { NextResponse } from 'next/server'
 import { Prisma } from '@prisma/client'
 
 async function trend(table: 'User' | 'Project' | 'Clip', days = 14) {
+  const tableSql =
+    table === 'User'
+      ? Prisma.sql`"User"`
+      : table === 'Project'
+        ? Prisma.sql`"Project"`
+        : Prisma.sql`"Clip"`
+
   const sql = Prisma.sql`
     SELECT date_trunc('day', "createdAt")::date AS day, COUNT(*)::int AS total
-    FROM "${Prisma.raw(table)}"
+    FROM ${tableSql}
     WHERE "createdAt" >= now() - (${days}::int * interval '1 day')
     GROUP BY 1 ORDER BY 1
   `

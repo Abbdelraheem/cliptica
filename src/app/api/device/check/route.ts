@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { assertDeviceAvailable, bindDevice } from '@/lib/device'
+import { enforceRequestRateLimit, apiMutationLimiter } from '@/lib/rate-limit'
 
 const bodySchema = z.object({
   deviceId: z.string().min(8).max(256),
@@ -12,6 +13,9 @@ const bodySchema = z.object({
 
 export async function POST(request: Request) {
   try {
+    const rateLimited = await enforceRequestRateLimit(apiMutationLimiter, request, 'device-check')
+    if (rateLimited) return rateLimited
+
     const parsed = bodySchema.safeParse(await request.json())
     if (!parsed.success) {
       return NextResponse.json({ error: 'Invalid input' }, { status: 400 })
@@ -28,7 +32,7 @@ export async function POST(request: Request) {
         return NextResponse.json(
           {
             status: 'device_conflict',
-            message: 'This device already has another Nology account. One account per device.',
+            message: 'This device already has another Cliptica account. One account per device.',
           },
           { status: 403 }
         )
@@ -48,7 +52,7 @@ export async function POST(request: Request) {
       return NextResponse.json(
         {
           status: 'device_conflict',
-          message: 'This device already has another Nology account. One account per device.',
+          message: 'This device already has another Cliptica account. One account per device.',
         },
         { status: 403 }
       )
