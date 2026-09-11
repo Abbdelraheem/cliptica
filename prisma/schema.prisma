@@ -80,9 +80,13 @@ model User {
   emailVerificationTokens EmailVerificationToken[]
   socialConnections       SocialConnection[]
   socialPublishLogs       SocialPublishLog[]
+  referredByAffiliateId   String?
+  referredByAffiliate     Affiliate? @relation("UserReferral", fields: [referredByAffiliateId], references: [id], onDelete: SetNull)
+  referredAt              DateTime?
 
   @@index([stripeCustomerId])
   @@index([stripeSubscriptionId])
+  @@index([referredByAffiliateId])
 }
 
 /// One physical browser/device can ever be linked to exactly ONE account.
@@ -388,3 +392,50 @@ model SocialPublishLog {
   @@index([userId, clipId])
   @@index([clipId])
 }
+
+model Affiliate {
+  id             String               @id @default(cuid())
+  name           String
+  code           String               @unique
+  email          String?
+  userId         String?
+  commissionRate Decimal              @default(20.00) @db.Decimal(5, 2)
+  isActive       Boolean              @default(true)
+  notes          String?              @db.Text
+  clicks         ReferralClick[]
+  conversions    ReferralConversion[]
+  referredUsers  User[]               @relation("UserReferral")
+  createdAt      DateTime             @default(now())
+  updatedAt      DateTime             @updatedAt
+
+  @@index([code])
+}
+
+model ReferralClick {
+  id          String    @id @default(cuid())
+  affiliateId String
+  affiliate   Affiliate @relation(fields: [affiliateId], references: [id], onDelete: Cascade)
+  ipHash      String?
+  userAgent   String?
+  referer     String?
+  landingPage String    @default("/")
+  createdAt   DateTime  @default(now())
+
+  @@index([affiliateId, createdAt])
+}
+
+model ReferralConversion {
+  id            String    @id @default(cuid())
+  affiliateId   String
+  affiliate     Affiliate @relation(fields: [affiliateId], references: [id], onDelete: Cascade)
+  userId        String?
+  type          String // "SIGNUP", "FIRST_PROJECT", "SUBSCRIPTION"
+  revenue       Decimal   @default(0) @db.Decimal(10, 2)
+  commission    Decimal   @default(0) @db.Decimal(10, 2)
+  stripeEventId String?
+  createdAt     DateTime  @default(now())
+
+  @@index([affiliateId, type, createdAt])
+  @@index([userId])
+}
+

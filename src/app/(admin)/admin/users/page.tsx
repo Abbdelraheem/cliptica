@@ -4,7 +4,7 @@ import { useMemo, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import Link from 'next/link'
 import { toast } from 'sonner'
-import { Search, Plus, Minus, AlertTriangle, ChevronLeft, ChevronRight, Coins } from 'lucide-react'
+import { Search, Plus, Minus, AlertTriangle, ChevronLeft, ChevronRight, Coins, Gift } from 'lucide-react'
 
 type UserRow = {
   id: string
@@ -73,8 +73,10 @@ export default function AdminUsersPage() {
   const [role, setRole] = useState('')
   const [page, setPage] = useState(1)
   const [debouncedQ, setDebouncedQ] = useState('')
-  const [editing, setEditing] = useState<{ user: UserRow; mode: 'role' | 'credits' } | null>(null)
+  const [editing, setEditing] = useState<{ user: UserRow; mode: 'role' | 'credits' | 'plan' } | null>(null)
   const [roleValue, setRoleValue] = useState(ROLE_OPTIONS[0])
+  const [selectedPlan, setSelectedPlan] = useState<'CLIPPER' | 'STUDIO' | 'FREE'>('CLIPPER')
+  const [addPlanCredits, setAddPlanCredits] = useState(true)
   const [amount, setAmount] = useState('10')
   const [reason, setReason] = useState('')
 
@@ -137,6 +139,34 @@ export default function AdminUsersPage() {
       setReason('')
     },
     onError: (e) => toast.error(e.message),
+  })
+
+  const planMutation = useMutation({
+    mutationFn: async ({ id }: { id: string }) => {
+      const res = await fetch(`/api/admin/users/${id}/plan`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          plan: selectedPlan,
+          addPlanCredits,
+          reason: reason || `Admin granted ${selectedPlan} subscription`,
+        }),
+      })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: 'Failed to grant plan' }))
+        throw new Error(err.error ?? 'Failed')
+      }
+      return res.json()
+    },
+    onSuccess: (data) => {
+      toast.success(
+        `Granted ${selectedPlan} plan${data?.grantedCredits ? ` (+${data.grantedCredits} credits)` : ''}`
+      )
+      queryClient.invalidateQueries({ queryKey: ['admin-users'] })
+      setEditing(null)
+      setReason('')
+    },
+    onError: (e) => toast.error(e instanceof Error ? e.message : 'Could not grant plan'),
   })
 
   const users = usersQuery.data?.users ?? []
@@ -203,21 +233,27 @@ export default function AdminUsersPage() {
                   <p className="truncate text-sm font-medium">{u.email}</p>
                   <p className="text-xs text-mist">{u.name || '—'} · {u._count.projects} proj</p>
                 </Link>
-                <div className="flex items-center gap-2 md:justify-center">
+                <div className="flex items-center gap-1.5 md:justify-center">
                   <span className={`truncate rounded-full px-2.5 py-1 text-[10px] uppercase tracking-widest ${ROLE_COLOR[u.role] ?? 'bg-pearl/10 text-mist'}`}>
                     {u.role}
                   </span>
                   <button
-                    onClick={() => { setEditing({ user: u, mode: 'role' }); setRoleValue(u.role) }}
-                    className="rounded-md border border-hair/50 px-1.5 py-0.5 text-[10px] text-mist transition-colors hover:text-gold"
+                    onClick={() => {
+                      setEditing({ user: u, mode: 'plan' })
+                      setSelectedPlan(u.role === 'CLIPPER' ? 'STUDIO' : 'CLIPPER')
+                      setAddPlanCredits(true)
+                      setReason('')
+                    }}
+                    title="Grant complimentary subscription"
+                    className="flex items-center gap-1 rounded-md border border-gold/40 bg-gold/10 px-1.5 py-0.5 text-[10px] font-medium text-gold transition-colors hover:bg-gold/20"
                   >
-                    edit
+                    <Gift className="h-2.5 w-2.5" /> Plan
                   </button>
                 </div>
                 <div className="flex items-center gap-2 md:justify-end">
                   <span className="text-sm font-medium text-gold">{u.credits}</span>
                   <button
-                    onClick={() => { setEditing({ user: u, mode: 'credits' }); setReason('') }}
+                    onClick={() => { setEditing({ user: u, mode: 'credits' }); setAmount('50'); setReason('') }}
                     className="rounded-md border border-hair/50 px-1.5 py-0.5 text-[10px] text-mist transition-colors hover:text-gold"
                   >
                     adjust
@@ -247,11 +283,77 @@ export default function AdminUsersPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" onClick={() => setEditing(null)}>
           <div className="w-full max-w-md rounded-2xl border border-hair/50 bg-onyx-2 p-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
             <h3 className="font-display text-xl font-semibold">
-              {editing.mode === 'role' ? 'Change role' : 'Adjust credits'}
+              {editing.mode === 'role'
+                ? 'Change role'
+                : editing.mode === 'plan'
+                ? 'Grant complimentary plan'
+                : 'Adjust credits'}
             </h3>
             <p className="mt-1 truncate text-sm text-mist">{editing.user.email}</p>
 
-            {editing.mode === 'role' ? (
+            {editing.mode === 'plan' ? (
+              <div className="mt-5 space-y-4">
+                <p className="text-xs text-mist">
+                  Grant a subscription without requiring Stripe payment. Sets active status and unlocks plan benefits.
+                </p>
+
+                <div className="grid grid-cols-3 gap-2.5">
+                  {[
+                    { id: 'CLIPPER' as const, name: 'Clipper', desc: '100 clips/mo', badge: '$19/mo' },
+                    { id: 'STUDIO' as const, name: 'Studio', desc: '400 clips/mo', badge: '$49/mo' },
+                    { id: 'FREE' as const, name: 'Free', desc: '40 free clips', badge: 'Reset' },
+                  ].map((p) => (
+                    <button
+                      key={p.id}
+                      type="button"
+                      onClick={() => setSelectedPlan(p.id)}
+                      className={`flex flex-col items-start rounded-xl border p-3 text-left transition-all ${
+                        selectedPlan === p.id
+                          ? 'border-gold bg-gold/15 text-gold ring-1 ring-gold'
+                          : 'border-hair/50 bg-black/20 text-mist hover:border-hair'
+                      }`}
+                    >
+                      <span className="text-xs font-bold text-pearl">{p.name}</span>
+                      <span className="mt-0.5 text-[10px] text-mist-2">{p.desc}</span>
+                      <span className="mt-1 rounded bg-white/10 px-1.5 py-0.5 text-[9px] font-mono text-champagne">{p.badge}</span>
+                    </button>
+                  ))}
+                </div>
+
+                {selectedPlan !== 'FREE' && (
+                  <label className="flex items-center gap-2.5 rounded-xl border border-hair/40 bg-black/20 p-3 text-xs text-mist cursor-pointer hover:border-gold/50">
+                    <input
+                      type="checkbox"
+                      checked={addPlanCredits}
+                      onChange={(e) => setAddPlanCredits(e.target.checked)}
+                      className="h-4 w-4 rounded border-hair bg-onyx text-gold focus:ring-gold"
+                    />
+                    <span>
+                      Deposit plan credits immediately ({selectedPlan === 'CLIPPER' ? '+100 credits' : '+400 credits'})
+                    </span>
+                  </label>
+                )}
+
+                <div>
+                  <label className="mb-1.5 block text-xs uppercase tracking-widest text-mist-2">Reason (ledger)</label>
+                  <input
+                    value={reason}
+                    onChange={(e) => setReason(e.target.value)}
+                    placeholder="e.g. VIP Creator / Promotion / Complimentary grant"
+                    className="input-lux"
+                  />
+                </div>
+
+                <button
+                  onClick={() => planMutation.mutate({ id: editing.user.id })}
+                  disabled={planMutation.isPending}
+                  className="btn-lux btn-gold flex w-full items-center justify-center gap-2"
+                >
+                  <Gift className="h-4 w-4" />
+                  {planMutation.isPending ? 'Granting…' : `Grant ${selectedPlan} Subscription`}
+                </button>
+              </div>
+            ) : editing.mode === 'role' ? (
               <div className="mt-5">
                 <label className="mb-1.5 block text-xs uppercase tracking-widest text-mist-2">Role</label>
                 <div className="grid grid-cols-4 gap-2">
@@ -279,6 +381,26 @@ export default function AdminUsersPage() {
               </div>
             ) : (
               <div className="mt-5 space-y-4">
+                <div>
+                  <label className="mb-1.5 block text-xs uppercase tracking-widest text-mist-2">Quick presets</label>
+                  <div className="flex gap-2">
+                    {[10, 25, 50, 100, 500].map((preset) => (
+                      <button
+                        key={preset}
+                        type="button"
+                        onClick={() => setAmount(String(preset))}
+                        className={`flex-1 rounded-lg border py-1.5 text-xs font-medium transition-colors ${
+                          amount === String(preset)
+                            ? 'border-gold bg-gold/20 text-gold'
+                            : 'border-hair/50 bg-black/20 text-mist hover:text-pearl'
+                        }`}
+                      >
+                        +{preset}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
                 <div>
                   <label className="mb-1.5 block text-xs uppercase tracking-widest text-mist-2">Amount (+ add / − remove)</label>
                   <div className="flex items-center gap-3">
@@ -311,7 +433,7 @@ export default function AdminUsersPage() {
                   <input
                     value={reason}
                     onChange={(e) => setReason(e.target.value)}
-                    placeholder="e.g. Refund for failed project"
+                    placeholder="e.g. VIP Creator grant / Bonus / Refund"
                     className="input-lux"
                   />
                 </div>

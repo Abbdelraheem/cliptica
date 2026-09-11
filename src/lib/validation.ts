@@ -8,6 +8,7 @@ export const registerSchema = z.object({
   password: z.string().min(8),
   name: z.string().min(2).max(100).optional(),
   deviceId: z.string().min(8).max(256),
+  ref: z.string().max(100).optional(),
 })
 
 export const emailOnlySchema = z.object({
@@ -85,5 +86,36 @@ export const CLIP_ADJUST_FREE_WINDOW_MS = 15 * 60 * 1000 // 15 minutes
 export function calcClipAdjustCost(clipCreatedAt: Date | string | number, now = Date.now()): number {
   const createdTime = new Date(clipCreatedAt).getTime()
   return now - createdTime <= CLIP_ADJUST_FREE_WINDOW_MS ? 0 : 1
+}
+
+/**
+ * Strips invisible Unicode marks, RTL/LTR directional overrides, zero-width spaces,
+ * and surrounding whitespace frequently injected when copying links from mobile or Arabic environments.
+ */
+export function cleanUrlString(input?: string | null): string {
+  if (!input) return ''
+  return input
+    .replace(/[\u200B-\u200D\uFEFF\u200E\u200F\u202A-\u202E\u2066-\u2069]/g, '')
+    .trim()
+}
+
+/**
+ * Normalises a pasted video URL into a valid https:// URL.
+ * Handles bare domains (e.g. "youtu.be/xyz" or "youtube.com/watch?v=xyz"),
+ * removes invisible formatting, and checks valid http/https protocol.
+ * Returns null if the URL is completely invalid.
+ */
+export function normaliseVideoUrl(input?: string | null): string | null {
+  const s = cleanUrlString(input)
+  if (!s) return null
+  const withProto = /^https?:\/\//i.test(s) ? s : `https://${s}`
+  try {
+    const u = new URL(withProto)
+    if (u.protocol !== 'http:' && u.protocol !== 'https:') return null
+    if (!u.hostname || !u.hostname.includes('.')) return null
+    return u.toString()
+  } catch {
+    return null
+  }
 }
 

@@ -15,6 +15,7 @@ import {
   Menu,
   X,
   ArrowLeft,
+  Share2,
 } from 'lucide-react'
 import { Wordmark } from '@/components/logo'
 
@@ -22,6 +23,7 @@ const NAV_ITEMS = [
   { name: 'Overview', href: '/admin', icon: Gauge },
   { name: 'Users', href: '/admin/users', icon: Users },
   { name: 'Projects', href: '/admin/projects', icon: FolderKanban },
+  { name: 'Referrals', href: '/admin/referrals', icon: Share2 },
   { name: 'Payouts', href: '/admin/payouts', icon: Banknote },
   { name: 'Payments', href: '/admin/payments', icon: Wallet },
   { name: 'Settings', href: '/admin/settings', icon: Settings },

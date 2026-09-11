@@ -8,7 +8,7 @@ import Stripe from 'stripe'
 const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET!
 
 /** Models the webhook handlers touch inside the idempotency transaction. */
-type Tx = Pick<PrismaClient, 'user' | 'creditTransaction' | 'processedWebhookEvent'>
+type Tx = Pick<PrismaClient, 'user' | 'creditTransaction' | 'processedWebhookEvent' | 'referralConversion'>
 
 export async function POST(request: Request) {
   try {
@@ -224,6 +224,40 @@ async function handleInvoicePaymentSucceeded(
       metadata: { plan: planKey, invoiceId: invoice.id },
     },
   })
+
+  // Referral commission tracking: record SUBSCRIPTION conversion
+  try {
+    const userWithReferral = await tx.user.findFirst({
+      where: { id: userId },
+      select: {
+        referredByAffiliateId: true,
+        referredByAffiliate: { select: { id: true, commissionRate: true, isActive: true } },
+      },
+    })
+
+    if (userWithReferral?.referredByAffiliate?.isActive) {
+      const affiliate = userWithReferral.referredByAffiliate
+      const amountPaidCents = invoice.amount_paid ?? invoice.total ?? 0
+      const revenue = amountPaidCents / 100
+      const commissionRate = Number(affiliate.commissionRate) || 20
+      const commission = Number(((revenue * commissionRate) / 100).toFixed(2))
+
+      if (tx.referralConversion && typeof tx.referralConversion.create === 'function') {
+        await tx.referralConversion.create({
+          data: {
+            affiliateId: affiliate.id,
+            userId,
+            type: 'SUBSCRIPTION',
+            revenue,
+            commission,
+            stripeEventId: invoice.id,
+          },
+        })
+      }
+    }
+  } catch (refErr) {
+    console.error('[webhook] referral tracking error:', refErr)
+  }
 }
 
 async function handleInvoicePaymentFailed(

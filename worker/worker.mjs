@@ -16,7 +16,7 @@ import { promisify } from 'util'
 import { mkdtemp, rm, writeFile, readFile, mkdir, copyFile, stat } from 'fs/promises'
 import { tmpdir } from 'os'
 import path from 'path'
-import { calcCredits, exceedsPlanMinutes, planMaxMinutes } from './credits.mjs'
+import { calcClipCredits, calcCredits, exceedsPlanMinutes, planMaxMinutes } from './credits.mjs'
 import { assertPublicHttpUrl } from './ssrf.mjs'
 import { ytProxyPool, recordProxyResult, redactProxy, categorizeDownloadError } from './proxy-pool.mjs'
 import { buildKaraokeAss, buildPhraseAss } from './caption-styles.mjs'
@@ -949,9 +949,9 @@ async function processJob(job) {
     await prisma.project.update({ where: { id: project.id }, data: { status: 'COMPLETED' } })
     await setP(100, 'Processing complete! All clips ready.')
 
-    // Charge real usage on completion: 1 credit/min of source video, +2 flat when AI motion was actually applied.
+    // Charge per-clip usage on completion: 1 credit per generated video clip, +2 flat when AI motion was actually applied.
     // minCredits was already reserved upfront at project creation.
-    const creditsSpent = calcCredits(duration, fx)
+    const creditsSpent = calcClipCredits(moments.length, fx)
     const alreadyPaid = Math.max(0, project.creditsUsed ?? 0)
     const diff = creditsSpent - alreadyPaid
 
@@ -966,7 +966,7 @@ async function processJob(job) {
               userId: project.userId,
               amount: -charged,
               type: 'usage',
-              description: `Clipping completion "${project.title}" (${Math.round(duration / 60)} min${fx ? ' · AI motion' : ''})`,
+              description: `Clipping completion "${project.title}" (${moments.length} clips${fx ? ' · AI motion' : ''})`,
               metadata: { projectId: project.id, totalCost: creditsSpent, reserved: alreadyPaid },
             },
           })

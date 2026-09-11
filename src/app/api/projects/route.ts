@@ -3,7 +3,7 @@ import { prisma } from '@/lib/prisma'
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { apiMutationLimiter, enforceRateLimit } from '@/lib/rate-limit'
-import { parseClipFrom } from '@/lib/validation'
+import { parseClipFrom, cleanUrlString, normaliseVideoUrl } from '@/lib/validation'
 import { planForRole } from '@/lib/stripe'
 import { getSettingNumber } from '@/lib/settings'
 
@@ -30,14 +30,11 @@ const ASPECT_RATIOS = ['9:16', '1:1', '16:9'] as const
 
 const createSchema = z.object({
   sourceType: z.enum(['url', 'file']),
-  // Lenient: trim whitespace and append a protocol when the user pastes a bare
-  // domain/short-link (e.g. "youtu.be/xyz") — otherwise zod .url() rejects it
-  // with a confusing "Invalid input".
+  // Lenient: clean whitespace and hidden unicode markers (LRM/RLM) so pasted links never fail
   url: z
     .string()
-    .max(500)
-    .transform((v) => v.trim())
-    .refine((v) => v.length === 0 || /^[0-9a-zA-Z.\-/?:&=+%_~#@]+$/.test(v), 'Invalid URL characters')
+    .max(1000)
+    .transform((v) => cleanUrlString(v))
     .optional(),
   fileKey: z.string().max(300).optional(),
   fileName: z.string().max(200).optional(),
@@ -52,18 +49,6 @@ const createSchema = z.object({
   motionFx: z.boolean().default(false),
 })
 
-/** Normalise a pasted link into an absolute https URL. Returns null if invalid. */
-function normaliseUrl(input: string): string | null {
-  let s = input.trim()
-  if (!s) return null
-  if (!/^https?:\/\//i.test(s)) s = `https://${s}`
-  try {
-    const u = new URL(s)
-    return u.protocol === 'http:' || u.protocol === 'https:' ? u.toString() : null
-  } catch {
-    return null
-  }
-}
 
 export async function GET(request: Request) {
   try {
@@ -110,15 +95,19 @@ export async function POST(request: Request) {
 
     const parsed = createSchema.safeParse(await request.json())
     if (!parsed.success) {
-      return NextResponse.json({ error: 'Invalid input', details: parsed.error.flatten() }, { status: 400 })
+      const firstError = parsed.error.errors[0]?.message || 'Invalid input'
+      return NextResponse.json({ error: firstError, details: parsed.error.flatten() }, { status: 400 })
     }
     const d = parsed.data
 
     let sourceUrl: string | null = null
     if (d.sourceType === 'url') {
-      const url = d.url ? normaliseUrl(d.url) : null
+      if (!d.url) {
+        return NextResponse.json({ error: 'Please enter a video link' }, { status: 400 })
+      }
+      const url = normaliseVideoUrl(d.url)
       if (!url) {
-        return NextResponse.json({ error: 'Paste a valid video link' }, { status: 400 })
+        return NextResponse.json({ error: 'Please enter a valid video link (e.g. YouTube URL)' }, { status: 400 })
       }
       sourceUrl = url
     }
@@ -131,7 +120,7 @@ export async function POST(request: Request) {
 
     const user = await prisma.user.findUnique({
       where: { id: session.user.id },
-      select: { credits: true, role: true },
+      select: { credits: true, role: true, referredByAffiliateId: true },
     })
     if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 })
 
@@ -142,7 +131,7 @@ export async function POST(request: Request) {
     startOfDay.setHours(0, 0, 0, 0)
 
     const [minCredits, todaysCount] = await Promise.all([
-      getSettingNumber('min_credits_required', process.env.MIN_CREDITS_REQUIRED, 10),
+      getSettingNumber('min_credits_required', process.env.MIN_CREDITS_REQUIRED, 1),
       plan
         ? prisma.project.count({ where: { userId: session.user.id, createdAt: { gte: startOfDay } } })
         : Promise.resolve(0),
@@ -232,6 +221,24 @@ export async function POST(request: Request) {
 
       return p
     })
+
+    // Referral funnel tracking: record FIRST_PROJECT milestone
+    if (user.referredByAffiliateId) {
+      prisma.project
+        .count({ where: { userId: session.user.id } })
+        .then((count) => {
+          if (count === 1) {
+            return prisma.referralConversion.create({
+              data: {
+                affiliateId: user.referredByAffiliateId!,
+                userId: session.user.id,
+                type: 'FIRST_PROJECT',
+              },
+            })
+          }
+        })
+        .catch((err) => console.error('[referral] first project conversion error:', err))
+    }
 
     return NextResponse.json({ id: project.id }, { status: 201 })
   } catch (error) {

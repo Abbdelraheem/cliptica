@@ -1,5 +1,23 @@
 import { describe, it, expect } from 'vitest'
-import { calcCredits, planMaxMinutes, exceedsPlanMinutes } from '../worker/credits.mjs'
+import { calcClipCredits, calcCredits, planMaxMinutes, exceedsPlanMinutes } from '../worker/credits.mjs'
+
+describe('calcClipCredits (per-video model)', () => {
+  it('charges 1 credit per generated video clip', () => {
+    expect(calcClipCredits(1, false)).toBe(1)
+    expect(calcClipCredits(3, false)).toBe(3)
+    expect(calcClipCredits(5, false)).toBe(5)
+    expect(calcClipCredits(10, false)).toBe(10)
+  })
+
+  it('charges minimum 1 credit if 0 clips were somehow returned', () => {
+    expect(calcClipCredits(0, false)).toBe(1)
+  })
+
+  it('adds +2 flat when AI motion fx was applied', () => {
+    expect(calcClipCredits(1, true)).toBe(3)
+    expect(calcClipCredits(5, true)).toBe(7)
+  })
+})
 
 describe('calcCredits', () => {
   it('charges minimum 1 credit for very short videos', () => {

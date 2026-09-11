@@ -9,6 +9,7 @@ import {
   Clapperboard,
 } from 'lucide-react'
 import { fetchWithTimeout } from '@/lib/utils'
+import { cleanUrlString, normaliseVideoUrl } from '@/lib/validation'
 
 const FRAMINGS = [
   { id: 'smart', name: 'Smart framing', desc: 'Crops to the speaker when there is one — center otherwise.', icon: ScanFace },
@@ -329,17 +330,10 @@ export default function NewProjectPage() {
   function validate(): string | null {
     if (tab === 'upload' && !uploadedKey) return 'Wait for the upload to finish first.'
     if (tab === 'link') {
-      const s = url.trim()
+      const s = cleanUrlString(url)
       if (!s) return 'Paste a video link.'
-      let candidate = s
-      if (!/^https?:\/\//i.test(candidate)) candidate = `https://${candidate}`
-      try {
-        const u = new URL(candidate)
-        if (u.protocol !== 'http:' && u.protocol !== 'https:') throw 0
-        if (!/^[0-9a-zA-Z.\-/?:&=+%_~#@]+$/.test(s)) return 'Paste a valid video link.'
-      } catch {
-        return 'Paste a valid video link.'
-      }
+      const normalised = normaliseVideoUrl(s)
+      if (!normalised) return 'Paste a valid video link (e.g. YouTube URL).'
     }
     if (clipFrom && !/^\d{1,2}:\d{2}(:\d{2})?$/.test(clipFrom)) return 'Start time format: mm:ss'
     return null
@@ -357,7 +351,7 @@ export default function NewProjectPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           sourceType: tab,
-          url: tab === 'link' ? url : undefined,
+          url: tab === 'link' ? cleanUrlString(url) : undefined,
           fileKey: tab === 'upload' ? uploadedKey : undefined,
           fileName: tab === 'upload' ? file?.name : undefined,
           title: title || undefined,

@@ -21,8 +21,24 @@ export async function POST(request: Request) {
       )
     }
 
-    const { email, password, name, deviceId } = validated.data
+    const { email, password, name, deviceId, ref } = validated.data
     const userAgent = request.headers.get('user-agent')
+
+    // Check for referral attribution via body param or cookie
+    const cookieHeader = request.headers.get('cookie') || ''
+    const cookieMatch = /cliptica_ref=([a-zA-Z0-9_-]+)/.exec(cookieHeader)
+    const referralCode = (ref || cookieMatch?.[1] || '').trim().toLowerCase()
+
+    let affiliateId: string | null = null
+    if (referralCode) {
+      const affiliate = await prisma.affiliate.findUnique({
+        where: { code: referralCode },
+        select: { id: true, isActive: true },
+      })
+      if (affiliate?.isActive) {
+        affiliateId = affiliate.id
+      }
+    }
 
     const existingUser = await prisma.user.findUnique({ where: { email } })
     if (existingUser) {
@@ -54,8 +70,20 @@ export async function POST(request: Request) {
         name,
         credits: 40,
         role: 'FREE',
+        referredByAffiliateId: affiliateId,
+        referredAt: affiliateId ? new Date() : null,
       },
     })
+
+    if (affiliateId) {
+      await prisma.referralConversion.create({
+        data: {
+          affiliateId,
+          userId: user.id,
+          type: 'SIGNUP',
+        },
+      }).catch((err) => console.error('[referral] signup conversion error:', err))
+    }
 
     // Bind this device to the new account.
     await bindDevice(deviceId, user.id, userAgent)

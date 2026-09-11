@@ -17,9 +17,12 @@ export default function RegisterPage() {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const [deviceId, setDeviceId] = useState('')
+  const [refCode, setRefCode] = useState('')
 
   useEffect(() => {
     getDeviceId().then(setDeviceId)
+    const ref = new URLSearchParams(window.location.search).get('ref')
+    if (ref) setRefCode(ref)
   }, [])
 
   async function handleSubmit(e: React.FormEvent) {
@@ -30,7 +33,7 @@ export default function RegisterPage() {
       const res = await fetchWithTimeout('/api/auth/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, email, password, deviceId }),
+        body: JSON.stringify({ name, email, password, deviceId, ref: refCode || undefined }),
       })
       if (!res.ok) {
         const data = await res.json().catch(() => null)
