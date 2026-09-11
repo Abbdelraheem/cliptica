@@ -9,7 +9,23 @@ import { getSettingNumber } from '@/lib/settings'
 
 const FRAMINGS = ['smart', 'face', 'center', 'blur', 'letter', 'variety'] as const
 const LANGUAGES = ['auto', 'en', 'ar', 'es', 'fr', 'de', 'tr', 'hi', 'pt'] as const
-const CAPTION_STYLES = ['hormozi', 'clean_minimal', 'neon_highlight', 'bold_impact', 'classic_subtitle', 'highlighter'] as const
+const CAPTION_STYLES = [
+  'hormozi',
+  'bold_impact',
+  'bounce_side',
+  'pill_box',
+  'tiktok_classic',
+  'clean_minimal',
+  'classic_subtitle',
+  'slow_fade',
+  'cinematic_caps',
+  'podcast_soft',
+  'neon_highlight',
+  'highlighter',
+  'typewriter',
+  'two_tone',
+  'glitch_flicker',
+] as const
 const ASPECT_RATIOS = ['9:16', '1:1', '16:9'] as const
 
 const createSchema = z.object({

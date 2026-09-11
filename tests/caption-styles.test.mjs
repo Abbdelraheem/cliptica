@@ -1,4 +1,4 @@
-﻿import { describe, it, expect } from 'vitest'
+import { describe, it, expect } from 'vitest'
 import {
   CAPTION_STYLES,
   getCaptionStyle,
@@ -8,14 +8,31 @@ import {
 } from '../worker/caption-styles.mjs'
 
 describe('caption-styles', () => {
-  const styleIds = ['hormozi', 'clean_minimal', 'neon_highlight', 'bold_impact', 'classic_subtitle', 'highlighter']
+  const styleIds = [
+    'hormozi',
+    'bold_impact',
+    'bounce_side',
+    'pill_box',
+    'tiktok_classic',
+    'clean_minimal',
+    'classic_subtitle',
+    'slow_fade',
+    'cinematic_caps',
+    'podcast_soft',
+    'neon_highlight',
+    'highlighter',
+    'typewriter',
+    'two_tone',
+    'glitch_flicker',
+  ]
 
-  it('contains at least 6 distinct visual styles', () => {
-    expect(Object.keys(CAPTION_STYLES).length).toBeGreaterThanOrEqual(6)
+  it('contains at least 15 distinct visual styles across Kinetic, Editorial, and Creative categories', () => {
+    expect(Object.keys(CAPTION_STYLES).length).toBe(15)
     for (const id of styleIds) {
       expect(CAPTION_STYLES[id]).toBeDefined()
       expect(CAPTION_STYLES[id].name).toBeTruthy()
       expect(CAPTION_STYLES[id].desc).toBeTruthy()
+      expect(CAPTION_STYLES[id].category).toMatch(/^(Kinetic|Editorial|Creative)$/)
     }
   })
 

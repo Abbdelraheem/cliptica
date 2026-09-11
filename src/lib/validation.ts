@@ -45,11 +45,20 @@ export function parseClipFrom(v?: string | number): number {
 
 export const VALID_CAPTION_STYLES = [
   'hormozi',
-  'clean_minimal',
-  'neon_highlight',
   'bold_impact',
+  'bounce_side',
+  'pill_box',
+  'tiktok_classic',
+  'clean_minimal',
   'classic_subtitle',
+  'slow_fade',
+  'cinematic_caps',
+  'podcast_soft',
+  'neon_highlight',
   'highlighter',
+  'typewriter',
+  'two_tone',
+  'glitch_flicker',
 ] as const
 
 export const clipAdjustSchema = z

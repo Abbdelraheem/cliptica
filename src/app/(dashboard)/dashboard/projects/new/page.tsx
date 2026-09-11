@@ -31,10 +31,12 @@ const LANGS = [
 ] as const
 
 const CAPTION_PRESETS = [
+  // === KINETIC CATEGORY ===
   {
     id: 'hormozi',
+    category: 'Kinetic',
     name: 'Hormozi Pop',
-    desc: 'Kinetic 1-3 word cards with scale bounce.',
+    desc: 'Kinetic 1-3 word cards with aggressive spring scale pop.',
     badge: 'Popular',
     sample: 'STOP SCROLLING',
     sampleStyle: {
@@ -44,31 +46,8 @@ const CAPTION_PRESETS = [
     },
   },
   {
-    id: 'clean_minimal',
-    name: 'Clean Minimal',
-    desc: 'Understated lower-third lines with smooth fade.',
-    badge: 'Clean',
-    sample: 'The simplest ideas win.',
-    sampleStyle: {
-      color: '#F3F4F6',
-      fontWeight: 400,
-      fontSize: '11px',
-    },
-  },
-  {
-    id: 'neon_highlight',
-    name: 'Neon Highlight',
-    desc: 'Electric cyan with glowing magenta shadow pulse.',
-    badge: 'Glow',
-    sample: 'PURE ENERGY',
-    sampleStyle: {
-      color: '#00FFFF',
-      textShadow: '0 0 8px rgba(255,0,128,0.9), 0 0 2px #FF0080',
-      fontWeight: 800,
-    },
-  },
-  {
     id: 'bold_impact',
+    category: 'Kinetic',
     name: 'Bold Impact',
     desc: 'Heavy uppercase gold text with deep shadow.',
     badge: 'High Impact',
@@ -81,11 +60,71 @@ const CAPTION_PRESETS = [
     },
   },
   {
+    id: 'bounce_side',
+    category: 'Kinetic',
+    name: 'Side Bounce',
+    desc: 'Slide-in from left with spring bounce settle.',
+    badge: 'Motion',
+    sample: 'FAST ACTION',
+    sampleStyle: {
+      color: '#FF5A1F',
+      textShadow: '0 2px 4px rgba(0,0,0,0.9)',
+      fontWeight: 900,
+    },
+  },
+  {
+    id: 'pill_box',
+    category: 'Kinetic',
+    name: 'Pill Box',
+    desc: 'Crisp typography in a dark obsidian slate pill badge.',
+    badge: 'Badge',
+    sample: 'KEY TAKEAWAY',
+    sampleStyle: {
+      color: '#FFFFFF',
+      backgroundColor: '#181410',
+      padding: '3px 8px',
+      borderRadius: '9999px',
+      border: '1px solid rgba(255,255,255,0.15)',
+      fontWeight: 800,
+    },
+  },
+  {
+    id: 'tiktok_classic',
+    category: 'Kinetic',
+    name: 'TikTok Big Word',
+    desc: 'Single-word center punch at jumbo scale for max retention.',
+    badge: 'Trending',
+    sample: 'VIRAL',
+    sampleStyle: {
+      color: '#FFFFFF',
+      textShadow: '0 4px 10px rgba(0,0,0,0.95), 0 0 3px #000',
+      fontWeight: 900,
+      fontSize: '15px',
+      letterSpacing: '0.08em',
+    },
+  },
+
+  // === EDITORIAL CATEGORY ===
+  {
+    id: 'clean_minimal',
+    category: 'Editorial',
+    name: 'Clean Minimal',
+    desc: 'Understated lower-third lines with smooth fade.',
+    badge: 'Clean',
+    sample: 'The simplest ideas win.',
+    sampleStyle: {
+      color: '#F3F4F6',
+      fontWeight: 400,
+      fontSize: '11px',
+    },
+  },
+  {
     id: 'classic_subtitle',
+    category: 'Editorial',
     name: 'Classic Subtitle',
     desc: 'Documentary safe-zone lines at bottom edge.',
-    badge: 'Classic',
-    sample: 'Every detail planned ahead.',
+    badge: 'Cinema',
+    sample: 'Every detail was planned in advance.',
     sampleStyle: {
       color: '#FFFFFF',
       textShadow: '0 1px 2px rgba(0,0,0,0.8)',
@@ -94,7 +133,65 @@ const CAPTION_PRESETS = [
     },
   },
   {
+    id: 'slow_fade',
+    category: 'Editorial',
+    name: 'Slow Fade',
+    desc: 'Gentle breathing fade with warm ivory serif typography.',
+    badge: 'Thoughtful',
+    sample: 'Reflections on what matters.',
+    sampleStyle: {
+      color: '#F8F0E8',
+      fontFamily: 'serif',
+      fontStyle: 'italic',
+      fontWeight: 500,
+      fontSize: '11px',
+    },
+  },
+  {
+    id: 'cinematic_caps',
+    category: 'Editorial',
+    name: 'Cinematic Caps',
+    desc: 'Widescreen letterbox tracked caps with silver luminescence.',
+    badge: 'Widescreen',
+    sample: 'A NEW HORIZON BECKONS',
+    sampleStyle: {
+      color: '#ECE8E8',
+      fontWeight: 600,
+      fontSize: '10px',
+      letterSpacing: '0.14em',
+    },
+  },
+  {
+    id: 'podcast_soft',
+    category: 'Editorial',
+    name: 'Podcast Soft',
+    desc: 'Warm peach-cream rounded geometry for friendly cadence.',
+    badge: 'Podcast',
+    sample: 'Here is what they never tell you.',
+    sampleStyle: {
+      color: '#FFD8A0',
+      fontWeight: 600,
+      fontSize: '11px',
+    },
+  },
+
+  // === CREATIVE CATEGORY ===
+  {
+    id: 'neon_highlight',
+    category: 'Creative',
+    name: 'Neon Highlight',
+    desc: 'Electric cyan with glowing magenta shadow pulse.',
+    badge: 'Glow',
+    sample: 'PURE ENERGY',
+    sampleStyle: {
+      color: '#00FFFF',
+      textShadow: '0 0 8px rgba(255,0,128,0.9), 0 0 2px #FF0080',
+      fontWeight: 800,
+    },
+  },
+  {
     id: 'highlighter',
+    category: 'Creative',
     name: 'Highlighter',
     desc: 'Fluorescent yellow marker box with black text.',
     badge: 'Marker',
@@ -105,6 +202,52 @@ const CAPTION_PRESETS = [
       fontWeight: 800,
       padding: '2px 6px',
       borderRadius: '2px',
+    },
+  },
+  {
+    id: 'typewriter',
+    category: 'Creative',
+    name: 'Typewriter',
+    desc: 'Retro mechanical monospace in terminal matrix green.',
+    badge: 'Code/Retro',
+    sample: 'system.init()',
+    sampleStyle: {
+      color: '#50FF50',
+      fontFamily: 'monospace',
+      backgroundColor: '#121612',
+      padding: '2px 6px',
+      borderRadius: '3px',
+      border: '1px solid rgba(80,255,80,0.3)',
+      fontWeight: 700,
+      fontSize: '11px',
+    },
+  },
+  {
+    id: 'two_tone',
+    category: 'Creative',
+    name: 'Two-Tone Alternate',
+    desc: 'Alternating golden yellow and crisp pearl cadence.',
+    badge: 'Dual Tone',
+    sample: 'BREAK THE PATTERN',
+    sampleStyle: {
+      color: '#FFFFFF',
+      textShadow: '0 2px 4px rgba(0,0,0,0.8)',
+      fontWeight: 900,
+      borderBottom: '2px solid #FFD700',
+    },
+  },
+  {
+    id: 'glitch_flicker',
+    category: 'Creative',
+    name: 'Glitch Accent',
+    desc: 'Cyber pink with electric cyan edges and rapid pulse.',
+    badge: 'Cyberpunk',
+    sample: 'GLITCH REALITY',
+    sampleStyle: {
+      color: '#C832FF',
+      textShadow: '0 0 6px rgba(0,255,255,0.9), 0 0 2px #00FFFF',
+      fontWeight: 900,
+      letterSpacing: '0.04em',
     },
   },
 ] as const
@@ -129,6 +272,7 @@ export default function NewProjectPage() {
   const [instructions, setInstructions] = useState('')
   const [clipFrom, setClipFrom] = useState('')
   const [framing, setFraming] = useState<(typeof FRAMINGS)[number]['id']>('smart')
+  const [captionCategory, setCaptionCategory] = useState<'All' | 'Kinetic' | 'Editorial' | 'Creative'>('All')
   const [captionStyle, setCaptionStyle] = useState<(typeof CAPTION_PRESETS)[number]['id']>('hormozi')
   const [aspectRatio, setAspectRatio] = useState<(typeof ASPECT_RATIOS)[number]['id']>('9:16')
   const [language, setLanguage] = useState('auto')
@@ -425,10 +569,41 @@ export default function NewProjectPage() {
         <div>
           <div className="mb-3 flex items-center justify-between">
             <p className="text-sm font-light text-mist">Caption Style Preset</p>
-            <span className="font-mono text-xs text-champagne">6 Styles Available</span>
+            <span className="font-mono text-xs text-champagne">15 Styles Available</span>
           </div>
+
+          {/* Category Filter Tabs */}
+          <div className="mb-3.5 flex items-center gap-1.5 overflow-x-auto pb-1">
+            {(['All', 'Kinetic', 'Editorial', 'Creative'] as const).map((cat) => {
+              const count = cat === 'All' ? CAPTION_PRESETS.length : CAPTION_PRESETS.filter((p) => p.category === cat).length
+              const label =
+                cat === 'All'
+                  ? `All (${count})`
+                  : cat === 'Kinetic'
+                  ? `⚡ Kinetic (${count})`
+                  : cat === 'Editorial'
+                  ? `📖 Editorial (${count})`
+                  : `🎨 Creative (${count})`
+              const isSelected = captionCategory === cat
+              return (
+                <button
+                  key={cat}
+                  type="button"
+                  onClick={() => setCaptionCategory(cat)}
+                  className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-all ${
+                    isSelected
+                      ? 'border border-champagne/60 bg-champagne/20 text-pearl shadow-[0_0_12px_rgba(212,175,55,0.15)]'
+                      : 'border border-hair/60 bg-black/30 text-mist hover:border-hair hover:text-pearl'
+                  }`}
+                >
+                  {label}
+                </button>
+              )
+            })}
+          </div>
+
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {CAPTION_PRESETS.map((preset) => (
+            {CAPTION_PRESETS.filter((p) => captionCategory === 'All' || p.category === captionCategory).map((preset) => (
               <button
                 key={preset.id}
                 type="button"

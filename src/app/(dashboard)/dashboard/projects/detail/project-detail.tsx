@@ -54,12 +54,24 @@ const STAGE_COPY: Record<string, string> = {
 }
 
 const CAPTION_PRESET_OPTIONS = [
-  { id: 'hormozi', name: 'Hormozi Pop (Yellow High-Impact)' },
-  { id: 'clean_minimal', name: 'Clean Minimal (Soft Subtitle)' },
-  { id: 'neon_highlight', name: 'Neon Highlight (Electric Cyan)' },
-  { id: 'bold_impact', name: 'Bold Impact (Punchy Red/Gold)' },
-  { id: 'classic_subtitle', name: 'Classic Subtitle (Cinema Standard)' },
-  { id: 'highlighter', name: 'Highlighter Marker (Neon Lime)' },
+  // === KINETIC ===
+  { id: 'hormozi', category: 'Kinetic', name: 'Hormozi Pop (Yellow High-Impact)' },
+  { id: 'bold_impact', category: 'Kinetic', name: 'Bold Impact (Punchy Gold Uppercase)' },
+  { id: 'bounce_side', category: 'Kinetic', name: 'Side Bounce (Left Slide Spring)' },
+  { id: 'pill_box', category: 'Kinetic', name: 'Pill Box (Obsidian Slate Badge)' },
+  { id: 'tiktok_classic', category: 'Kinetic', name: 'TikTok Big Word (Jumbo Retention)' },
+  // === EDITORIAL ===
+  { id: 'clean_minimal', category: 'Editorial', name: 'Clean Minimal (Soft Subtitle)' },
+  { id: 'classic_subtitle', category: 'Editorial', name: 'Classic Subtitle (Cinema Standard)' },
+  { id: 'slow_fade', category: 'Editorial', name: 'Slow Fade (Serif Breathing Fade)' },
+  { id: 'cinematic_caps', category: 'Editorial', name: 'Cinematic Caps (Letterbox Tracked)' },
+  { id: 'podcast_soft', category: 'Editorial', name: 'Podcast Soft (Warm Peach Cadence)' },
+  // === CREATIVE ===
+  { id: 'neon_highlight', category: 'Creative', name: 'Neon Highlight (Electric Cyan Glow)' },
+  { id: 'highlighter', category: 'Creative', name: 'Highlighter Marker (Fluorescent Lime)' },
+  { id: 'typewriter', category: 'Creative', name: 'Typewriter (Monospace Terminal Green)' },
+  { id: 'two_tone', category: 'Creative', name: 'Two-Tone Alternate (Gold/Pearl Cadence)' },
+  { id: 'glitch_flicker', category: 'Creative', name: 'Glitch Accent (Chromatic Cyber Pink)' },
 ] as const
 
 function mmss(s: number) {
@@ -515,11 +527,27 @@ export default function ProjectDetail({ projectId }: { projectId: string }) {
                           onChange={(e) => setAdjustState((prev) => ({ ...prev, captionStyle: e.target.value }))}
                           className="w-full rounded border border-white/15 bg-black/80 px-2 py-1.5 text-xs text-white focus:border-gold focus:outline-none"
                         >
-                          {CAPTION_PRESET_OPTIONS.map((opt) => (
-                            <option key={opt.id} value={opt.id}>
-                              {opt.name}
-                            </option>
-                          ))}
+                          <optgroup label="⚡ Kinetic Styles">
+                            {CAPTION_PRESET_OPTIONS.filter((o) => o.category === 'Kinetic').map((opt) => (
+                              <option key={opt.id} value={opt.id}>
+                                {opt.name}
+                              </option>
+                            ))}
+                          </optgroup>
+                          <optgroup label="📖 Editorial Styles">
+                            {CAPTION_PRESET_OPTIONS.filter((o) => o.category === 'Editorial').map((opt) => (
+                              <option key={opt.id} value={opt.id}>
+                                {opt.name}
+                              </option>
+                            ))}
+                          </optgroup>
+                          <optgroup label="🎨 Creative Styles">
+                            {CAPTION_PRESET_OPTIONS.filter((o) => o.category === 'Creative').map((opt) => (
+                              <option key={opt.id} value={opt.id}>
+                                {opt.name}
+                              </option>
+                            ))}
+                          </optgroup>
                         </select>
                       </div>
 

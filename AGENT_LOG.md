@@ -516,3 +516,69 @@ Date format: YYYY-MM-DD. One entry per completed round (what was checked → wha
     - 2 vCPUs (Intel Xeon Platinum 8488C), 7.6 GiB RAM (12% used, 6.7 GiB headroom), 38 GB NVMe disk (28% used).
     - `nology-web` (203 MB), `nology-worker` (71 MB), `nology-bot` (80 MB) healthy under PM2 root context.
     - Zero-downtime hot reloads verified. Full 56-route Next.js production build verified.
+
+---
+
+## Round 19 — Part 1: Expanding Caption Styles from 6 to 15
+**Date**: 2026-09-11  
+**Status**: Completed & Verified  
+**Test Suite**: 13 test suites, 210 tests passing (100%), including 108 tests in `tests/caption-styles.test.mjs`  
+
+### 1. Style Architecture & Categories
+Added 9 distinct presets to `worker/caption-styles.mjs` across 3 categories with genuine font, animation, positioning, and layout differences:
+- **Kinetic (5 styles)**:
+  - `hormozi`: Punchy 1-3 word cards with aggressive spring scale pop (`\fscx118\fscy118` -> `\fscx100\fscy100`).
+  - `bold_impact`: Heavy uppercase golden yellow fill (`#FFD700`), thick black outline, center-mid screen (`y=68%`).
+  - `bounce_side`: Left slide-in (`\move`) with spring settling bounce, bold orange fill (`#FF5A1F`).
+  - `pill_box`: Opaque obsidian slate backdrop box (`borderStyle: 3`), pill geometry, crisp white typography.
+  - `tiktok_classic`: Single-word center punch at massive scale (`fontSizeRatio: 0.115`), maximum retention.
+- **Editorial (5 styles)**:
+  - `clean_minimal`: Understated lower-third phrase layout with subtle fade (`\fad(80,80)`), no bounce.
+  - `classic_subtitle`: Documentary safe-zone lines at bottom edge (`y=88%`), natural sentence cadence.
+  - `slow_fade`: Gentle breathing fade (`\fad(220,180)`), warm ivory serif typography (`Liberation Serif, Georgia`).
+  - `cinematic_caps`: Letterbox tracked caps (`\fsp4`), silver luminescence (`#E8E8EC`), widescreen aesthetic.
+  - `podcast_soft`: Warm peach-cream geometry (`#FFD8A0`), rounded typography, relaxed conversational cadence.
+- **Creative (5 styles)**:
+  - `neon_highlight`: Electric cyan fill with glowing magenta pulse shadow (`\blur4\fscx112`).
+  - `highlighter`: Vibrant marker box backdrop (`borderStyle: 3`), bold black lettering.
+  - `typewriter`: Monospace terminal green (`#50FF50`), dark terminal container box, mechanical pacing.
+  - `two_tone`: Alternating dual-color highlight between bright gold and crisp pearl per word.
+  - `glitch_flicker`: Cyber pink with electric cyan edges and chromatic opacity flicker pulse.
+
+### 2. FFmpeg Libass Benchmark & Verification
+Executed `scripts/test-render-styles.mjs` rendering 1080x1920 video with burned-in ASS subtitles for all 15 presets:
+| Style ID | Style Name | Category | Success | Resolution | Render Duration |
+|---|---|---|---|---|---|
+| `hormozi` | Hormozi Pop | Kinetic | true | 1080x1920 | 2051ms |
+| `bold_impact` | Bold Impact | Kinetic | true | 1080x1920 | 2044ms |
+| `bounce_side` | Side Bounce | Kinetic | true | 1080x1920 | 1083ms |
+| `pill_box` | Pill Box | Kinetic | true | 1080x1920 | 1358ms |
+| `tiktok_classic` | TikTok Big Word | Kinetic | true | 1080x1920 | 1126ms |
+| `clean_minimal` | Clean Minimal | Editorial | true | 1080x1920 | 1185ms |
+| `classic_subtitle` | Classic Subtitle | Editorial | true | 1080x1920 | 1162ms |
+| `slow_fade` | Slow Fade | Editorial | true | 1080x1920 | 1301ms |
+| `cinematic_caps` | Cinematic Caps | Editorial | true | 1080x1920 | 1147ms |
+| `podcast_soft` | Podcast Soft | Editorial | true | 1080x1920 | 1146ms |
+| `neon_highlight` | Neon Highlight | Creative | true | 1080x1920 | 1121ms |
+| `highlighter` | Highlighter | Creative | true | 1080x1920 | 1131ms |
+| `typewriter` | Typewriter | Creative | true | 1080x1920 | 1178ms |
+| `two_tone` | Two-Tone Alternate | Creative | true | 1080x1920 | 1082ms |
+| `glitch_flicker` | Glitch Accent | Creative | true | 1080x1920 | 1077ms |
+
+**Edge Case Assertions**:
+- Long words (>25 chars): Wrapped cleanly without horizontal boundary overflow.
+- Single short words (1-2 chars): Centered without clipping or abnormal scaling.
+- Emoji preservation: Tested with multi-byte unicode emojis (`🚀`, `✨`, `🔥`) without crashing libass.
+- Arabic / RTL text: Bidirectional text rendered cleanly without tag corruption.
+- Tag injection security: ASS tag markers (`{`, `}`, `\`) stripped from all input words.
+
+### 3. UI Implementation
+- `src/app/(dashboard)/dashboard/projects/new/page.tsx`:
+  - Added category filter tabs: `All (15)`, `⚡ Kinetic (5)`, `📖 Editorial (5)`, `🎨 Creative (5)`.
+  - Added visual preview badges and sample cards styled to accurately represent each preset.
+- `src/app/(dashboard)/dashboard/projects/detail/project-detail.tsx`:
+  - Updated `CAPTION_PRESET_OPTIONS` with all 15 presets.
+  - Grouped presets into `<optgroup>` tags (`⚡ Kinetic Styles`, `📖 Editorial Styles`, `🎨 Creative Styles`) in the re-trim adjustment modal.
+- `COMPETITIVE_GAP_ANALYSIS.md`:
+  - Added required top comment.
+  - Updated Caption Styles row from 6 to 15 (Parity achieved with market leader Opus Clip).

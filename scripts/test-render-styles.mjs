@@ -1,4 +1,4 @@
-﻿import fs from 'fs/promises'
+import fs from 'fs/promises'
 import path from 'path'
 import os from 'os'
 import { execFile } from 'child_process'
@@ -7,8 +7,8 @@ import { CAPTION_STYLES, buildKaraokeAss } from '../worker/caption-styles.mjs'
 
 const run = promisify(execFile)
 
-async function sh(cmd, args) {
-  return await run(cmd, args)
+async function sh(cmd, args, opts = {}) {
+  return await run(cmd, args, opts)
 }
 
 async function runRenderTests() {
@@ -24,8 +24,8 @@ async function runRenderTests() {
     '-pix_fmt', 'yuv420p',
     '-c:a', 'aac',
     '-shortest',
-    baseVideo,
-  ])
+    'base.mp4',
+  ], { cwd: tmp })
 
   const testWords = [
     { text: 'Look', start: 0.5, end: 1.0 },
@@ -41,25 +41,24 @@ async function runRenderTests() {
   const results = []
   for (const styleId of styles) {
     const t0 = Date.now()
-    const assFile = path.join(tmp, `test-${styleId}.ass`)
-    const outFile = path.join(tmp, `out-${styleId}.mp4`)
+    const assName = `test-${styleId}.ass`
+    const outName = `out-${styleId}.mp4`
+    const assFile = path.join(tmp, assName)
 
     try {
       const assContent = buildKaraokeAss(testWords, 0, 4.0, '✨', styleId, 1080, 1920)
       await fs.writeFile(assFile, assContent, 'utf8')
 
-      // Escape path for ffmpeg filter
-      const escAss = assFile.replace(/\\/g, '/').replace(/:/g, '\\:')
       await sh('ffmpeg', [
         '-y',
-        '-i', baseVideo,
-        '-vf', `ass=${escAss}`,
+        '-i', 'base.mp4',
+        '-vf', `ass=${assName}`,
         '-c:v', 'libx264',
         '-preset', 'ultrafast',
         '-c:a', 'copy',
         '-t', '3',
-        outFile,
-      ])
+        outName,
+      ], { cwd: tmp })
 
       // Probe output
       const probe = await sh('ffprobe', [
@@ -67,8 +66,8 @@ async function runRenderTests() {
         '-print_format', 'json',
         '-show_format',
         '-show_streams',
-        outFile,
-      ])
+        outName,
+      ], { cwd: tmp })
       const meta = JSON.parse(probe.stdout)
       const vStream = meta.streams.find((s) => s.codec_type === 'video')
       const dur = Date.now() - t0
