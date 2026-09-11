@@ -154,6 +154,7 @@ model Project {
   framing      String        @default("smart") // smart|face|center|blur|letter|variety
   language     String        @default("auto")
   captionStyle String        @default("hormozi") // hormozi|clean_minimal|neon_highlight|bold_impact|classic_subtitle|highlighter
+  aspectRatio  String        @default("9:16") // 9:16|1:1|16:9
   transcript   Json?         // Groq/Whisper word-level transcript cache for fast clip re-trim
   motionFx     Boolean       @default(false) // AI motion graphics (+2 credits)
   creditsUsed  Int           @default(0)
@@ -201,7 +202,8 @@ model Clip {
   status         ClipStatus @default(GENERATING)
   thumbnailUrl   String?
   videoUrl       String?
-  captionStyle   String     @default("beast_mode")
+  captionStyle   String     @default("hormozi")
+  aspectRatio    String     @default("9:16") // 9:16|1:1|16:9
   captionData    Json? // word-level timing
   motionGraphics Json? // applied templates
   reframeData    Json? // face tracking data

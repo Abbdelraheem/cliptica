@@ -18,6 +18,12 @@ const FRAMINGS = [
   { id: 'variety', name: 'Variety pack', desc: 'Alternates framing across the batch.', icon: Shuffle },
 ] as const
 
+const ASPECT_RATIOS = [
+  { id: '9:16', name: '9:16 Vertical', desc: 'TikTok, Reels, Shorts', icon: '📱' },
+  { id: '1:1', name: '1:1 Square', desc: 'Instagram & LinkedIn Feed', icon: '⏹️' },
+  { id: '16:9', name: '16:9 Landscape', desc: 'YouTube & Web Desktop', icon: '🖥️' },
+] as const
+
 const LANGS = [
   ['auto', 'Auto-detect'],
   ['en', 'English'], ['ar', 'العربية (Arabic)'], ['es', 'Spanish'],
@@ -124,6 +130,7 @@ export default function NewProjectPage() {
   const [clipFrom, setClipFrom] = useState('')
   const [framing, setFraming] = useState<(typeof FRAMINGS)[number]['id']>('smart')
   const [captionStyle, setCaptionStyle] = useState<(typeof CAPTION_PRESETS)[number]['id']>('hormozi')
+  const [aspectRatio, setAspectRatio] = useState<(typeof ASPECT_RATIOS)[number]['id']>('9:16')
   const [language, setLanguage] = useState('auto')
   const [motionFx, setMotionFx] = useState(false)
   const [motionAvailable, setMotionAvailable] = useState(false)
@@ -215,6 +222,7 @@ export default function NewProjectPage() {
           framing,
           language,
           captionStyle,
+          aspectRatio,
           motionFx: motionAvailable && motionFx,
         }),
       }, 20000)
@@ -362,6 +370,32 @@ export default function NewProjectPage() {
             placeholder='e.g. "Focus on the most emotional moments", "Only clips about pricing", "Avoid the sponsor segment"…'
             className="input-lux resize-none"
           />
+        </div>
+
+        {/* Aspect Ratio */}
+        <div>
+          <div className="mb-3 flex items-center justify-between">
+            <p className="text-sm font-light text-mist">Target Aspect Ratio</p>
+            <span className="font-mono text-xs text-champagne">3 Formats Available</span>
+          </div>
+          <div className="grid grid-cols-3 gap-3">
+            {ASPECT_RATIOS.map((ar) => (
+              <button
+                key={ar.id}
+                type="button"
+                onClick={() => setAspectRatio(ar.id)}
+                className={`flex flex-col items-center rounded-xl border p-3.5 text-center transition-all ${
+                  aspectRatio === ar.id
+                    ? 'border-champagne/70 bg-champagne/10 shadow-[0_0_15px_rgba(212,175,55,0.12)]'
+                    : 'border-hair/60 bg-black/25 hover:border-hair hover:bg-black/40'
+                }`}
+              >
+                <span className="mb-1.5 text-xl">{ar.icon}</span>
+                <p className={`text-xs font-semibold ${aspectRatio === ar.id ? 'text-pearl' : 'text-mist'}`}>{ar.name}</p>
+                <p className="mt-1 text-[11px] leading-snug text-mist-2">{ar.desc}</p>
+              </button>
+            ))}
+          </div>
         </div>
 
         {/* Framing */}

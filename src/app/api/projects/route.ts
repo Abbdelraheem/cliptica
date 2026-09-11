@@ -10,6 +10,7 @@ import { getSettingNumber } from '@/lib/settings'
 const FRAMINGS = ['smart', 'face', 'center', 'blur', 'letter', 'variety'] as const
 const LANGUAGES = ['auto', 'en', 'ar', 'es', 'fr', 'de', 'tr', 'hi', 'pt'] as const
 const CAPTION_STYLES = ['hormozi', 'clean_minimal', 'neon_highlight', 'bold_impact', 'classic_subtitle', 'highlighter'] as const
+const ASPECT_RATIOS = ['9:16', '1:1', '16:9'] as const
 
 const createSchema = z.object({
   sourceType: z.enum(['url', 'file']),
@@ -31,6 +32,7 @@ const createSchema = z.object({
   framing: z.enum(FRAMINGS).default('smart'),
   language: z.enum(LANGUAGES).default('auto'),
   captionStyle: z.enum(CAPTION_STYLES).default('hormozi'),
+  aspectRatio: z.enum(ASPECT_RATIOS).default('9:16'),
   motionFx: z.boolean().default(false),
 })
 
@@ -201,6 +203,7 @@ export async function POST(request: Request) {
           framing: d.framing,
           language: d.language,
           captionStyle: d.captionStyle,
+          aspectRatio: d.aspectRatio,
           motionFx,
           status: 'PENDING',
           creditsUsed: minCredits, // tracks reserved credits
