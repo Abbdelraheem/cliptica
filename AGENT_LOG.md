@@ -466,3 +466,53 @@ Date format: YYYY-MM-DD. One entry per completed round (what was checked → wha
    - Created unit tests in `tests/pricing-model.test.ts` (5 tests passing).
    - Updated `COMPETITIVE_GAP_ANALYSIS.md` and created `GAP_CLOSURE_REPORT.md`.
    - All 12 test suites passing (144/144 tests) on both local environment and EC2 production host.
+
+---
+
+## Round 18 — Detective → Senior Engineer → Fixer → Creator Mandate
+**Date**: 2026-09-11  
+**Status**: Confirmed & Live in Production  
+**Test Suite**: 13 test suites, 147 unit & integration tests passing (100%)  
+
+### 1. Role 1: The Detective Audit
+- Executed audit across all 39 API routes, background worker (`worker/worker.mjs`), Prisma models, and EC2 host infrastructure.
+- Generated `DETECTIVE_FINDINGS.md` categorizing all findings by severity:
+  - **SEC-01 (High)**: Worker external fetch calls lacked timeouts/AbortSignals.
+  - **SEC-02 (High)**: `/api/device/check` lacked direct rate limiting.
+  - **FEAT-01 (Medium)**: Database had `hookScore`, `retentionScore`, `shareScore` columns unpopulated by scoring pipeline.
+  - **FEAT-02 (Medium)**: Aspect ratio was hardcoded strictly to 9:16 vertical only.
+  - **UX-01 (Medium)**: Pipeline progress reported numeric percentages without descriptive stage labels.
+  - **BRD-01 (Medium)**: Legacy "Nology" brand leakage in transactional emails, error messages, and landing copy.
+  - **DB-01 (Low)**: `Prisma.raw(table)` used in admin stats queries.
+- Authored `NEEDS_HUMAN_DECISION.md` cataloguing custom domain, Stripe live keys, production SMTP, and proxy upgrades.
+
+### 2. Role 2 & 3: Senior Engineer & Fixer Execution
+- **SEC-01 Fix**: Equipped all external Groq/OpenAI fetch calls (`transcribeGroq`, `llmScoreMoments`, `llmMotionPackages`) with `signal: AbortSignal.timeout(...)` to eliminate indefinite worker hangs.
+- **SEC-02 Fix**: Added `enforceRequestRateLimit(apiMutationLimiter, ...)` to `/api/device/check`.
+- **DB-01 Fix**: Replaced `Prisma.raw(table)` with static SQL fragment mappings (`Prisma.sql`"User"``, etc.) in `src/app/api/admin/stats/route.ts`.
+- **BRD-01 Fix**: Standardized customer-facing emails (`src/lib/email.ts`), metadata (`src/app/layout.tsx`), header logos (`src/components/logo.tsx`), auth messages, and legal policies to "Cliptica".
+
+### 3. Role 4: The Creator High-Value Features
+- **Real-Time Stage Labels**:
+  - Worker now dispatches granular stage descriptions into `ProcessingJob.result.stage`:
+    - 8%: "Fetching video source media..."
+    - 30%: "Transcribing speech audio with AI Whisper model..."
+    - 52%: "Scoring viral moments, hooks, retention & shareability..."
+    - 56%: "Generating AI motion graphics title cards..."
+    - 58%: "Reframing vertical layout & rendering karaoke captions..."
+    - 62–98%: "Uploading clip X of Y to Cloudflare R2..."
+    - 100%: "Processing complete! All clips ready."
+  - Project detail page (`project-detail.tsx`) renders the active stage label and progress percentage live.
+- **Virality Sub-scores (Hook, Retention, Share)**:
+  - Updated LLM prompt and heuristic scorer to evaluate Hook Score (0-100), Retention Score (0-100), and Shareability Score (0-100).
+  - Saved into `prisma.clip.create(...)` and displayed in visual 3-column sub-score badges on every clip card.
+  - Created `tests/scoring-subscores.test.mjs` (3/3 tests passing).
+- **User-Selectable Aspect Ratio (9:16, 1:1, 16:9)**:
+  - Added `aspectRatio` to `Project` and `Clip` in Prisma schema, synchronized to Neon DB.
+  - Implemented dynamic FFmpeg crop calculations for vertical (`9:16`), square (`1:1`), and landscape (`16:9`).
+  - Added visual format picker on `/dashboard/projects/new`.
+- **Production Infrastructure Notes**:
+  - Measured live EC2 specs and authored `INFRASTRUCTURE_NOTES.md`:
+    - 2 vCPUs (Intel Xeon Platinum 8488C), 7.6 GiB RAM (12% used, 6.7 GiB headroom), 38 GB NVMe disk (28% used).
+    - `nology-web` (203 MB), `nology-worker` (71 MB), `nology-bot` (80 MB) healthy under PM2 root context.
+    - Zero-downtime hot reloads verified. Full 56-route Next.js production build verified.
