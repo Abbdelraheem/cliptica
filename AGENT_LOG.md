@@ -727,3 +727,41 @@ Executed `scripts/test-render-styles.mjs` rendering 1080x1920 video with burned-
 - **Unit Tests**: All 15 test files, 248 tests passed (100%).
 - **TypeScript**: `npx tsc --noEmit` exited 0 with zero errors.
 - **Build**: `npm run build` compiled 59 routes cleanly with zero warnings/errors.
+
+---
+
+## 2026-09-12: Overhaul of Viral Clipping Engine, Avatar/Speaker Tracking & Speed
+
+### 1. Root Cause Analysis
+- **Problem 1 (Slow processing - 32 minutes)**:
+  - In `worker/worker.mjs`, when `GROQ_API_KEY` was empty, the worker fell back to `faster-whisper` running on CPU (`WhisperModel("small")`). On EC2 with no GPU, audio transcription took 32 minutes for a single video.
+- **Problem 2 (Bad clipping & arbitrary non-viral moments)**:
+  - Without an active LLM key, `heuristicScoreMoments` fell back to an English-only regex (`secret|never|nobody...`) which produced 0 matches on Arabic speech, assigning random scores.
+  - Slicing was rigid and dumb (`win = 38` seconds, `s += win / 2`), chopping sentences and words in half without respecting speech pauses or narrative completion.
+- **Problem 3 (Avatar / Speaker not framed correctly)**:
+  - `worker/worker.mjs` invoked system `python3` instead of `/opt/nology-venv/bin/python`, causing `ModuleNotFoundError: No module named 'insightface'`.
+  - `faces.py` failed silently without writing output JSON, triggering `ENOENT: no such file or directory, open 'faces0.json'` in `worker.mjs`.
+  - The worker caught this error and defaulted to static `centerCrop` on 100% of jobs, amputating speakers or avatars positioned off-center.
+  - `buffalo_l` was only designed for human photorealistic faces and ignored 2D/3D avatars, VTubers, or webcam overlays.
+
+### 2. Solutions Implemented
+- **Avatar & Face Tracking (`worker/premium/faces.py`)**:
+  - Multi-tier detection: InsightFace SCRFD (`allowed_modules=['detection']` for 5x-10x CPU speedup) -> OpenCV Haar frontal + profile cascades (for sideways speakers & zero-download fallback) -> Motion saliency & contour detection (for 2D/3D avatars, VTubers, webcam overlays).
+  - 2-Person Podcast / Interview framing: centers between both speakers if they fit within 78% of the 9:16 crop window.
+  - Smooth cinematic panning: dead-zone threshold (8px) + exponential moving average filter eliminating camera micro-jitter.
+  - Bulletproof fallback: always writes `{ "commands": [], "thumb_ts": null, "win": [win_w, win_h] }` on exit, eliminating `ENOENT`.
+- **Worker & Script Resolution (`worker/worker.mjs`)**:
+  - Added `fileURLToPath` and `existsSync` to resolve absolute path `FACES_SCRIPT` and dynamic `PYTHON_BIN` pointing to `/opt/nology-venv/bin/python`.
+  - In `CFG`, changed default fallback CPU whisper model from `small` to `base` (5x faster).
+  - Added dynamic DB settings synchronization for `groq_api_key`, `openai_api_key`, and `whisper_model` so keys can be configured directly from admin settings.
+- **Viral Clipping Engine 2.0 (`worker/worker.mjs`)**:
+  - Implemented `generateCandidateMoments`: groups whisper segments by natural sentence endings (`.`, `?`, `!`, `؟`, `…`) and pauses (`gap >= 0.6s`), generating coherent thought units (25s–55s) that always start with a clean hook and end on a completed thought.
+  - Rebuilt `heuristicScoreMoments`: comprehensive bilingual Arabic + English virality analysis (hook detection, opening question/exclamation bonus, cadence & speech pace 2.0-3.6 WPM, narrative conclusion bonus, and shareability metrics).
+  - Upgraded `llmScoreMoments`: tailored system prompt instructing Groq LLaMA 3.3-70B and OpenAI to produce Arabic titles and reasons for Arabic videos, evaluating hookScore, retentionScore, and shareScore.
+- **Tests (`tests/scoring-subscores.test.mjs`)**:
+  - Added unit tests for Arabic viral questions/hooks and English virality benchmarks.
+
+### 3. Verification
+- **Unit Tests**: All 15 test files, 249 tests passed (100%).
+- **TypeScript**: `npx tsc --noEmit` exited 0 with zero errors.
+- **Build**: `npm run build` compiled 59 routes cleanly with zero warnings/errors.

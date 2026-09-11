@@ -14,6 +14,8 @@ import { PrismaClient } from '@prisma/client'
 import { execFile } from 'child_process'
 import { promisify } from 'util'
 import { mkdtemp, rm, writeFile, readFile, mkdir, copyFile, stat } from 'fs/promises'
+import { existsSync } from 'fs'
+import { fileURLToPath } from 'url'
 import { tmpdir } from 'os'
 import path from 'path'
 import { calcClipCredits, calcCredits, exceedsPlanMinutes, planMaxMinutes } from './credits.mjs'
@@ -22,6 +24,16 @@ import { ytProxyPool, recordProxyResult, redactProxy, categorizeDownloadError } 
 import { buildKaraokeAss, buildPhraseAss } from './caption-styles.mjs'
 
 const run = promisify(execFile)
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url))
+const FACES_SCRIPT = path.join(__dirname, 'premium', 'faces.py')
+const PYTHON_BIN =
+  process.env.PYTHON_BIN ||
+  (process.platform === 'win32'
+    ? 'python'
+    : existsSync('/opt/nology-venv/bin/python')
+      ? '/opt/nology-venv/bin/python'
+      : 'python3')
 
 // Bootstrap env from the production env file so the worker is never at the
 // mercy of how pm2 / shells were launched. Existing process env wins.
@@ -47,7 +59,7 @@ const CFG = {
 
   groqKey: process.env.GROQ_API_KEY,
   openaiKey: process.env.OPENAI_API_KEY,
-  whisperModel: process.env.WHISPER_MODEL ?? 'small',
+  whisperModel: process.env.WHISPER_MODEL ?? 'base',
 
   premium: process.env.PIPELINE_PREMIUM !== '0',
   faceFps: process.env.FACE_FPS ?? '4',
@@ -80,6 +92,9 @@ const SETTING_PARSE = {
   clip_target_seconds: (v) => Math.max(5, Number(v) || 38),
   render_parallel: (v) => Math.max(1, Math.min(8, Number(v) || 4)),
   stale_job_minutes: (v) => Math.max(1, Number(v) || 30),
+  groq_api_key: (v) => String(v || '').trim(),
+  openai_api_key: (v) => String(v || '').trim(),
+  whisper_model: (v) => String(v || '').trim(),
 }
 
 let configCache = null
@@ -112,6 +127,9 @@ async function syncConfigInto() {
   CFG.clipsPerVideo = c.clips_per_video
   CFG.clipLength = c.clip_target_seconds
   CFG.renderParallel = c.render_parallel
+  if (c.groq_api_key) CFG.groqKey = c.groq_api_key
+  if (c.openai_api_key) CFG.openaiKey = c.openai_api_key
+  if (c.whisper_model) CFG.whisperModel = c.whisper_model
 }
 
 async function sh(cmd, args, opts) {
@@ -327,6 +345,96 @@ async function transcribe(file, dir, language = 'auto') {
 
 /* ---------- scoring ---------- */
 
+/**
+ * Semantic & pause-aware candidate generation.
+ * Groups whisper segments by natural sentence endings (. ? ! ؟ …) or silence gaps (>0.6s),
+ * ensuring every clip starts with a clean sentence (hook) and ends on a completed thought
+ * without cutting words or sentences in half.
+ */
+function generateCandidateMoments(transcript, duration, from = 0, targetLen = 38) {
+  const minDur = Math.max(20, Math.round(targetLen * 0.65))
+  const maxDur = Math.min(75, Math.round(targetLen * 1.45))
+  const segs = (transcript.segments ?? []).filter((s) => s.start >= Math.max(0, from - 2))
+
+  if (!segs.length) {
+    // Time-based fallback when transcript has no segments
+    const win = targetLen
+    const fallback = []
+    for (let s = Math.max(0, from); s + win <= duration && fallback.length < 50; s += win / 2) {
+      fallback.push({ start: Math.round(s), end: Math.round(s + win), text: '' })
+    }
+    return fallback
+  }
+
+  // Detect sentence or thought boundary
+  const isBoundary = (idx) => {
+    if (idx >= segs.length - 1) return true
+    const text = (segs[idx].text || '').trim()
+    const endsWithPunct = /[.?!؟…]$/.test(text)
+    const gap = segs[idx + 1].start - segs[idx].end
+    return endsWithPunct || gap >= 0.6
+  }
+
+  const candidates = []
+  const usedRanges = []
+
+  // Step through segment by segment
+  for (let i = 0; i < segs.length && candidates.length < 50; i++) {
+    const startSeg = segs[i]
+    if (startSeg.start < from) continue
+
+    let accumulatedText = []
+    let clipStart = startSeg.start
+    let clipEnd = startSeg.end
+
+    for (let j = i; j < segs.length; j++) {
+      accumulatedText.push(segs[j].text.trim())
+      clipEnd = segs[j].end
+      const currentDur = clipEnd - clipStart
+
+      if (currentDur >= minDur) {
+        if (isBoundary(j) || currentDur >= maxDur) {
+          const fullText = accumulatedText.join(' ').trim()
+          const wordCount = fullText.split(/\s+/).filter(Boolean).length
+
+          // Avoid dead silence or tiny blips
+          if (wordCount >= 18) {
+            const overlap = usedRanges.some(
+              (r) => Math.abs(r.start - clipStart) < 12 && Math.abs(r.end - clipEnd) < 12
+            )
+            if (!overlap) {
+              candidates.push({
+                start: Math.round(clipStart),
+                end: Math.round(clipEnd),
+                text: fullText,
+              })
+              usedRanges.push({ start: clipStart, end: clipEnd })
+            }
+          }
+          break
+        }
+      }
+    }
+  }
+
+  // Fallback if semantic grouping produced too few candidates
+  if (candidates.length < 3) {
+    const win = targetLen
+    for (let s = Math.max(0, from); s + win < duration && candidates.length < 40; s += win / 2) {
+      const text = segs
+        .filter((x) => x.start >= s - 1 && x.end <= s + win + 1)
+        .map((x) => x.text)
+        .join(' ')
+        .trim()
+      if (text.split(/\s+/).length > 20) {
+        candidates.push({ start: Math.round(s), end: Math.round(s + win), text })
+      }
+    }
+  }
+
+  return candidates
+}
+
 async function llmScoreMoments(candidates, instructions) {
   const providers = []
   if (CFG.groqKey)
@@ -335,12 +443,14 @@ async function llmScoreMoments(candidates, instructions) {
     providers.push({ name: 'openai', url: 'https://api.openai.com/v1/chat/completions', key: CFG.openaiKey, model: 'gpt-4o-mini' })
 
   let system =
-    'You are a short-form virality expert ranking podcast/video moments for TikTok/Reels/Shorts. ' +
+    'You are a master viral video editor for TikTok, Instagram Reels, and YouTube Shorts. ' +
+    'Analyze the provided speech moments (which may be in Arabic, English, or mixed) and evaluate their virality.\n' +
     'For each moment evaluate three distinct sub-scores from 0 to 100:\n' +
-    '- hookScore: Power of the first 3 seconds to halt scrolling (question, shock, pattern interrupt).\n' +
-    '- retentionScore: Pacing and narrative structure preventing audience dropoff.\n' +
-    '- shareScore: Relatability, quote-worthiness, or emotional controversy.\n' +
+    '- hookScore: Power of the first 3 seconds to halt scrolling (provocative question, shocking statement, mystery, or curiosity gap).\n' +
+    '- retentionScore: Pacing, storytelling flow, and lack of fluff that keeps viewers watching until the end.\n' +
+    '- shareScore: Relatability, quote-worthiness, surprising value, or emotional impact.\n' +
     '- score: Overall weighted viral potential (0-100).\n' +
+    'If the candidate text is in Arabic, write the "title" (3-6 words) and "reason" in Arabic. ' +
     'Return strict JSON {"moments":[{"index":<int>,"score":<0-100>,"hookScore":<0-100>,"retentionScore":<0-100>,"shareScore":<0-100>,"title":"<=6 punchy words",' +
     '"reason":"one sentence why it performs","emoji":"one fitting emoji"}]}. ' +
     `Return exactly the ${CFG.clipsPerVideo} strongest moments, best first.`
@@ -360,7 +470,7 @@ async function llmScoreMoments(candidates, instructions) {
           temperature: 0.3,
           messages: [
             { role: 'system', content: system },
-            { role: 'user', content: JSON.stringify(candidates.map((c, i) => ({ index: i, text: c.text.slice(0, 600) }))) },
+            { role: 'user', content: JSON.stringify(candidates.map((c, i) => ({ index: i, text: c.text.slice(0, 700) }))) },
           ],
         }),
       })
@@ -388,17 +498,51 @@ async function llmScoreMoments(candidates, instructions) {
 }
 
 function heuristicScoreMoments(candidates) {
-  const HOOKS = /\b(secret|never|nobody|mistake|million|why|how|best|worst|stop|truth)\b/gi
+  const AR_HOOKS = /\b(سر|أسرار|غلطة|أكبر غلطة|كارثة|إياك|انتبه|احذر|لا تسوي|لا تعمل|حقيقة|صدمة|نصيحة|سري|خطير|ليش|لماذا|كيف|هل تعلم|شو السبب|ما هو|تخيل|فكرك|مين|متى|بتعرف|أغرب|عجيب|مليون|ملايين|آلاف|ألف|أضعاف|بالمية|فجأة|اللي صار|المشكلة|الحل|اكتشفت|تعلمت|قصة|النتيجة)\b/ui
+  const EN_HOOKS = /\b(secret|never|nobody|mistake|million|billion|why|how|what if|imagine|did you know|best|worst|stop|truth|exposed|warning|danger|actually|suddenly|problem|solution|discovered|story|first time)\b/gi
+
   return candidates
     .map((c) => {
-      const hookCount = c.text.match(HOOKS)?.length ?? 0
-      const questionCount = c.text.split('?').length - 1
-      const wordCount = c.text.split(/\s+/).filter(Boolean).length
+      const text = c.text || ''
+      const dur = Math.max(15, c.end - c.start)
+      const words = text.split(/\s+/).filter(Boolean)
+      const wordCount = words.length
+      const wps = wordCount / dur // words per second
 
-      const hookScore = Math.min(98, Math.max(45, 50 + hookCount * 12 + questionCount * 8))
-      const retentionScore = Math.min(95, Math.max(40, 48 + Math.min(30, Math.round(wordCount * 0.4))))
-      const shareScore = Math.min(96, Math.max(35, 42 + hookCount * 8 + (c.text.includes('!') ? 10 : 0)))
-      const overallScore = Math.round(hookScore * 0.4 + retentionScore * 0.35 + shareScore * 0.25)
+      // 1. Hook score (0-100): opening power in first 15 words
+      const firstSlice = words.slice(0, 15).join(' ')
+      const hasOpeningQ = firstSlice.includes('?') || firstSlice.includes('؟')
+      const hasOpeningEx = firstSlice.includes('!')
+      const arHookCount = (text.match(AR_HOOKS) || []).length
+      const enHookCount = (text.match(EN_HOOKS) || []).length
+      const hookCount = arHookCount + enHookCount
+      const openingHook = (firstSlice.match(AR_HOOKS) || []).length + (firstSlice.match(EN_HOOKS) || []).length
+
+      let hookScore = 50 + (hookCount * 7) + (openingHook * 15) + (hasOpeningQ ? 16 : 0) + (hasOpeningEx ? 8 : 0)
+      hookScore = Math.min(99, Math.max(40, Math.round(hookScore)))
+
+      // 2. Retention score (0-100): cadence, energy, clean ending
+      let paceBonus = 0
+      if (wps >= 2.0 && wps <= 3.6) paceBonus = 18
+      else if (wps >= 1.5 && wps < 2.0) paceBonus = 8
+      else if (wps > 3.6 && wps <= 4.5) paceBonus = 10
+
+      const endsCleanly = /[.!?؟]$/.test(text.trim())
+      let retentionScore = 46 + paceBonus + (endsCleanly ? 12 : 0) + Math.min(18, Math.round(wordCount * 0.18))
+      retentionScore = Math.min(98, Math.max(38, Math.round(retentionScore)))
+
+      // 3. Shareability score (0-100): curiosity, numbers, facts
+      const hasNumbers = /\d+|مليون|آلاف|ألف|million|billion|10x|%/.test(text)
+      let shareScore = 44 + (hookCount * 6) + (hasNumbers ? 15 : 0) + (hasOpeningQ ? 10 : 0)
+      shareScore = Math.min(97, Math.max(35, Math.round(shareScore)))
+
+      const overallScore = Math.round(hookScore * 0.42 + retentionScore * 0.35 + shareScore * 0.23)
+
+      let title = words.slice(0, 6).join(' ')
+      if (hasOpeningQ) {
+        const qPart = text.split(/[?؟]/)[0]
+        if (qPart && qPart.length < 50) title = qPart.trim() + '؟'
+      }
 
       return {
         ...c,
@@ -406,9 +550,14 @@ function heuristicScoreMoments(candidates) {
         hookScore,
         retentionScore,
         shareScore,
-        title: c.text.split(/\s+/).slice(0, 5).join(' '),
-        reason: 'High keyword & question density',
-        emoji: '🔥',
+        title: title.slice(0, 60),
+        reason:
+          hookCount > 0
+            ? (arHookCount > 0
+                ? 'مقطع مشوق يحتوي على خطاف قوي ومحتوى تفاعلي عالي'
+                : 'High-engagement viral hook with strong narrative pacing')
+            : 'Cohesive thought unit with continuous speech density',
+        emoji: arHookCount > 0 ? '🔥' : '⚡',
       }
     })
     .sort((a, b) => b.score - a.score)
@@ -416,27 +565,19 @@ function heuristicScoreMoments(candidates) {
 }
 
 async function scoreMoments(transcript, duration, from = 0, instructions = null) {
-  const win = CFG.clipLength
-  const candidates = []
-  for (let s = Math.max(0, from); s + win < duration && candidates.length < 60; s += win / 2) {
-    const text = transcript.segments
-      .filter((x) => x.start >= s - 2 && x.end <= s + win + 2)
-      .map((x) => x.text).join(' ')
-      .trim()
-    if (text.split(/\s+/).length > 25) candidates.push({ start: Math.round(s), end: Math.round(s + win), text })
-  }
+  const candidates = generateCandidateMoments(transcript, duration, from, CFG.clipLength)
   if (!candidates.length) return []
   return (await llmScoreMoments(candidates, instructions)) ?? heuristicScoreMoments(candidates)
 }
 
 /* ---------- premium vision ---------- */
 
-/** Dominant-speaker crop path via InsightFace. Returns null on any failure. */
+/** Dominant-speaker crop path via InsightFace + OpenCV + Avatar motion fallback. Returns null on any failure. */
 async function faceTrack(src, moment, dir, idx) {
   if (!CFG.premium) return null
   const outJson = path.join(dir, `faces${idx}.json`)
   try {
-    await sh('python3', ['worker/premium/faces.py', 'track', src, String(moment.start), String(moment.end), outJson], {
+    await sh(PYTHON_BIN, [FACES_SCRIPT, 'track', src, String(moment.start), String(moment.end), outJson], {
       timeout: 1000 * 60 * 10,
       env: { ...process.env, FACE_FPS: CFG.faceFps, OUT_W: String(CFG.outW), OUT_H: String(CFG.outH) },
     })
