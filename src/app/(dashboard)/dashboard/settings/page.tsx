@@ -17,7 +17,6 @@ import {
   AlertCircle,
   CheckCircle2,
   ShieldAlert,
-  ShieldCheck,
   Trash2,
 } from 'lucide-react'
 import { ConnectionSummary } from '@/lib/social/types'
