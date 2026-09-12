@@ -765,3 +765,51 @@ Executed `scripts/test-render-styles.mjs` rendering 1080x1920 video with burned-
 - **Unit Tests**: All 15 test files, 249 tests passed (100%).
 - **TypeScript**: `npx tsc --noEmit` exited 0 with zero errors.
 - **Build**: `npm run build` compiled 59 routes cleanly with zero warnings/errors.
+
+---
+
+## 2026-09-12: Captions Burn-in PTS/ASS Fix, Real-Time Credit Sync, 3-Clip Selection, Motion FX Removal & Whop/ContentReward Campaign Ingestion
+
+### 1. Groq API Key Configuration
+- Saved provided production Groq API key securely to `/opt/nology/.env.production` on EC2.
+- Enables lightning-fast Groq Whisper audio transcription (~10-15s instead of 32 mins on CPU) and Groq LLaMA 3.3-70B virality scoring & campaign analysis.
+
+### 2. Captions Burn-in Bug Fixes (`worker/caption-styles.mjs`)
+- **Relative PTS Timestamps**: Video rendering runs FFmpeg with input seek (`-ss [start] -i [source] -t [duration]`), which resets playback timestamps (PTS) to 0. Absolute subtitles (e.g. starting at 00:00:45) never appeared within a 30s clip. Converted all subtitle event start/end times to relative offsets: `Math.max(0, card.start - start)`.
+- **ASS Events Header Format**: Fixed ASS header from 5 columns to the standard 10 columns: `Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text`. Previously, `libass` interpreted dialogue text as formatting directives, resulting in blank subtitles.
+- **FontName Comma Splitting**: Stripped CSS-style comma fallback lists in `Fontname` (e.g., `'DejaVu Sans'` instead of `'Liberation Sans, Arial Black, DejaVu Sans'`) across all 15 preset styles so libass matches system fonts reliably.
+- **Verification**: Added unit tests in `tests/caption-styles.test.mjs` verifying relative offset calculations and 10-column header conformance. All 123 tests in `caption-styles.test.mjs` passed.
+
+### 3. Real-Time Credits Sync
+- **State Synchronization**: Added `liveCredits` polling and event subscription to `src/components/dashboard-layout.tsx` and `src/app/(dashboard)/dashboard/billing/page.tsx`.
+- **Immediate Deductions**: Listeners for the window event `credits-updated` automatically refresh user credit counts upon project creation and video generation without requiring manual browser reloads or re-authentication.
+
+### 4. 3 Clips Generation & Interactive Final Clip Selection
+- **Default 3 Clips**: Worker default `clipsPerVideo` set to 3 candidate clips per source video.
+- **Interactive UI (`src/app/(dashboard)/dashboard/projects/detail/project-detail.tsx`)**:
+  - Displays "Option N of 3" badges on each clip card.
+  - Interactive "اختر هذا المقطع كفيديو نهائي (Select as Final)" button for each clip.
+  - Persistent selection saved to localStorage (`cliptica_final_clip_[projectId]`).
+  - Active final clip highlighted with a prominent gold banner and glowing border.
+
+### 5. Motion Graphics Removal
+- Completely excised Motion Graphics across UI, API, and worker pipeline:
+  - Removed motion packages, heuristic pack, and `-filter_complex` color overlays from `worker/worker.mjs`.
+  - Removed AI Motion FX toggle switch, Clapperboard icon, and cost notes from `src/app/(dashboard)/dashboard/projects/new/page.tsx`.
+
+### 6. Whop & ContentReward Clipping Campaign Ingestion
+- **SSRF Protection (`src/lib/ssrf.ts`)**: Built rigorous server-side request forgery protection blocking private IP ranges, cloud metadata addresses (169.254.169.254), loopback, and IPv4-mapped IPv6.
+- **Campaign Analysis API (`src/app/api/campaigns/analyze/route.ts`)**:
+  - Safely extracts text, Google Drive links, YouTube links, and video URLs from Whop or ContentReward campaign pages.
+  - Uses Groq LLaMA 3.3-70B with JSON output mode to extract payout terms, clipping guidelines, required hashtags, and recommended prompts.
+- **Campaign Tab UI (`src/app/(dashboard)/dashboard/projects/new/page.tsx`)**:
+  - Added dedicated 3rd tab: "Campaign (Whop / ContentReward)".
+  - Instant URL analysis displaying platform badge, payout badge, rules, and detected assets.
+  - 1-click selection of detected Google Drive or YouTube source video to immediately launch the clipping job.
+
+### 7. Verification & Deployment
+- **Unit Tests**: 15 test suites, 264 unit tests passed (100%).
+- **TypeScript**: Zero errors (`npx tsc --noEmit` exited 0).
+- **Next.js Production Build**: Built cleanly with all 60 static and dynamic routes.
+- **Deployment**: Changes committed (`f48c6ed`), pushed to GitHub origin, pulled to EC2 `/opt/nology`, rebuilt on EC2, and reloaded via PM2 (`pm2 reload all --update-env`).
+- **Health Check**: `https://cliptica.com/api/health` and PM2 services (`nology-web`, `nology-worker`, `nology-bot`) online and healthy.
