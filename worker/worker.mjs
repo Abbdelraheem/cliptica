@@ -179,7 +179,11 @@ async function download(url, dir) {
       ytdlpArgs([
         ...(proxy ? ['--proxy', proxy] : []),
         '--socket-timeout',
-        '20',
+        proxy ? '10' : '20',
+        '--retries',
+        '1',
+        '--fragment-retries',
+        '1',
         '-N',
         '8',
         '-f',
@@ -194,7 +198,7 @@ async function download(url, dir) {
         out,
         url,
       ]),
-      { timeout: 1000 * 60 * 10 }
+      { timeout: proxy ? 45000 : 1000 * 60 * 5 }
     )
 
   // Direct first — most stable when YouTube isn't flagging the IP.
