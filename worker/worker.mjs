@@ -14,7 +14,7 @@ import { PrismaClient } from '@prisma/client'
 import { execFile } from 'child_process'
 import { promisify } from 'util'
 import { mkdtemp, rm, writeFile, readFile, mkdir, copyFile, stat } from 'fs/promises'
-import { existsSync } from 'fs'
+import { existsSync, readFileSync } from 'fs'
 import { fileURLToPath } from 'url'
 import { tmpdir } from 'os'
 import path from 'path'
@@ -36,7 +36,7 @@ const PYTHON_BIN =
       : 'python3')
 
 // Bootstrap env from the production env file so the worker is never at the
-// mercy of how pm2 / shells were launched. Existing process env wins.
+// mercy of how pm2 / shells were launched. Fills empty or missing keys directly.
 function loadEnvFile() {
   const file = process.env.NOLOGY_ENV_FILE ?? '/opt/nology/.env.production'
   if (typeof process.loadEnvFile === 'function') {
@@ -45,6 +45,27 @@ function loadEnvFile() {
     } catch {
       /* file absent in dev / non-prod — fall back to process env */
     }
+  }
+  try {
+    if (existsSync(file)) {
+      const content = readFileSync(file, 'utf8')
+      for (const line of content.split('\n')) {
+        const trimmed = line.trim()
+        if (!trimmed || trimmed.startsWith('#')) continue
+        const eqIdx = trimmed.indexOf('=')
+        if (eqIdx <= 0) continue
+        const key = trimmed.slice(0, eqIdx).trim()
+        let val = trimmed.slice(eqIdx + 1).trim()
+        if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"))) {
+          val = val.slice(1, -1)
+        }
+        if (!process.env[key] || process.env[key].trim() === '') {
+          if (val) process.env[key] = val
+        }
+      }
+    }
+  } catch (e) {
+    console.warn('[worker] manual env parse notice:', e.message)
   }
 }
 loadEnvFile()
@@ -127,9 +148,9 @@ async function syncConfigInto() {
   CFG.clipsPerVideo = c.clips_per_video
   CFG.clipLength = c.clip_target_seconds
   CFG.renderParallel = c.render_parallel
-  if (c.groq_api_key) CFG.groqKey = c.groq_api_key
-  if (c.openai_api_key) CFG.openaiKey = c.openai_api_key
-  if (c.whisper_model) CFG.whisperModel = c.whisper_model
+  CFG.groqKey = c.groq_api_key || process.env.GROQ_API_KEY || CFG.groqKey
+  CFG.openaiKey = c.openai_api_key || process.env.OPENAI_API_KEY || CFG.openaiKey
+  CFG.whisperModel = c.whisper_model || process.env.WHISPER_MODEL || CFG.whisperModel
 }
 
 async function sh(cmd, args, opts) {
@@ -991,9 +1012,9 @@ async function processJob(job) {
     await prisma.project.update({ where: { id: project.id }, data: { status: 'COMPLETED' } })
     await setP(100, 'Processing complete! All clips ready.')
 
-    // Charge per-clip usage on completion: 1 credit per generated video clip.
-    // minCredits was already reserved upfront at project creation.
-    const creditsSpent = calcClipCredits(moments.length, false)
+    // Charge per-clip usage on completion: 1 credit per operation (user chooses 1 final video).
+    // minCredits (1) was already reserved upfront at project creation.
+    const creditsSpent = 1
     const alreadyPaid = Math.max(0, project.creditsUsed ?? 0)
     const diff = creditsSpent - alreadyPaid
 
@@ -1104,11 +1125,12 @@ async function claimNextJob() {
 }
 
 async function loop() {
+  await syncConfigInto()
   const envFlags = {
     db: process.env.DATABASE_URL ? 1 : 0,
     r2: process.env.R2_ACCESS_KEY_ID && process.env.R2_SECRET_ACCESS_KEY && process.env.R2_ENDPOINT ? 1 : 0,
     cookies: process.env.YTDLP_COOKIES ? 1 : 0,
-    groq: process.env.GROQ_API_KEY ? 1 : 0,
+    groq: (CFG.groqKey || process.env.GROQ_API_KEY) ? 1 : 0,
   }
   console.log(`[worker] online — premium=${CFG.premium}, parallel=${CFG.renderParallel}, env=${Object.entries(envFlags).map(([k, v]) => `${k}${v ? '+' : '-'}`).join('')}`)
 

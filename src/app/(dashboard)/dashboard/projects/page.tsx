@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import { Plus, Sparkles, Loader2, AlertTriangle } from 'lucide-react'
 
@@ -26,6 +27,7 @@ function fmtDate(iso: string) {
 }
 
 export default function ProjectsPage() {
+  const router = useRouter()
   const [projects, setProjects] = useState<Project[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -84,7 +86,11 @@ export default function ProjectsPage() {
               <Link
                 key={p.id}
                 href={`/dashboard/projects/detail?id=${p.id}`}
-                className="glass-card group !p-0 transition-transform duration-300 hover:-translate-y-1"
+                onClick={(e) => {
+                  e.preventDefault()
+                  router.push(`/dashboard/projects/detail?id=${p.id}`)
+                }}
+                className="block glass-card group !p-0 cursor-pointer transition-transform duration-300 hover:-translate-y-1"
               >
                 {/* Thumbnail */}
                 <div className="relative h-36 overflow-hidden rounded-t-[17px] bg-gradient-to-br from-emerald-deep/40 via-onyx-2 to-champagne/10">

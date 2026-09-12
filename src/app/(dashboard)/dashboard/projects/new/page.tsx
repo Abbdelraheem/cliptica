@@ -857,9 +857,9 @@ export default function NewProjectPage() {
 
         {/* Cost note */}
         <div className="flex items-center justify-between rounded-xl border border-hair/50 bg-onyx-2/60 px-5 py-4">
-          <span className="text-sm font-light text-mist">Cost</span>
-          <span className="font-display text-lg italic text-gold">
-            1 credit / minute · charged on completion
+          <span className="text-sm font-light text-mist">التكلفة / Cost</span>
+          <span className="font-display text-base sm:text-lg italic text-gold">
+            1 كريديت لكل فيديو نهائي (1 credit per final video)
           </span>
         </div>
 

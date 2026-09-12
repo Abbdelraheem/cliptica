@@ -1,4 +1,4 @@
-﻿import { getAdminSession } from '@/lib/auth'
+import { getAdminSession } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
@@ -32,9 +32,9 @@ const KNOWN_KEYS: { key: SettingKey; kind: 'bool' | 'number' | 'string'; label: 
 const defaults: Record<string, SettingValue> = {
   motion_fx: true,
   pipeline_premium: true,
-  min_credits_required: 10,
+  min_credits_required: 1,
   max_upload_mb: 500,
-  clips_per_video: 6,
+  clips_per_video: 3,
   clip_target_seconds: 38,
   render_parallel: 4,
   stale_job_minutes: 30,

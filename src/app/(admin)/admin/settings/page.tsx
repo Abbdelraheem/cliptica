@@ -11,9 +11,9 @@ type SettingsState = Record<string, boolean | number>
 const DEFAULTS: SettingsState = {
   motion_fx: true,
   pipeline_premium: true,
-  min_credits_required: 10,
+  min_credits_required: 1,
   max_upload_mb: 500,
-  clips_per_video: 6,
+  clips_per_video: 3,
   clip_target_seconds: 38,
   render_parallel: 4,
   stale_job_minutes: 30,

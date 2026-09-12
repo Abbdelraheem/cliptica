@@ -88,7 +88,7 @@ export default function BillingPage() {
         </div>
         <div className="text-right">
           <p className="max-w-xs text-sm font-light leading-relaxed text-mist">
-            1 credit ≈ 1 minute of source footage. Unused monthly credits roll over for 30 days.
+            1 كريديت لكل فيديو نهائي. الرصيد الشهري غير المستخدم يترحل لـ 30 يوماً.
           </p>
           {(userRole === 'CLIPPER' || userRole === 'STUDIO') && (
             <a
