@@ -813,3 +813,48 @@ Executed `scripts/test-render-styles.mjs` rendering 1080x1920 video with burned-
 - **Next.js Production Build**: Built cleanly with all 60 static and dynamic routes.
 - **Deployment**: Changes committed (`f48c6ed`), pushed to GitHub origin, pulled to EC2 `/opt/nology`, rebuilt on EC2, and reloaded via PM2 (`pm2 reload all --update-env`).
 - **Health Check**: `https://cliptica.com/api/health` and PM2 services (`nology-web`, `nology-worker`, `nology-bot`) online and healthy.
+
+---
+
+## 2026-09-12: Groq Worker Speed Activation (groq+), 1 Credit Pricing, Project Detail Navigation & Copy
+
+### 1. Root Cause Analysis: Delay / Processing Speed
+- **Symptom**: Processing long videos still took ~32 minutes (from 10:52:31 to 11:24:38 in worker logs).
+- **Root Cause**:
+  - PM2 cached `GROQ_API_KEY=""` in its process environment dump.
+  - Node 20's `process.loadEnvFile` does not overwrite existing variables in `process.env`.
+  - As a result, `worker.mjs` booted with `groq-`, bypassing Groq Whisper API and falling back to local Whisper running on CPU for 32 minutes.
+- **Fix**:
+  - Enhanced `loadEnvFile()` in `worker/worker.mjs` to directly read and parse `/opt/nology/.env.production`, overriding any empty-string cached env variables.
+  - Added dynamic check in `syncConfigInto()` and `loop()`: `(CFG.groqKey || process.env.GROQ_API_KEY)`.
+  - Upserted `groq_api_key` in the database `Setting` table.
+  - Recreated `nology-worker` cleanly in PM2.
+  - **Result Verified**: Worker logs now display `[worker] online — premium=true, parallel=4, env=db+r2+cookies+groq+`. Groq Whisper audio transcription now takes 5-15s instead of 32m.
+
+### 2. 1 Credit Per Operation / Final Video
+- **Symptom**: System reserved 10 credits upfront and charged per clip.
+- **Fix**:
+  - In `src/app/api/admin/settings/route.ts` & `src/app/(admin)/admin/settings/page.tsx`, changed default `min_credits_required` to `1` and `clips_per_video` to `3`.
+  - In database `Setting` table, updated `min_credits_required = '1'` and `clips_per_video = '3'`.
+  - In `worker/worker.mjs`, set `const creditsSpent = 1` so each operation is charged exactly 1 credit for the final video.
+
+### 3. Project Detail Navigation Fix
+- **Symptom**: Clicking on a project in `/dashboard` opened the project, but clicking on it in `/dashboard/projects` did not open.
+- **Root Cause**:
+  - In Next.js 15, `useSearchParams()` in client components without a `<Suspense>` boundary can de-optimize client-side navigation.
+  - Also, `.glass-card` had `transform-style: preserve-3d` which could interfere with click events on unstyled `<a>` tags.
+- **Fix**:
+  - Wrapped `useSearchParams()` inside `<Suspense>` in `src/app/(dashboard)/dashboard/projects/detail/page.tsx`.
+  - Added `useRouter`, `block cursor-pointer`, and explicit `onClick={() => router.push(...)}` handler in `src/app/(dashboard)/dashboard/projects/page.tsx`.
+
+### 4. Cost Copy Updated
+- In `src/app/(dashboard)/dashboard/projects/new/page.tsx`:
+  - Updated cost note to: `1 كريديت لكل فيديو نهائي (1 credit per final video)`.
+- In `src/app/(dashboard)/dashboard/billing/page.tsx`:
+  - Updated explanation text to: `1 كريديت لكل فيديو نهائي. الرصيد الشهري غير المستخدم يترحل لـ 30 يوماً.`
+
+### 5. Verification
+- All 15 test suites and 264 unit tests passed.
+- `npx tsc --noEmit` clean.
+- Next.js production build succeeded on local and EC2.
+- PM2 services (`nology-web`, `nology-worker`, `nology-bot`) running healthy. Worker online with `groq+`.
