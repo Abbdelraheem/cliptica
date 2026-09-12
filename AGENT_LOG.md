@@ -858,3 +858,63 @@ Executed `scripts/test-render-styles.mjs` rendering 1080x1920 video with burned-
 - `npx tsc --noEmit` clean.
 - Next.js production build succeeded on local and EC2.
 - PM2 services (`nology-web`, `nology-worker`, `nology-bot`) running healthy. Worker online with `groq+`.
+
+---
+
+## 2026-09-12: Display Name Persistence, Password Flow Hardening, Complete Motion Graphics Removal & Rebranding
+
+### 1. Step 5 — Display Name Persistence Fix
+- **Root Cause**:
+  - `/api/auth/me` was correctly updating `User.name` in PostgreSQL.
+  - However, NextAuth's `jwt` callback only read `dbUser.role` and `dbUser.credits` from the database, omitting `name` from `dbUser` select.
+  - Furthermore, `token.name` was not being updated on `trigger === 'update'`, and the client-side Settings page (`src/app/(dashboard)/dashboard/settings/page.tsx`) was not invoking `update({ name })` after saving.
+- **Fix**:
+  - `src/lib/auth.ts`: Added `name: true` to initial DB query, ensured `token.name = dbUser.name ?? user.name ?? token.name`, added `name` handling to `trigger === 'update'`, and forwarded `token.name` to `session.user.name` in `session` callback.
+  - `src/app/(dashboard)/dashboard/settings/page.tsx`: Destructured `{ update }` from `useSession()` and invoked `await update({ name: trimmed })` immediately following successful `/api/auth/me` response.
+  - `tests/auth-name-sync.test.ts`: Created unit tests pinning initial sign-in DB load, session update trigger, and session callback propagation. Passed 3/3.
+- **Commit**: `6e244d9` ("fix(auth): persist and sync display name in NextAuth JWT and session callback").
+
+### 2. Step 6 — Password Reverts Investigation & Hardening
+- **Investigation**:
+  - Tested both `/api/auth/change-password` and `/api/auth/reset-password`.
+  - Confirmed via integration test (`tests/password-flow.test.ts`) that new bcrypt hash is permanently committed to PostgreSQL, the old password cannot authenticate, and the new password authenticates with 200 OK.
+  - Root cause of user perception: Missing `autoComplete` attributes on password input fields allowed browser password managers to autofill cached stale passwords upon reload, and feedback toasts were too brief (3000ms).
+- **Fix**:
+  - `src/app/(dashboard)/dashboard/settings/page.tsx`: Added `autoComplete="current-password"` to Current password input, `autoComplete="new-password"` to New and Confirm password inputs.
+  - Extended feedback toast duration to 6000ms and clarified message: `"Password updated successfully! Your new password is now active."`.
+- **Commit**: `3de0a56` ("fix(auth): add password autocomplete attributes, persistent feedback, and integration tests").
+
+### 3. Step 7 — Complete Motion Graphics Feature Removal
+- **Scope of Removal**:
+  - Excised all AI motion graphics routes, settings, schema fields, worker logic, and marketing mentions:
+  - Deleted `src/app/api/admin/motion-fx/route.ts`.
+  - Removed `motion_fx` setting key from `src/app/api/admin/settings/route.ts` and `src/app/(admin)/admin/settings/page.tsx`.
+  - Removed `motionFx` from `src/lib/validation.ts` schema and `src/app/api/projects/route.ts`.
+  - Removed `toggleMotion` function, state, and admin toggle section from `src/app/(dashboard)/dashboard/settings/page.tsx`.
+  - Excised `motionFx Boolean @default(false)` from `prisma/schema.prisma` and regenerated Prisma Client types.
+  - In `worker/worker.mjs`: Removed `motion: null` from crop returns, eliminated motion parameter mismatch in `renderClip`, and removed motion objects from `Clip.motionGraphics`.
+  - In `worker/credits.mjs`: Removed `fx` surcharge (+2) parameter from `calcClipCredits` and `calcCredits`.
+  - In `src/lib/stripe.ts` and `src/app/(dashboard)/dashboard/billing/page.tsx`: Replaced "Motion graphics & zoom effects" with "Dynamic zooms & viral hook pacing".
+  - In `src/app/(dashboard)/dashboard/projects/detail/project-detail.tsx`: Cleaned `motionGraphics` from `Clip` interface and hook generation.
+  - In `src/app/(marketing)/page.tsx`: Replaced "Motion polish" and "22 motion templates" with "Dynamic framing".
+  - Updated `tests/credits.test.mjs` (all 9 tests passing).
+- **Verification**: Zero remaining grep traces for `motionFx`, `motion-fx`, `motion_fx`, `MotionPackage`, `llmMotionPackages` in source files.
+- **Commit**: `0f74209` ("feat(pipeline): completely remove motion graphics feature across codebase and schema").
+
+### 4. Bonus — Rebranding Cleanup (NOLOGY -> Cliptica)
+- Replaced all user-facing instances of "NOLOGY" / "Nology" across:
+  - Email notification subjects: `change-password`, `forgot-password`, `resend-verification`.
+  - Authentication UI: `login/page.tsx` ("New to Cliptica?"), `register/page.tsx`, `forgot-password`, `reset-password`, `verify-email`, and `not-found.tsx` (`aria-label="Cliptica home"`).
+  - Navigation layouts: `dashboard-layout.tsx` (`aria-label="Cliptica dashboard"`), `marketing-layout.tsx` (`aria-label="Cliptica home"`).
+  - Support contact emails: Updated all instances to `support@cliptica.com` across `billing`, `settings`, `privacy`, `terms`, `refund-policy`, and `marketing-layout`.
+  - Sitemap & robots fallbacks: Updated default base URL to `https://cliptica.com`.
+  - Earnings CSV download: Filename updated to `cliptica-payouts-YYYY-MM-DD.csv`.
+  - Design system headers & logo component: Exported `ClipticaMark` and preserved backward-compatible `NologyMark` alias in `src/components/logo.tsx`.
+- **Commit**: `749e838` ("chore(branding): replace all remaining NOLOGY strings with Cliptica in emails and user-facing UI") + `73c7acc` ("chore: remove unused ShieldCheck import in settings").
+
+### 5. Final Verification & Production Deployment
+- **TypeScript**: `npx tsc --noEmit` exited 0 (clean).
+- **Unit & Integration Tests**: All 17 test suites (266 tests) passed (100%).
+- **Production Builds**: `next build` succeeded cleanly on local machine and production EC2 instance.
+- **Deployment**: Pushed to GitHub `main`, pulled to EC2 `/opt/nology`, generated Prisma client, built, and executed zero-downtime PM2 reload (`sudo pm2 reload all --update-env`).
+- **Live Health**: `curl -s http://localhost:3000/api/health` returned HTTP 200 with all database and storage checks healthy; all 3 PM2 services (`nology-web`, `nology-worker`, `nology-bot`) online.
