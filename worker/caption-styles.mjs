@@ -13,7 +13,7 @@ export const CAPTION_STYLES = {
     category: 'Kinetic',
     desc: 'Punchy 1-3 word cards with aggressive spring scale pop.',
     sample: 'STOP SCROLLING',
-    fontName: 'Liberation Sans, Arial Black, DejaVu Sans',
+    fontName: 'DejaVu Sans',
     fontSizeRatio: 0.082,
     primaryColor: '&H00FFFFFF', // White
     outlineColor: '&H00000000', // Black
@@ -36,7 +36,7 @@ export const CAPTION_STYLES = {
     category: 'Kinetic',
     desc: 'Heavy uppercase text, golden yellow fill, thick outline, center-mid screen.',
     sample: 'MUST WATCH THIS',
-    fontName: 'Liberation Sans, Impact, DejaVu Sans',
+    fontName: 'DejaVu Sans',
     fontSizeRatio: 0.092,
     primaryColor: '&H0000D7FF', // Golden Yellow (BBGGRR: RR=FF, GG=D7, BB=00)
     outlineColor: '&H00000000', // Deep Black
@@ -58,7 +58,7 @@ export const CAPTION_STYLES = {
     category: 'Kinetic',
     desc: 'Kinetic entry sliding from the left margin with a satisfying settling bounce.',
     sample: 'FAST ACTION',
-    fontName: 'Liberation Sans, Arial Black, DejaVu Sans',
+    fontName: 'DejaVu Sans',
     fontSizeRatio: 0.082,
     primaryColor: '&H001F5AFF', // Flame Orange (BBGGRR: RR=FF, GG=5A, BB=1F)
     outlineColor: '&H00000000',
@@ -85,7 +85,7 @@ export const CAPTION_STYLES = {
     category: 'Kinetic',
     desc: 'Clean white typography encapsulated in a sleek dark obsidian pill badge.',
     sample: 'KEY TAKEAWAY',
-    fontName: 'Liberation Sans, Arial Black, DejaVu Sans',
+    fontName: 'DejaVu Sans',
     fontSizeRatio: 0.070,
     primaryColor: '&H00FFFFFF',
     outlineColor: '&H00302010',
@@ -107,7 +107,7 @@ export const CAPTION_STYLES = {
     category: 'Kinetic',
     desc: 'Single-word center punch at massive scale — maximum retention and visual grip.',
     sample: 'VIRAL',
-    fontName: 'Liberation Sans, Arial Black, DejaVu Sans',
+    fontName: 'DejaVu Sans',
     fontSizeRatio: 0.115,
     primaryColor: '&H00FFFFFF',
     outlineColor: '&H00000000',
@@ -130,7 +130,7 @@ export const CAPTION_STYLES = {
     category: 'Editorial',
     desc: 'Understated lower-third phrase layout with subtle fade, no bounce.',
     sample: 'The simplest ideas win.',
-    fontName: 'Liberation Sans, Arial, DejaVu Sans',
+    fontName: 'DejaVu Sans',
     fontSizeRatio: 0.052,
     primaryColor: '&H00FFFFFF',
     outlineColor: '&H00111111',
@@ -152,7 +152,7 @@ export const CAPTION_STYLES = {
     category: 'Editorial',
     desc: 'Documentary style, natural sentence lines at bottom safe zone.',
     sample: 'Every detail was planned in advance.',
-    fontName: 'Liberation Sans, Arial, DejaVu Sans',
+    fontName: 'DejaVu Sans',
     fontSizeRatio: 0.048,
     primaryColor: '&H00FFFFFF',
     outlineColor: '&H00000000',
@@ -174,7 +174,7 @@ export const CAPTION_STYLES = {
     category: 'Editorial',
     desc: 'Gentle breathing fade with warm ivory serif typography for calm, thoughtful pacing.',
     sample: 'Reflections on what matters.',
-    fontName: 'Liberation Serif, Georgia, DejaVu Serif',
+    fontName: 'DejaVu Serif',
     fontSizeRatio: 0.056,
     primaryColor: '&H00E8F0F8', // Warm Ivory
     outlineColor: '&H00181820',
@@ -196,7 +196,7 @@ export const CAPTION_STYLES = {
     category: 'Editorial',
     desc: 'Widescreen letterbox aesthetic with tracked letter-spacing and silver luminescence.',
     sample: 'A NEW HORIZON BECKONS',
-    fontName: 'Liberation Sans, Arial, DejaVu Sans',
+    fontName: 'DejaVu Sans',
     fontSizeRatio: 0.050,
     primaryColor: '&H00E8E8EC', // Silver White
     outlineColor: '&H00101010',
@@ -218,7 +218,7 @@ export const CAPTION_STYLES = {
     category: 'Editorial',
     desc: 'Warm peach-cream tones with friendly rounded geometry and comfortable dialog cadence.',
     sample: 'Here is what they never tell you.',
-    fontName: 'Liberation Sans, DejaVu Sans, Arial',
+    fontName: 'DejaVu Sans',
     fontSizeRatio: 0.064,
     primaryColor: '&H00A0D8FF', // Soft Peach-Cream (BBGGRR: RR=FF, GG=D8, BB=A0)
     outlineColor: '&H00181420',
@@ -241,7 +241,7 @@ export const CAPTION_STYLES = {
     category: 'Creative',
     desc: 'Electric cyan text with magenta shadow glow and expansion pulse.',
     sample: 'PURE ENERGY',
-    fontName: 'Liberation Sans, Arial Black, DejaVu Sans',
+    fontName: 'DejaVu Sans',
     fontSizeRatio: 0.080,
     primaryColor: '&H00FFFF00', // Electric Cyan (BBGGRR)
     outlineColor: '&H00200030', // Deep Plum
@@ -264,7 +264,7 @@ export const CAPTION_STYLES = {
     category: 'Creative',
     desc: 'Marker box backdrop with high contrast black lettering.',
     sample: 'HIGHLIGHTED TRUTH',
-    fontName: 'Liberation Sans, Arial Black, DejaVu Sans',
+    fontName: 'DejaVu Sans',
     fontSizeRatio: 0.072,
     primaryColor: '&H00000000', // Black text
     outlineColor: '&H00000000',
@@ -286,7 +286,7 @@ export const CAPTION_STYLES = {
     category: 'Creative',
     desc: 'Retro mechanical monospace with terminal green tint and crisp cadence.',
     sample: 'system.init()',
-    fontName: 'DejaVu Sans Mono, Courier New, monospace',
+    fontName: 'DejaVu Sans Mono',
     fontSizeRatio: 0.058,
     primaryColor: '&H0050FF50', // Terminal Matrix Green (BBGGRR: RR=50, GG=FF, BB=50)
     outlineColor: '&H00000000',
@@ -308,7 +308,7 @@ export const CAPTION_STYLES = {
     category: 'Creative',
     desc: 'Contrasting dual-color cadence alternating between brilliant gold and crisp pearl.',
     sample: 'BREAK THE PATTERN',
-    fontName: 'Liberation Sans, Arial Black, DejaVu Sans',
+    fontName: 'DejaVu Sans',
     fontSizeRatio: 0.078,
     primaryColor: '&H00FFFFFF', // White base
     outlineColor: '&H00000000',
@@ -330,7 +330,7 @@ export const CAPTION_STYLES = {
     category: 'Creative',
     desc: 'High-energy chromatic flash with rapid opacity flickering on the accent word.',
     sample: 'GLITCH IN REALITY',
-    fontName: 'Liberation Sans, Impact, DejaVu Sans',
+    fontName: 'DejaVu Sans',
     fontSizeRatio: 0.088,
     primaryColor: '&H00FF32C8', // Electric Cyber Pink (BBGGRR: RR=C8, GG=32, BB=FF)
     outlineColor: '&H00FFFF00', // Cyan outline (BBGGRR: RR=00, GG=FF, BB=FF)
@@ -353,10 +353,11 @@ export function getCaptionStyle(styleId) {
 }
 
 export function tsAss(s) {
-  const h = Math.floor(s / 3600)
-  const m = String(Math.floor((s % 3600) / 60)).padStart(2, '0')
-  const sec = String(Math.floor(s % 60)).padStart(2, '0')
-  const cs = String(Math.floor((s % 1) * 100)).padStart(2, '0')
+  const safe = Math.max(0, s)
+  const h = Math.floor(safe / 3600)
+  const m = String(Math.floor((safe % 3600) / 60)).padStart(2, '0')
+  const sec = String(Math.floor(safe % 60)).padStart(2, '0')
+  const cs = String(Math.floor((safe % 1) * 100)).padStart(2, '0')
   return `${h}:${m}:${sec}.${cs}`
 }
 
@@ -374,7 +375,7 @@ Format: Name, Fontname, Fontsize, PrimaryColour, OutlineColour, BackColour, Bold
 Style: MainStyle,${style.fontName},${fontSize},${style.primaryColor},${style.outlineColor},${style.backColor},${style.bold},${style.borderStyle},${outline},${style.shadow},${style.alignment},40,40,0,1
 
 [Events]
-Format: Layer, Start, End, Style, Text
+Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 `
 }
 
@@ -400,19 +401,20 @@ export function buildKaraokeAss(words, start, end, emoji = null, styleId = 'horm
 
   let events = ''
   if (emoji) {
-    events += `Dialogue: 1,${tsAss(start)},${tsAss(start + 0.8)},MainStyle,,0,0,0,,{\\fad(80,120)\\pos(${W / 2},${Math.round(H * 0.34)})}${emoji}\n`
+    events += `Dialogue: 1,0:00:00.00,0:00:00.80,MainStyle,,0,0,0,,{\\fad(80,120)\\pos(${W / 2},${Math.round(H * 0.34)})}${emoji}\n`
   }
 
   const posX = Math.round(W / 2)
   const posY = Math.round(H * style.posYRatio)
 
   cards.forEach((card, i) => {
-    const cs = Math.max(card[0].start, start)
-    let ce =
+    // Relative to clip start since FFmpeg cut input resets PTS to 00:00:00
+    const cs = Math.max(0, card[0].start - start)
+    const rawCe =
       i === cards.length - 1
         ? Math.min(card[card.length - 1].end, end)
         : Math.min(card[card.length - 1].end, cards[i + 1][0]?.start ?? end)
-    if (ce <= cs) ce = cs + 0.35
+    let ce = Math.max(cs + 0.35, rawCe - start)
 
     let rawText
     if (style.id === 'two_tone') {
@@ -444,7 +446,8 @@ export function buildPhraseAss(text, start, end, styleId = 'hormozi', W = 1080, 
   const maxLen = style.wordsPerCard > 4 ? 60 : 36
   const regex = new RegExp(`.{1,${maxLen}}(\\s|$)`, 'g')
   const lines = text.match(regex) ?? [text]
-  const per = (end - start) / lines.length
+  const dur = Math.max(0.1, end - start)
+  const per = dur / lines.length
 
   const posX = Math.round(W / 2)
   const posY = Math.round(H * style.posYRatio)
@@ -463,7 +466,8 @@ export function buildPhraseAss(text, start, end, styleId = 'hormozi', W = 1080, 
     } else if (style.uppercase) {
       t = t.toUpperCase()
     }
-    events += `Dialogue: 0,${tsAss(start + per * i)},${tsAss(start + per * (i + 1))},MainStyle,,0,0,0,,{\\pos(${posX},${posY})}${t}\n`
+    // Relative to clip start
+    events += `Dialogue: 0,${tsAss(per * i)},${tsAss(per * (i + 1))},MainStyle,,0,0,0,,{\\pos(${posX},${posY})}${t}\n`
   })
 
   return buildAssHeader(W, H, style) + events

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { useSession } from 'next-auth/react'
 import { Check } from 'lucide-react'
@@ -36,7 +36,24 @@ export default function BillingPage() {
   const { data: session } = useSession()
   const [loading, setLoading] = useState<string | null>(null)
   const [error, setError] = useState('')
+  const [liveCredits, setLiveCredits] = useState<number | null>(null)
 
+  useEffect(() => {
+    let cancelled = false
+    fetch('/api/auth/me')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (!cancelled && typeof d?.user?.credits === 'number') {
+          setLiveCredits(d.user.credits)
+        }
+      })
+      .catch(() => {})
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  const displayCredits = liveCredits ?? session?.user?.credits ?? 0
   const userRole = (session?.user?.role ?? 'FREE').toUpperCase()
 
   async function upgrade(plan: string) {
@@ -61,11 +78,11 @@ export default function BillingPage() {
       <div className="glass-card mt-10 flex flex-wrap items-center justify-between gap-6 !p-8">
         <div>
           <p className="text-sm font-light text-mist">Credits remaining</p>
-          <p className="stat-value mt-1">{session?.user?.credits ?? 0}</p>
+          <p className="stat-value mt-1">{displayCredits}</p>
           <div className="mt-3 h-1.5 w-56 overflow-hidden rounded-full bg-pearl/10">
             <div
               className="h-full rounded-full bg-gradient-to-r from-gold to-champagne transition-all"
-              style={{ width: `${Math.min(100, ((session?.user?.credits ?? 0) / 1200) * 100)}%` }}
+              style={{ width: `${Math.min(100, (displayCredits / 1200) * 100)}%` }}
             />
           </div>
         </div>

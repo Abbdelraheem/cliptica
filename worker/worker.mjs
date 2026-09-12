@@ -67,7 +67,7 @@ const CFG = {
   outH: Number(process.env.OUT_H ?? 1920),
   wordsPerCard: Math.max(1, Math.min(4, Number(process.env.WORDS_PER_CARD ?? 2))),
 
-  clipsPerVideo: Number(process.env.CLIPS_PER_VIDEO ?? 6),
+  clipsPerVideo: Number(process.env.CLIPS_PER_VIDEO ?? 3),
   clipLength: Number(process.env.CLIP_TARGET_SECONDS ?? 38),
   renderParallel: Number(process.env.RENDER_PARALLEL ?? 4),
 }
@@ -80,7 +80,7 @@ const CFG = {
 
 const ENV_DEFAULTS = {
   pipeline_premium: process.env.PIPELINE_PREMIUM !== '0',
-  clips_per_video: Number(process.env.CLIPS_PER_VIDEO ?? 6),
+  clips_per_video: Number(process.env.CLIPS_PER_VIDEO ?? 3),
   clip_target_seconds: Number(process.env.CLIP_TARGET_SECONDS ?? 38),
   render_parallel: Number(process.env.RENDER_PARALLEL ?? 4),
   stale_job_minutes: Number(process.env.STALE_JOB_MINUTES ?? 30),
@@ -88,7 +88,7 @@ const ENV_DEFAULTS = {
 
 const SETTING_PARSE = {
   pipeline_premium: (v) => v === 'true',
-  clips_per_video: (v) => Math.max(1, Number(v) || 6),
+  clips_per_video: (v) => Math.max(1, Number(v) || 3),
   clip_target_seconds: (v) => Math.max(5, Number(v) || 38),
   render_parallel: (v) => Math.max(1, Math.min(8, Number(v) || 4)),
   stale_job_minutes: (v) => Math.max(1, Number(v) || 30),
@@ -592,66 +592,9 @@ async function faceTrack(src, moment, dir, idx) {
 /* ---------- captions ---------- */
 // Preset styles & ASS generation are imported from ./caption-styles.mjs
 
-/* ---------- AI motion graphics ---------- */
-
-async function llmMotionPackages(moments) {
-  const providers = []
-  if (CFG.groqKey)
-    providers.push({ name: 'groq', url: 'https://api.groq.com/openai/v1/chat/completions', key: CFG.groqKey, model: process.env.GROQ_SCORE_MODEL ?? 'llama-3.3-70b-versatile' })
-  if (CFG.openaiKey)
-    providers.push({ name: 'openai', url: 'https://api.openai.com/v1/chat/completions', key: CFG.openaiKey, model: 'gpt-4o-mini' })
-
-  const system =
-    'You are a motion-graphics director for vertical short-form videos (TikTok/Reels/Shorts). ' +
-    'For each moment design the opening title card: a scroll-stopping headline and one supporting kicker line. ' +
-    'Return strict JSON {"packs":[{"index":<int>,"headline":"<=24 chars, UPPERCASE, punchy hook",' +
-    '"kicker":"<=34 chars supporting line, sentence case"}]}.'
-
-  for (const p of providers) {
-    try {
-      const res = await fetch(p.url, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${p.key}`, 'Content-Type': 'application/json' },
-        signal: AbortSignal.timeout(45_000),
-        body: JSON.stringify({
-          model: p.model,
-          response_format: { type: 'json_object' },
-          temperature: 0.6,
-          messages: [
-            { role: 'system', content: system },
-            { role: 'user', content: JSON.stringify(moments.map((m, i) => ({ index: i, topic: m.title, text: m.text.slice(0, 280) }))) },
-          ],
-        }),
-      })
-      if (!res.ok) throw new Error(`${p.name} ${res.status}`)
-      const data = await res.json()
-      const parsed = JSON.parse(data.choices[0].message.content)
-      const packs = (parsed.packs ?? [])
-        .filter((pk) => Number.isInteger(pk.index) && moments[pk.index])
-        .map((pk) => ({
-          index: pk.index,
-          headline: String(pk.headline ?? '').toUpperCase().replace(/["'\\]/g, '').slice(0, 26),
-          kicker: String(pk.kicker ?? '').replace(/["'\\]/g, '').slice(0, 36),
-        }))
-      if (packs.length) return packs
-    } catch (e) {
-      console.error(`[worker] motion packs via ${p.name} failed:`, e.message)
-    }
-  }
-  return null
-}
-
-function heuristicMotionPack(moment) {
-  return {
-    index: moment.index ?? 0,
-    headline: (moment.title || 'Watch this').toUpperCase().replace(/["'\\]/g, '').slice(0, 26),
-    kicker: moment.emoji ? `${moment.emoji} must watch` : 'must watch',
-  }
-}
-
 /* ---------- render ---------- */
 
-async function renderClip(src, moment, dir, idx, transcript, mode = 'smart', motion = null, captionStyle = 'hormozi', aspectRatio = '9:16') {
+async function renderClip(src, moment, dir, idx, transcript, mode = 'smart', captionStyle = 'hormozi', aspectRatio = '9:16') {
   let W = CFG.outW, H = CFG.outH
   if (aspectRatio === '1:1') {
     W = 1080
@@ -713,54 +656,11 @@ async function renderClip(src, moment, dir, idx, transcript, mode = 'smart', mot
       vfCore = faceCrop
   }
 
-  const escPath = (p) => p.replace(/\\/g, '/').replace(/:/g, '\\:')
-  const font = process.env.MOTION_FONT ?? '/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf'
-  let motionLayer = null
-  if (motion?.headline) {
-    const headlineFile = path.join(dir, `head${idx}.txt`)
-    const kickerFile = path.join(dir, `kick${idx}.txt`)
-    await writeFile(headlineFile, motion.headline)
-    await writeFile(kickerFile, motion.kicker || '')
-    const D = targetDur.toFixed(2)
-    const fsBig = Math.round(H * 0.042)
-    const fsSmall = Math.round(H * 0.024)
-    const entranceY = `'${H}*0.068+${H}*0.05*(1-min(1\\,max(0\\,(t-0.15)/0.55)))'`
-    motionLayer =
-      `drawtext=fontfile='${font}':textfile='${escPath(headlineFile)}':fontsize=${fsBig}` +
-      `:fontcolor=white:borderw=${Math.max(3, Math.round(H / 480))}:bordercolor=black@0.6` +
-      `:shadowcolor=black@0.45:shadowx=4:shadowy=4` +
-      `:x=(w-text_w)/2:y=${entranceY}:alpha='clip((t-0.15)/0.5\\,0\\,1)'` +
-      `,drawtext=fontfile='${font}':textfile='${escPath(kickerFile)}':fontsize=${fsSmall}` +
-      `:fontcolor=white@0.92:borderw=${Math.max(2, Math.round(H / 700))}:bordercolor=black@0.5` +
-      `:x=(w-text_w)/2:y=${H * 0.128}:alpha='clip((t-0.5)/0.5\\,0\\,1)'` +
-      `,drawtext=fontfile='${font}':text='Follow for more':fontsize=${fsSmall}` +
-      `:fontcolor=white:borderw=${Math.max(2, Math.round(H / 700))}:bordercolor=black@0.55` +
-      `:x=(w-text_w)/2:y=h*0.82:alpha='if(lt(t\\,${D}-1.4)\\,0\\,clip((${D}-t)/0.9\\,0\\,1))'`
-  }
-
   const buildArgs = (usePrimary) => {
     const baseChain = `${usePrimary ? vfCore : centerCrop},scale=${W}:${H},subtitles=${escAss}`
-    if (!motionLayer) {
-      return [
-        '-y', '-ss', String(moment.start), '-t', String(targetDur), '-i', src,
-        '-vf', baseChain,
-        '-af', 'loudnorm=I=-14:TP=-1.5:LRA=11',
-        '-c:v', 'libx264', '-preset', 'superfast', '-crf', '22',
-        '-c:a', 'aac', '-b:a', '192k', '-movflags', '+faststart',
-      ]
-    }
-    // AI motion pass: title card + kicker + end CTA + animated progress bar
-    const D = targetDur.toFixed(2)
     return [
       '-y', '-ss', String(moment.start), '-t', String(targetDur), '-i', src,
-      '-f', 'lavfi', '-i', `color=c=white@0.20:s=${W}x10:r=30:d=${D}`,
-      '-f', 'lavfi', '-i', `color=c=0xFF7A3D:s=${W}x10:r=30:d=${D}`,
-      '-filter_complex',
-      `[0:v]${baseChain},${motionLayer}[base];` +
-        `[base][1:v]overlay=x=0:y=${H - 26}:eof_action=repeat[tr];` +
-        `[2:v]crop=w='iw*min(1\\,t/${D})':h=ih:x=0:y=0[fill];` +
-        `[tr][fill]overlay=x=0:y=${H - 26}:eof_action=repeat[vout]`,
-      '-map', '[vout]', '-map', '0:a?',
+      '-vf', baseChain,
       '-af', 'loudnorm=I=-14:TP=-1.5:LRA=11',
       '-c:v', 'libx264', '-preset', 'superfast', '-crf', '22',
       '-c:a', 'aac', '-b:a', '192k', '-movflags', '+faststart',
@@ -778,27 +678,42 @@ async function renderClip(src, moment, dir, idx, transcript, mode = 'smart', mot
   }
 
   // thumbnail (best face frame when tracked, else +3s in)
-  // faces.thumb_ts and moment.start are ABSOLUTE source timestamps, but the
-  // seek below reads the rendered CLIP (relative 0) — so both must be offset
-  // by moment.start, else the seek lands past EOF and produces a blank frame.
-  const thumbTs = faces?.thumb_ts != null ? Math.max(0, faces.thumb_ts - moment.start) : 3
-  const thumbPath = path.join(dir, `thumb${idx}.jpg`)
-  await sh('ffmpeg', ['-y', '-ss', String(thumbTs), '-i', outFile, '-frames:v', '1', '-q:v', '2', thumbPath])
+  const thumbFile = path.join(dir, `thumb${idx}.jpg`)
+  const thumbSec = faces?.bestFaceSec ?? Math.min(targetDur - 0.5, 3.0)
+  await sh(
+    'ffmpeg',
+    [
+      '-y',
+      '-ss',
+      String(moment.start + thumbSec),
+      '-i',
+      src,
+      '-frames:v',
+      '1',
+      '-vf',
+      `${vfCore},scale=${W}:${H}`,
+      '-q:v',
+      '2',
+      thumbFile,
+    ],
+    { timeout: 1000 * 60 * 5 }
+  )
 
-  return { file: outFile, thumb: thumbPath, cropMode: faces ? 'face-track' : 'center', motion: motion ? { mode: 'ai-motion', headline: motion.headline, kicker: motion.kicker } : null }
+  return { file: outFile, thumb: thumbFile, duration: gotDur, cropMode: faces ? 'face-track' : 'center', motion: null }
 }
 
+/** Probe original video dimensions once. */
 let srcProbeCache = null
 async function probeSize(file) {
   if (srcProbeCache) return srcProbeCache
-  const out = await sh('ffprobe', ['-v', 'quiet', '-select_streams', 'v:0', '-show_entries', 'stream=width,height', '-of', 'json', file])
+  const out = await sh('ffprobe', ['-v', 'error', '-select_streams', 'v:0', '-show_entries', 'stream=width,height', '-of', 'json', file])
   const s = JSON.parse(out).streams[0]
   srcProbeCache = { w: s.width, h: s.height }
   return srcProbeCache
 }
 
 /** Render all clips with bounded parallelism. */
-async function renderAll(src, moments, dir, transcript, framing = 'smart', pkgs = null, captionStyle = 'hormozi', aspectRatio = '9:16') {
+async function renderAll(src, moments, dir, transcript, framing = 'smart', captionStyle = 'hormozi', aspectRatio = '9:16') {
   const VARIETY = ['face', 'blur', 'center']
   const results = new Array(moments.length)
   let next = 0
@@ -807,8 +722,8 @@ async function renderAll(src, moments, dir, transcript, framing = 'smart', pkgs 
       const i = next++
       if (i >= moments.length) return
       const mode = framing === 'variety' ? VARIETY[i % VARIETY.length] : framing
-      console.log(`[worker] rendering clip ${i + 1}/${moments.length} [${mode}${pkgs?.[i] ? ' +motion' : ''}, style=${captionStyle}, ratio=${aspectRatio}]`)
-      results[i] = await renderClip(src, moments[i], dir, i, transcript, mode, pkgs?.[i] ?? null, captionStyle, aspectRatio)
+      console.log(`[worker] rendering clip ${i + 1}/${moments.length} [${mode}, style=${captionStyle}, ratio=${aspectRatio}]`)
+      results[i] = await renderClip(src, moments[i], dir, i, transcript, mode, captionStyle, aspectRatio)
     }
   }
   await Promise.all(Array.from({ length: Math.min(CFG.renderParallel, moments.length) }, lane))
@@ -1029,25 +944,11 @@ async function processJob(job) {
     const moments = await scoreMoments(transcript, duration, project.clipFrom ?? 0, project.instructions)
     if (!moments.length) throw new Error('no viable moments found')
 
-    // AI motion graphics: admin-only feature with a global kill switch — re-checked at render time.
-    let fx = !!project.motionFx
-    if (fx) {
-      const flag = await prisma.setting.findUnique({ where: { key: 'motion_fx' } })
-      if (flag && flag.value !== 'true') fx = false
-    }
-    let pkgs = null
-    if (fx) {
-      console.log('[worker] designing AI motion packages')
-      await setP(56, 'Generating AI motion graphics title cards...')
-      const llmPacks = await llmMotionPackages(moments).catch(() => null)
-      pkgs = moments.map((_, i) => llmPacks?.find((p) => p.index === i) ?? heuristicMotionPack({ ...moments[i], index: i }))
-    }
-
     const captionStyle = project.captionStyle ?? 'hormozi'
     const aspectRatio = project.aspectRatio ?? '9:16'
-    console.log(`[worker] rendering ${moments.length} clips (premium=${CFG.premium}, framing=${project.framing}, style=${captionStyle}, ratio=${aspectRatio}${fx ? ' +motion' : ''})`)
+    console.log(`[worker] rendering ${moments.length} clips (premium=${CFG.premium}, framing=${project.framing}, style=${captionStyle}, ratio=${aspectRatio})`)
     await setP(58, 'Reframing vertical layout & rendering karaoke captions...')
-    const files = await renderAll(src, moments, dir, transcript, project.framing ?? 'smart', pkgs, captionStyle, aspectRatio)
+    const files = await renderAll(src, moments, dir, transcript, project.framing ?? 'smart', captionStyle, aspectRatio)
 
     for (let i = 0; i < moments.length; i++) {
       const m = moments[i]
@@ -1090,9 +991,9 @@ async function processJob(job) {
     await prisma.project.update({ where: { id: project.id }, data: { status: 'COMPLETED' } })
     await setP(100, 'Processing complete! All clips ready.')
 
-    // Charge per-clip usage on completion: 1 credit per generated video clip, +2 flat when AI motion was actually applied.
+    // Charge per-clip usage on completion: 1 credit per generated video clip.
     // minCredits was already reserved upfront at project creation.
-    const creditsSpent = calcClipCredits(moments.length, fx)
+    const creditsSpent = calcClipCredits(moments.length, false)
     const alreadyPaid = Math.max(0, project.creditsUsed ?? 0)
     const diff = creditsSpent - alreadyPaid
 
@@ -1107,7 +1008,7 @@ async function processJob(job) {
               userId: project.userId,
               amount: -charged,
               type: 'usage',
-              description: `Clipping completion "${project.title}" (${moments.length} clips${fx ? ' · AI motion' : ''})`,
+              description: `Clipping completion "${project.title}" (${moments.length} clips)`,
               metadata: { projectId: project.id, totalCost: creditsSpent, reserved: alreadyPaid },
             },
           })

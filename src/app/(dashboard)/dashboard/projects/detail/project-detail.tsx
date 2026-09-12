@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { useCallback, useEffect, useState } from 'react'
 import {
   ArrowLeft, Loader2, AlertTriangle, Download, Sparkles,
-  Captions, ScanFace, Clock, Flame, Clapperboard,
+  Captions, ScanFace, Clock, Flame,
   Copy, Check, Share2, Scissors, Zap, Send, ExternalLink, X,
 } from 'lucide-react'
 import { ConnectionSummary } from '@/lib/social/types'
@@ -104,6 +104,21 @@ export default function ProjectDetail({ projectId }: { projectId: string }) {
   const [publishError, setPublishError] = useState<string | null>(null)
   const [publishSuccess, setPublishSuccess] = useState<{ message: string; postUrl?: string } | null>(null)
   const [socialConnections, setSocialConnections] = useState<ConnectionSummary[]>([])
+  const [selectedFinalClipId, setSelectedFinalClipId] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (projectId && typeof window !== 'undefined') {
+      const saved = localStorage.getItem(`cliptica_final_clip_${projectId}`)
+      if (saved) setSelectedFinalClipId(saved)
+    }
+  }, [projectId])
+
+  const handleSelectFinalClip = (clipId: string) => {
+    setSelectedFinalClipId(clipId)
+    if (projectId && typeof window !== 'undefined') {
+      localStorage.setItem(`cliptica_final_clip_${projectId}`, clipId)
+    }
+  }
 
   useEffect(() => {
     fetch('/api/social/connections')
@@ -367,8 +382,17 @@ export default function ProjectDetail({ projectId }: { projectId: string }) {
         </p>
       ) : (
         <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-          {project.clips.map((c) => (
-            <div key={c.id} className="glass-card group !p-0 overflow-hidden transition-transform duration-300 hover:-translate-y-1">
+          {project.clips.map((c, cIndex) => {
+            const isFinal = selectedFinalClipId === c.id
+            return (
+            <div
+              key={c.id}
+              className={`glass-card group !p-0 overflow-hidden transition-all duration-300 ${
+                isFinal
+                  ? 'border-2 border-gold shadow-[0_0_35px_rgba(212,175,55,0.25)] ring-1 ring-gold/60'
+                  : 'hover:-translate-y-1'
+              }`}
+            >
               <div className="relative aspect-[9/13] bg-black">
                 {c.status === 'GENERATING' ? (
                   <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/85 p-4 text-center z-10">
@@ -405,9 +429,13 @@ export default function ProjectDetail({ projectId }: { projectId: string }) {
                     <span className="text-white/80 font-medium">{c.viralScore}%</span>
                   )}
                 </div>
-                {c.motionGraphics?.mode === 'ai-motion' && (
-                  <span className="absolute left-2.5 top-2.5 flex items-center gap-1 rounded-lg border border-champagne/40 bg-black/70 px-2 py-0.5 font-mono text-[10px] uppercase tracking-wider text-champagne backdrop-blur z-20">
-                    <Clapperboard className="h-3 w-3" /> AI motion
+                {isFinal ? (
+                  <span className="absolute left-2.5 top-2.5 flex items-center gap-1.5 rounded-lg border border-gold bg-black/90 px-2.5 py-1 font-mono text-[11px] font-bold uppercase tracking-wider text-gold backdrop-blur z-20 shadow-lg">
+                    <Check className="h-3.5 w-3.5 text-gold" /> Final Selected Clip
+                  </span>
+                ) : (
+                  <span className="absolute left-2.5 top-2.5 rounded-lg border border-white/10 bg-black/60 px-2 py-0.5 font-mono text-[10px] text-mist-2 backdrop-blur z-20">
+                    Option {cIndex + 1} of {project.clips.length}
                   </span>
                 )}
               </div>
@@ -448,6 +476,30 @@ export default function ProjectDetail({ projectId }: { projectId: string }) {
                 </div>
 
                 <div className="mt-4 space-y-2 pt-2 border-t border-hair-soft">
+                  {/* Final Clip Selection Button */}
+                  <button
+                    type="button"
+                    onClick={() => handleSelectFinalClip(c.id)}
+                    disabled={c.status === 'GENERATING'}
+                    className={`w-full flex items-center justify-center gap-2 rounded-xl py-2 px-3 text-xs font-semibold transition-all ${
+                      isFinal
+                        ? 'bg-gradient-to-r from-gold to-champagne text-black shadow-[0_0_15px_rgba(212,175,55,0.35)]'
+                        : 'border border-gold/40 bg-gold/10 text-gold hover:bg-gold/20 hover:border-gold'
+                    }`}
+                  >
+                    {isFinal ? (
+                      <>
+                        <Check className="h-4 w-4" />
+                        <span>الفيديو النهائي المعتمد (Selected Final Clip)</span>
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="h-4 w-4" />
+                        <span>اختر هذا المقطع كفيديو نهائي (Select as Final)</span>
+                      </>
+                    )}
+                  </button>
+
                   <div className="flex gap-2">
                     <button
                       type="button"
@@ -692,7 +744,7 @@ export default function ProjectDetail({ projectId }: { projectId: string }) {
                 </div>
               </div>
             </div>
-          ))}
+          )})}
         </div>
       )}
 

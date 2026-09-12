@@ -65,8 +65,18 @@ describe('caption-styles', () => {
           expect(ass).toContain('[V4+ Styles]')
           expect(ass).toContain('Style: MainStyle,')
           expect(ass).toContain('[Events]')
+          expect(ass).toContain('Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text')
           expect(ass).toContain('Dialogue: ')
           expect(ass).toContain('\\pos(')
+        })
+
+        it('generates relative timestamps offset from clip start', () => {
+          const offsetWords = [
+            { text: 'Start', start: 60.5, end: 61.2 },
+            { text: 'later', start: 61.3, end: 62.0 },
+          ]
+          const ass = buildKaraokeAss(offsetWords, 60.0, 65.0, null, styleId, 1080, 1920)
+          expect(ass).toContain('Dialogue: 0,0:00:00.50,')
         })
 
         it('generates phrase fallback when words are absent', () => {

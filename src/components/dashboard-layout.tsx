@@ -31,7 +31,37 @@ export function DashboardLayout({ children }: { children: ReactNode }) {
   const pathname = usePathname()
   const { data: session } = useSession()
   const [mobileOpen, setMobileOpen] = useState(false)
+  const [liveCredits, setLiveCredits] = useState<number | null>(null)
   const deviceChecked = useRef(false)
+
+  // Fetch real-time live credits from DB so deductions/topups reflect immediately
+  useEffect(() => {
+    let cancelled = false
+    const fetchCredits = async () => {
+      try {
+        const res = await fetch('/api/auth/me')
+        if (!cancelled && res.ok) {
+          const data = await res.json()
+          if (typeof data?.user?.credits === 'number') {
+            setLiveCredits(data.user.credits)
+          }
+        }
+      } catch {}
+    }
+
+    fetchCredits()
+    const handleUpdate = () => { fetchCredits() }
+    window.addEventListener('credits-updated', handleUpdate)
+    window.addEventListener('focus', handleUpdate)
+
+    return () => {
+      cancelled = true
+      window.removeEventListener('credits-updated', handleUpdate)
+      window.removeEventListener('focus', handleUpdate)
+    }
+  }, [pathname])
+
+  const displayCredits = liveCredits ?? session?.user?.credits ?? 0
 
   // One-account-per-device enforcement — runs on every dashboard entry.
   // Catches OAuth (Google/GitHub) accounts that bypassed the form flows.
@@ -124,12 +154,12 @@ export function DashboardLayout({ children }: { children: ReactNode }) {
           <div className="mb-3 rounded-xl border border-hair/50 bg-surface p-3">
             <p className="text-xs uppercase tracking-widest text-mist-2">Credits</p>
             <p className="font-display text-2xl font-semibold text-gold">
-              {session?.user?.credits ?? 0}
+              {displayCredits}
             </p>
             <div className="mt-2 h-1 overflow-hidden rounded-full bg-pearl/10">
               <div
                 className="h-full rounded-full bg-gradient-to-r from-gold to-champagne transition-all"
-                style={{ width: `${Math.min(100, ((session?.user?.credits ?? 0) / 1200) * 100)}%` }}
+                style={{ width: `${Math.min(100, (displayCredits / 1200) * 100)}%` }}
               />
             </div>
           </div>

@@ -1,12 +1,12 @@
 'use client'
 
-import { useRef, useState, useEffect } from 'react'
+import { useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import {
   Link2, Upload, Loader2, Sparkles, ScanFace, Frame,
   RectangleHorizontal, Shuffle, CloudUpload, CheckCircle2,
-  Clapperboard,
+  Megaphone, ExternalLink, FileVideo, HardDrive,
 } from 'lucide-react'
 import { fetchWithTimeout } from '@/lib/utils'
 import { cleanUrlString, normaliseVideoUrl } from '@/lib/validation'
@@ -258,7 +258,7 @@ const ALLOWED_TYPES = new Set([
 ])
 const MAX_MB = 500
 
-type Tab = 'upload' | 'link'
+type Tab = 'upload' | 'link' | 'campaign'
 
 export default function NewProjectPage() {
   const router = useRouter()
@@ -277,17 +277,53 @@ export default function NewProjectPage() {
   const [captionStyle, setCaptionStyle] = useState<(typeof CAPTION_PRESETS)[number]['id']>('hormozi')
   const [aspectRatio, setAspectRatio] = useState<(typeof ASPECT_RATIOS)[number]['id']>('9:16')
   const [language, setLanguage] = useState('auto')
-  const [motionFx, setMotionFx] = useState(false)
-  const [motionAvailable, setMotionAvailable] = useState(false)
   const [error, setError] = useState('')
   const [submitting, setSubmitting] = useState(false)
 
-  useEffect(() => {
-    fetchWithTimeout('/api/admin/motion-fx', {}, 8000)
-      .then(async (r) => (r.ok ? r.json() : { enabled: false, isAdmin: false }))
-      .then((d) => setMotionAvailable(!!d.enabled && !!d.isAdmin))
-      .catch(() => setMotionAvailable(false))
-  }, [])
+  // Campaign state (Whop / ContentReward / Google Drive assets)
+  const [campaignUrl, setCampaignUrl] = useState('')
+  const [analyzingCampaign, setAnalyzingCampaign] = useState(false)
+  const [campaignData, setCampaignData] = useState<{
+    platform: string
+    title: string
+    payout: string | null
+    guidelines: string[]
+    requiredHashtags: string[]
+    recommendedInstructions: string
+    assets: Array<{ type: string; url: string; label: string }>
+  } | null>(null)
+  const [selectedAsset, setSelectedAsset] = useState<string | null>(null)
+
+  async function handleAnalyzeCampaign() {
+    const clean = campaignUrl.trim()
+    if (!clean) return setError('Please enter a Whop or ContentReward campaign URL.')
+    setError('')
+    setAnalyzingCampaign(true)
+    try {
+      const res = await fetchWithTimeout('/api/campaigns/analyze', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: clean }),
+      }, 25000)
+      const data = await res.json()
+      if (!res.ok || !data.success) {
+        throw new Error(data?.error ?? 'Failed to inspect campaign')
+      }
+      setCampaignData(data.campaign)
+      if (!title) setTitle(data.campaign.title)
+      if (data.campaign.recommendedInstructions) {
+        setInstructions(data.campaign.recommendedInstructions)
+      }
+      if (data.campaign.assets?.length) {
+        setSelectedAsset(data.campaign.assets[0].url)
+        setUrl(data.campaign.assets[0].url)
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not analyze campaign URL')
+    } finally {
+      setAnalyzingCampaign(false)
+    }
+  }
 
   async function pickFile(f: File | undefined | null) {
     setError('')
@@ -335,6 +371,10 @@ export default function NewProjectPage() {
       const normalised = normaliseVideoUrl(s)
       if (!normalised) return 'Paste a valid video link (e.g. YouTube URL).'
     }
+    if (tab === 'campaign') {
+      const targetUrl = selectedAsset || url
+      if (!targetUrl) return 'Analyze the campaign and select a footage asset or paste a source URL.'
+    }
     if (clipFrom && !/^\d{1,2}:\d{2}(:\d{2})?$/.test(clipFrom)) return 'Start time format: mm:ss'
     return null
   }
@@ -345,13 +385,14 @@ export default function NewProjectPage() {
     if (v) return setError(v)
     setError('')
     setSubmitting(true)
+    const targetUrl = tab === 'campaign' ? (selectedAsset || url) : url
     try {
       const res = await fetchWithTimeout('/api/projects', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          sourceType: tab === 'link' ? 'url' : 'file',
-          url: tab === 'link' ? cleanUrlString(url) : undefined,
+          sourceType: tab === 'upload' ? 'file' : 'url',
+          url: tab !== 'upload' ? cleanUrlString(targetUrl) : undefined,
           fileKey: tab === 'upload' ? uploadedKey : undefined,
           fileName: tab === 'upload' ? file?.name : undefined,
           title: title || undefined,
@@ -361,12 +402,14 @@ export default function NewProjectPage() {
           language,
           captionStyle,
           aspectRatio,
-          motionFx: motionAvailable && motionFx,
         }),
       }, 20000)
       if (!res.ok) {
         const data = await res.json().catch(() => null)
         throw new Error(data?.error ?? 'Failed to start clipping')
+      }
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new Event('credits-updated'))
       }
       router.push('/dashboard/projects')
       router.refresh()
@@ -390,17 +433,21 @@ export default function NewProjectPage() {
 
         {/* Tabs */}
         <div className="flex gap-1 rounded-xl border border-hair/60 bg-black/30 p-1">
-          {(['upload', 'link'] as Tab[]).map((t) => (
+          {([
+            { id: 'upload', label: 'Upload file', icon: CloudUpload },
+            { id: 'link', label: 'YouTube link', icon: Link2 },
+            { id: 'campaign', label: 'Campaign (Whop / ContentReward)', icon: Megaphone },
+          ] as const).map((t) => (
             <button
-              key={t}
+              key={t.id}
               type="button"
-              onClick={() => { setTab(t); setError('') }}
-              className={`flex flex-1 items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm transition-all ${
-                tab === t ? 'bg-champagne/15 font-semibold text-gold' : 'text-mist hover:text-pearl'
+              onClick={() => { setTab(t.id); setError('') }}
+              className={`flex flex-1 items-center justify-center gap-2 rounded-lg px-3 py-2.5 text-xs sm:text-sm transition-all ${
+                tab === t.id ? 'bg-champagne/15 font-semibold text-gold' : 'text-mist hover:text-pearl'
               }`}
             >
-              {t === 'upload' ? <CloudUpload className="h-4 w-4" /> : <Link2 className="h-4 w-4" />}
-              {t === 'upload' ? 'Upload file' : 'YouTube link'}
+              <t.icon className="h-4 w-4" />
+              {t.label}
             </button>
           ))}
         </div>
@@ -463,6 +510,161 @@ export default function NewProjectPage() {
             <p className="mt-2 text-xs leading-relaxed text-mist-2">
               Heads up: YouTube limits automated downloads, so links can fail or stall.
               If it does — download the video and upload it above; that always works.
+            </p>
+          </div>
+        )}
+
+        {tab === 'campaign' && (
+          <div className="space-y-4">
+            <div className="flex gap-2">
+              <div className="relative flex-1">
+                <Megaphone className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-champagne" />
+                <input
+                  type="url"
+                  value={campaignUrl}
+                  onChange={(e) => setCampaignUrl(e.target.value)}
+                  placeholder="Paste Whop, ContentReward, or clipping campaign URL…"
+                  className="input-lux !pl-11"
+                />
+              </div>
+              <button
+                type="button"
+                onClick={handleAnalyzeCampaign}
+                disabled={analyzingCampaign || !campaignUrl.trim()}
+                className="btn-lux btn-gold !py-2.5 !px-5 shrink-0 disabled:opacity-50 flex items-center gap-2"
+              >
+                {analyzingCampaign ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    <span>Analyzing…</span>
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="h-4 w-4" />
+                    <span>Inspect Assets</span>
+                  </>
+                )}
+              </button>
+            </div>
+
+            {campaignData && (
+              <div className="rounded-2xl border border-champagne/40 bg-black/40 p-5 space-y-4 shadow-[0_0_25px_rgba(212,175,55,0.08)]">
+                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-hair/50 pb-3">
+                  <div className="flex items-center gap-2">
+                    <span className="rounded-full bg-champagne/20 px-2.5 py-0.5 font-mono text-[11px] font-semibold text-champagne border border-champagne/30">
+                      {campaignData.platform}
+                    </span>
+                    <h3 className="text-sm font-semibold text-pearl">{campaignData.title}</h3>
+                  </div>
+                  {campaignData.payout && (
+                    <span className="rounded-full bg-emerald-500/15 px-3 py-0.5 font-mono text-xs font-semibold text-emerald-400 border border-emerald-500/30">
+                      💰 {campaignData.payout}
+                    </span>
+                  )}
+                </div>
+
+                {/* Campaign Guidelines */}
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wider text-mist-2 mb-2">Campaign Guidelines &amp; Criteria</p>
+                  <ul className="space-y-1.5 text-xs text-mist">
+                    {campaignData.guidelines.map((g, idx) => (
+                      <li key={idx} className="flex items-start gap-2">
+                        <span className="text-gold mt-0.5">✦</span>
+                        <span>{g}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+
+                {/* Extracted Media Assets (Drive / YouTube / Video) */}
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <p className="text-xs font-semibold uppercase tracking-wider text-mist-2">
+                      Detected Assets &amp; Footage ({campaignData.assets.length})
+                    </p>
+                    <span className="text-[11px] text-champagne">Select one to clip</span>
+                  </div>
+
+                  {campaignData.assets.length === 0 ? (
+                    <div className="rounded-xl border border-hair/50 bg-black/20 p-3 text-xs text-mist-2">
+                      No direct Drive or video links detected on the page. Paste your source video link manually:
+                      <input
+                        type="url"
+                        value={url}
+                        onChange={(e) => setUrl(e.target.value)}
+                        placeholder="https://drive.google.com/... or https://youtube.com/..."
+                        className="input-lux mt-2"
+                      />
+                    </div>
+                  ) : (
+                    <div className="grid gap-2">
+                      {campaignData.assets.map((asset, idx) => {
+                        const isChosen = (selectedAsset || url) === asset.url
+                        return (
+                          <div
+                            key={idx}
+                            onClick={() => {
+                              setSelectedAsset(asset.url)
+                              setUrl(asset.url)
+                            }}
+                            className={`flex items-center justify-between gap-3 rounded-xl border p-3 cursor-pointer transition-all ${
+                              isChosen
+                                ? 'border-champagne bg-champagne/15 shadow-[0_0_15px_rgba(212,175,55,0.15)]'
+                                : 'border-hair/60 bg-black/30 hover:border-hair hover:bg-black/50'
+                            }`}
+                          >
+                            <div className="flex items-center gap-3 min-w-0">
+                              {asset.type === 'drive' ? (
+                                <HardDrive className={`h-5 w-5 shrink-0 ${isChosen ? 'text-gold' : 'text-mist'}`} />
+                              ) : asset.type === 'youtube' ? (
+                                <Link2 className={`h-5 w-5 shrink-0 ${isChosen ? 'text-gold' : 'text-mist'}`} />
+                              ) : (
+                                <FileVideo className={`h-5 w-5 shrink-0 ${isChosen ? 'text-gold' : 'text-mist'}`} />
+                              )}
+                              <div className="min-w-0">
+                                <p className={`text-xs font-semibold truncate ${isChosen ? 'text-pearl' : 'text-mist'}`}>
+                                  {asset.label}
+                                </p>
+                                <p className="text-[11px] text-mist-2 truncate">{asset.url}</p>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2 shrink-0">
+                              <a
+                                href={asset.url}
+                                target="_blank"
+                                rel="noreferrer"
+                                onClick={(e) => e.stopPropagation()}
+                                className="p-1 text-mist-2 hover:text-pearl"
+                                title="Open asset in new tab"
+                              >
+                                <ExternalLink className="h-3.5 w-3.5" />
+                              </a>
+                              <span className={`text-xs font-medium px-2 py-0.5 rounded ${isChosen ? 'bg-gold text-black font-semibold' : 'bg-white/5 text-mist'}`}>
+                                {isChosen ? 'Selected ✓' : 'Select'}
+                              </span>
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )}
+                </div>
+
+                {/* Campaign Tags */}
+                {campaignData.requiredHashtags?.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5 pt-1">
+                    {campaignData.requiredHashtags.map((tag, idx) => (
+                      <span key={idx} className="rounded-md bg-white/5 px-2 py-0.5 font-mono text-[10px] text-champagne/90">
+                        {tag.startsWith('#') ? tag : `#${tag}`}
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            <p className="text-xs leading-relaxed text-mist-2">
+              Automatically ingests campaign rules, extracts Google Drive media assets, and tunes AI scoring to match the payout requirements.
             </p>
           </div>
         )}
@@ -631,45 +833,6 @@ export default function NewProjectPage() {
           </div>
         </div>
 
-        {/* AI motion graphics toggle — admin only, globally switchable */}
-        {motionAvailable && (
-        <button
-          type="button"
-          onClick={() => setMotionFx((v) => !v)}
-          className={`flex w-full items-center gap-4 rounded-xl border p-4 text-left transition-all ${
-            motionFx ? 'border-champagne/60 bg-champagne/10' : 'border-hair/60 bg-black/20 hover:border-hair'
-          }`}
-        >
-          <span
-            className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${
-              motionFx ? 'bg-gradient-to-br from-gold to-champagne' : 'border border-hair'
-            }`}
-          >
-            <Clapperboard className={`h-5 w-5 ${motionFx ? 'text-black' : 'text-mist-2'}`} />
-          </span>
-          <span className="min-w-0 flex-1">
-            <p className={`flex flex-wrap items-center gap-x-2 text-sm font-semibold ${motionFx ? 'text-pearl' : 'text-mist'}`}>
-              AI Motion Graphics
-              <span className="rounded-full bg-gold/15 px-2 py-0.5 font-mono text-[10px] tracking-wide text-gold">+2 credits</span>
-            </p>
-            <p className="mt-0.5 text-xs leading-snug text-mist-2">
-              Kinetic headline card, animated progress bar &amp; end-card CTA — designed by AI per clip.
-            </p>
-          </span>
-          <span
-            className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${
-              motionFx ? 'bg-gradient-to-r from-gold to-champagne' : 'bg-white/15'
-            }`}
-          >
-            <span
-              className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-all ${
-                motionFx ? 'left-[22px]' : 'left-0.5'
-              }`}
-            />
-          </span>
-        </button>
-        )}
-
         {/* Language */}
         <div>
           <label htmlFor="lang" className="mb-2 block text-sm font-light text-mist">Spoken language</label>
@@ -696,7 +859,7 @@ export default function NewProjectPage() {
         <div className="flex items-center justify-between rounded-xl border border-hair/50 bg-onyx-2/60 px-5 py-4">
           <span className="text-sm font-light text-mist">Cost</span>
           <span className="font-display text-lg italic text-gold">
-            1 credit / minute{motionFx ? ' + 2 motion' : ''} · charged on completion
+            1 credit / minute · charged on completion
           </span>
         </div>
 
