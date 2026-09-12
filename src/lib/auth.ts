@@ -83,17 +83,20 @@ export const authOptions: NextAuthOptions = {
         // and OAuth, whose profile ids are provider-specific, not ours).
         const dbUser = await prisma.user.findUnique({
           where: { email: user.email.toLowerCase() },
-          select: { id: true, role: true, credits: true },
+          select: { id: true, role: true, credits: true, name: true },
         })
         if (dbUser) {
           token.id = dbUser.id
           token.role = dbUser.role
           token.credits = dbUser.credits
+          token.name = dbUser.name ?? user.name ?? token.name
         }
       }
       if (trigger === 'update' && session) {
-        token.credits = (session as { credits?: number }).credits ?? (token.credits as number)
-        token.role = (session as { role?: string }).role ?? (token.role as string)
+        const s = session as { credits?: number; role?: string; name?: string }
+        if (s.credits !== undefined) token.credits = s.credits
+        if (s.role !== undefined) token.role = s.role
+        if (s.name !== undefined) token.name = s.name
       }
       return token
     },
@@ -102,6 +105,7 @@ export const authOptions: NextAuthOptions = {
         ;(session.user as { id?: string }).id = token.id as string
         ;(session.user as { role?: string }).role = token.role as string
         ;(session.user as { credits?: number }).credits = token.credits as number
+        session.user.name = (token.name as string | null) ?? session.user.name
       }
       return session
     },

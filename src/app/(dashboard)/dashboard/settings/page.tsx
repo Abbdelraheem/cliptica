@@ -47,7 +47,7 @@ interface NotificationPrefs {
 }
 
 export default function SettingsPage() {
-  const { data: session } = useSession()
+  const { data: session, update } = useSession()
 
   // Profile state
   const [name, setName] = useState(session?.user?.name ?? '')
@@ -213,6 +213,10 @@ export default function SettingsPage() {
       if (!res.ok) {
         setProfileError('Failed to update profile. Please try again.')
         return
+      }
+      const trimmed = name.trim()
+      if (update) {
+        await update({ name: trimmed })
       }
       setSaved(true)
       setTimeout(() => setSaved(false), 2500)
