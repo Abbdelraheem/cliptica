@@ -251,11 +251,11 @@ export default function SettingsPage() {
         setPasswordError(data.error || 'Failed to update password.')
         return
       }
-      setPasswordSuccess('Password updated successfully!')
+      setPasswordSuccess('Password updated successfully! Your new password is now active.')
       setCurrentPassword('')
       setNewPassword('')
       setConfirmPassword('')
-      setTimeout(() => setPasswordSuccess(''), 3000)
+      setTimeout(() => setPasswordSuccess(''), 6000)
     } catch {
       setPasswordError('Something went wrong. Please try again.')
     } finally {
@@ -393,6 +393,7 @@ export default function SettingsPage() {
             <input
               id="currentPassword"
               type="password"
+              autoComplete="current-password"
               value={currentPassword}
               onChange={(e) => setCurrentPassword(e.target.value)}
               placeholder="••••••••"
@@ -405,6 +406,7 @@ export default function SettingsPage() {
               <input
                 id="newPassword"
                 type="password"
+                autoComplete="new-password"
                 required
                 minLength={8}
                 value={newPassword}
@@ -418,6 +420,7 @@ export default function SettingsPage() {
               <input
                 id="confirmPassword"
                 type="password"
+                autoComplete="new-password"
                 required
                 minLength={8}
                 value={confirmPassword}
