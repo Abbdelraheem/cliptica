@@ -27,7 +27,6 @@ type Clip = {
   thumbnailUrl: string | null
   captionStyle: string
   captionData: { mode?: string; emoji?: string; words?: Array<{ start: number; end: number; word: string }> } | null
-  motionGraphics: { mode?: string; headline?: string; kicker?: string } | null
   createdAt: string
 }
 
@@ -236,7 +235,7 @@ export default function ProjectDetail({ projectId }: { projectId: string }) {
   }
 
   const copySocialKit = async (c: Clip) => {
-    const hook = c.description || (c.motionGraphics?.headline ? `${c.motionGraphics.headline} — ${c.motionGraphics.kicker}` : 'Watch this viral highlight.')
+    const hook = c.description || 'Watch this viral highlight.'
     const hashtags = '#shorts #viral #fyp #reels #trending #growth'
     const postText = `${c.title}\n\n${hook}\n\n${hashtags}`
     try {

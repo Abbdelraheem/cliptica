@@ -20,7 +20,7 @@ const PLANS = [
     price: '$19',
     period: '/ mo',
     credits: '300 credits / month',
-    items: ['No watermark · 1080p 60fps', 'Campaign hub + ledger', 'Motion graphics & zoom effects'],
+    items: ['No watermark · 1080p 60fps', 'Campaign hub + ledger', 'Dynamic zooms & viral hook pacing'],
   },
   {
     name: 'Studio',

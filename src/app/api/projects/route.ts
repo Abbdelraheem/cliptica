@@ -112,17 +112,6 @@ export async function POST(request: Request) {
       )
     }
 
-    // AI motion graphics is an admin-only feature with a global kill switch.
-    let motionFx = d.motionFx
-    if (motionFx) {
-      if (user.role !== 'ADMIN') {
-        motionFx = false
-      } else {
-        const setting = await prisma.setting.findUnique({ where: { key: 'motion_fx' } })
-        if (setting && setting.value !== 'true') motionFx = false
-      }
-    }
-
     const title =
       d.title ??
       (d.sourceType === 'url' && sourceUrl
@@ -169,7 +158,6 @@ export async function POST(request: Request) {
           language: d.language,
           captionStyle: d.captionStyle,
           aspectRatio: d.aspectRatio,
-          motionFx,
           status: 'PENDING',
           creditsUsed: minCredits, // tracks reserved credits
         },

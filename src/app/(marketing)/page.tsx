@@ -369,7 +369,7 @@ const STEPS = [
   {
     icon: Scissors,
     title: 'Auto-edit to vertical',
-    body: 'Clips are cropped to 9:16 with the speaker’s face locked in frame, captions burned in word-by-word, and motion polish applied.',
+    body: 'Clips are cropped to 9:16 with the speaker’s face locked in frame, and captions burned in word-by-word.',
     tag: 'STEP 03',
   },
   {
@@ -435,8 +435,8 @@ const FEATURES = [
   },
   {
     icon: Wand2,
-    name: 'Motion polish',
-    desc: 'Auto zoom-punches, B-roll beats, and emphasis pops applied from 22 motion templates.',
+    name: 'Dynamic framing',
+    desc: 'Auto zoom-punches and viral hook pacing calibrated for high-retention short-form feeds.',
     span: '',
   },
   {

@@ -3,48 +3,37 @@ import { calcClipCredits, calcCredits, planMaxMinutes, exceedsPlanMinutes } from
 
 describe('calcClipCredits (per-video model)', () => {
   it('charges 1 credit per generated video clip', () => {
-    expect(calcClipCredits(1, false)).toBe(1)
-    expect(calcClipCredits(3, false)).toBe(3)
-    expect(calcClipCredits(5, false)).toBe(5)
-    expect(calcClipCredits(10, false)).toBe(10)
+    expect(calcClipCredits(1)).toBe(1)
+    expect(calcClipCredits(3)).toBe(3)
+    expect(calcClipCredits(5)).toBe(5)
+    expect(calcClipCredits(10)).toBe(10)
   })
 
   it('charges minimum 1 credit if 0 clips were somehow returned', () => {
-    expect(calcClipCredits(0, false)).toBe(1)
-  })
-
-  it('adds +2 flat when AI motion fx was applied', () => {
-    expect(calcClipCredits(1, true)).toBe(3)
-    expect(calcClipCredits(5, true)).toBe(7)
+    expect(calcClipCredits(0)).toBe(1)
   })
 })
 
 describe('calcCredits', () => {
   it('charges minimum 1 credit for very short videos', () => {
-    expect(calcCredits(1, false)).toBe(1)
-    expect(calcCredits(10, false)).toBe(1)
-    expect(calcCredits(0, false)).toBe(1)
+    expect(calcCredits(1)).toBe(1)
+    expect(calcCredits(10)).toBe(1)
+    expect(calcCredits(0)).toBe(1)
   })
 
   it('charges exactly 1 credit at one minute', () => {
-    expect(calcCredits(60, false)).toBe(1)
+    expect(calcCredits(60)).toBe(1)
   })
 
   it('rounds up to the next started minute', () => {
-    expect(calcCredits(61, false)).toBe(2)
-    expect(calcCredits(119, false)).toBe(2)
-    expect(calcCredits(120, false)).toBe(2)
-    expect(calcCredits(121, false)).toBe(3)
-  })
-
-  it('adds flat +2 when AI motion fx was applied', () => {
-    expect(calcCredits(60, true)).toBe(3)
-    expect(calcCredits(300, true)).toBe(7)
-    expect(calcCredits(15, true)).toBe(3)
+    expect(calcCredits(61)).toBe(2)
+    expect(calcCredits(119)).toBe(2)
+    expect(calcCredits(120)).toBe(2)
+    expect(calcCredits(121)).toBe(3)
   })
 
   it('matches the documented 10-minute no-fx price', () => {
-    expect(calcCredits(600, false)).toBe(10)
+    expect(calcCredits(600)).toBe(10)
   })
 })
 

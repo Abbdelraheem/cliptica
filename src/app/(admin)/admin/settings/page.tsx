@@ -9,7 +9,6 @@ type Setting = { key: string; kind: 'bool' | 'number' | 'string'; label: string;
 type SettingsState = Record<string, boolean | number>
 
 const DEFAULTS: SettingsState = {
-  motion_fx: true,
   pipeline_premium: true,
   min_credits_required: 1,
   max_upload_mb: 500,

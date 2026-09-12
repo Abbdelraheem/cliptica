@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-const mockPrisma = {
+const mockPrisma = vi.hoisted(() => ({
   user: {
     findUnique: vi.fn(),
     create: vi.fn(),
@@ -8,11 +8,13 @@ const mockPrisma = {
   creditTransaction: {
     create: vi.fn(),
   },
-}
+}))
 
 vi.mock('@/lib/prisma', () => ({
   prisma: mockPrisma,
 }))
+
+import { authOptions } from '@/lib/auth'
 
 describe('NextAuth Name Persistence & Sync', () => {
   beforeEach(() => {
@@ -27,7 +29,6 @@ describe('NextAuth Name Persistence & Sync', () => {
       name: 'Dr. Abdelraheem',
     })
 
-    const { authOptions } = await import('@/lib/auth')
     const jwtCallback = authOptions.callbacks?.jwt
     expect(jwtCallback).toBeDefined()
 
@@ -41,10 +42,9 @@ describe('NextAuth Name Persistence & Sync', () => {
     expect(token.name).toBe('Dr. Abdelraheem')
     expect(token.credits).toBe(50)
     expect(token.role).toBe('FREE')
-  }, 15000)
+  })
 
   it('jwt callback: updates token.name on trigger === "update"', async () => {
-    const { authOptions } = await import('@/lib/auth')
     const jwtCallback = authOptions.callbacks?.jwt
     expect(jwtCallback).toBeDefined()
 
@@ -67,7 +67,6 @@ describe('NextAuth Name Persistence & Sync', () => {
   })
 
   it('session callback: passes token.name to session.user.name', async () => {
-    const { authOptions } = await import('@/lib/auth')
     const sessionCallback = authOptions.callbacks?.session
     expect(sessionCallback).toBeDefined()
 

@@ -49,7 +49,7 @@ export const PLANS: Record<PlanKey, PlanDef> = {
       '300 credits/month',
       'No watermark · 1080p at 60fps',
       'Campaign hub + earnings ledger',
-      'Motion graphics & zoom effects',
+      'Dynamic zooms & viral hook pacing',
       'Full editor access',
     ],
   },

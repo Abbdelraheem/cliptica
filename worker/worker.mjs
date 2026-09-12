@@ -720,7 +720,7 @@ async function renderClip(src, moment, dir, idx, transcript, mode = 'smart', cap
     { timeout: 1000 * 60 * 5 }
   )
 
-  return { file: outFile, thumb: thumbFile, duration: gotDur, cropMode: faces ? 'face-track' : 'center', motion: null }
+  return { file: outFile, thumb: thumbFile, duration: gotDur, cropMode: faces ? 'face-track' : 'center' }
 }
 
 /** Probe original video dimensions once. */
@@ -858,7 +858,6 @@ async function processClipAdjust(job) {
     console.log(`[worker] [clip_adjust] rendering clip ${clipId} [${start}s-${end}s, style=${captionStyle}]`)
     await setP(60, 'Re-rendering adjusted clip & subtitle burn-in...')
 
-    const motion = clip.motionGraphics?.mode === 'ai-motion' ? clip.motionGraphics : null
     const aspectRatio = project.aspectRatio ?? '9:16'
     const rendered = await renderClip(
       src,
@@ -867,7 +866,6 @@ async function processClipAdjust(job) {
       `adj_${Date.now()}`,
       transcript,
       project.framing ?? 'smart',
-      motion,
       captionStyle,
       aspectRatio
     )
@@ -1003,7 +1001,7 @@ async function processJob(job) {
           thumbnailUrl: thumbUrl,
           captionStyle: captionStyle,
           captionData: { mode: 'karaoke', emoji: m.emoji ?? '', words: winWords, style: captionStyle },
-          motionGraphics: { ...(files[i].motion ?? { mode: 'none' }), cropMode: files[i].cropMode },
+          motionGraphics: { cropMode: files[i].cropMode },
         },
       })
       await setP(62 + Math.round(((i + 1) / moments.length) * 36), `Uploading clip ${i + 1} of ${moments.length} to Cloudflare R2...`)

@@ -6,7 +6,6 @@ import { z } from 'zod'
 type SettingValue = string | boolean | number
 
 const SETTING_KEYS = [
-  'motion_fx',
   'pipeline_premium',
   'min_credits_required',
   'max_upload_mb',
@@ -19,7 +18,6 @@ const SETTING_KEYS = [
 type SettingKey = (typeof SETTING_KEYS)[number]
 
 const KNOWN_KEYS: { key: SettingKey; kind: 'bool' | 'number' | 'string'; label: string }[] = [
-  { key: 'motion_fx', kind: 'bool', label: 'Motion FX enabled' },
   { key: 'pipeline_premium', kind: 'bool', label: 'Premium pipeline' },
   { key: 'min_credits_required', kind: 'number', label: 'Min credits to run a job' },
   { key: 'max_upload_mb', kind: 'number', label: 'Max upload size (MB)' },
@@ -30,7 +28,6 @@ const KNOWN_KEYS: { key: SettingKey; kind: 'bool' | 'number' | 'string'; label: 
 ]
 
 const defaults: Record<string, SettingValue> = {
-  motion_fx: true,
   pipeline_premium: true,
   min_credits_required: 1,
   max_upload_mb: 500,

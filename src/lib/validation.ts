@@ -143,7 +143,6 @@ export const projectCreateSchema = z.object({
   language: z.enum(PROJECT_LANGUAGES).default('auto'),
   captionStyle: z.enum(VALID_CAPTION_STYLES).default('hormozi'),
   aspectRatio: z.enum(PROJECT_ASPECT_RATIOS).default('9:16'),
-  motionFx: z.boolean().default(false),
 })
 
 

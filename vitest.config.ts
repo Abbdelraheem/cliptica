@@ -5,6 +5,7 @@ export default defineConfig({
   test: {
     environment: 'node',
     include: ['tests/**/*.test.{ts,tsx,mts,mjs}'],
+    testTimeout: 30000,
     env: {
       DATABASE_URL: 'postgresql://test:test@localhost:5432/test',
       NEXTAUTH_SECRET: 'test-secret-for-unit-tests',

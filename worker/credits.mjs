@@ -1,18 +1,17 @@
 /**
  * Per-video credit pricing for the clipping pipeline.
- * 1 credit per successfully generated video clip, +2 flat when AI motion
- * graphics (fx) were rendered. Always at least 1 credit for a completed job.
+ * 1 credit per successfully generated video clip. Always at least 1 credit for a completed job.
  */
-export function calcClipCredits(clipCount, fx) {
+export function calcClipCredits(clipCount) {
   const count = typeof clipCount === 'number' && Number.isFinite(clipCount) ? Math.round(clipCount) : 1
-  return Math.max(1, count) + (fx ? 2 : 0)
+  return Math.max(1, count)
 }
 
 /**
  * Legacy/fallback minute-based credit calculation.
  */
-export function calcCredits(durationSeconds, fx) {
-  return Math.max(1, Math.ceil(durationSeconds / 60)) + (fx ? 2 : 0)
+export function calcCredits(durationSeconds) {
+  return Math.max(1, Math.ceil(durationSeconds / 60))
 }
 
 /** Max SOURCE length (minutes) a role's plan may process. */
