@@ -63,8 +63,8 @@ export default function RefundPolicyPage() {
             <h2 className="text-xl font-semibold text-pearl">5. How to Request a Refund</h2>
             <p>
               To request a refund, please send an email to{' '}
-              <a href="mailto:support@getnology.com?subject=Refund%20Request" className="text-gold underline underline-offset-4">
-                support@getnology.com
+              <a href="mailto:support@cliptica.com?subject=Refund%20Request" className="text-gold underline underline-offset-4">
+                support@cliptica.com
               </a>{' '}
               with the subject line &quot;Refund Request&quot; and include:
             </p>

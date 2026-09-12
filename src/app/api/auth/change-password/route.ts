@@ -1,4 +1,4 @@
-﻿import { auth } from '@/lib/auth'
+import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { compare, hash } from 'bcryptjs'
 import { NextResponse } from 'next/server'
@@ -60,7 +60,7 @@ export async function POST(request: Request) {
     if (user.email) {
       sendEmail({
         to: user.email,
-        subject: 'Your NOLOGY password was changed',
+        subject: 'Your Cliptica password was changed',
         html: passwordChangedEmailHtml(),
       }).catch((e) => console.error('[change-password] failed to send email notification:', e))
     }

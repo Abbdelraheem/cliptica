@@ -48,7 +48,7 @@ export async function POST(request: Request) {
       const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'
       await sendEmail({
         to: user.email,
-        subject: 'Confirm your NOLOGY email',
+        subject: 'Confirm your Cliptica email',
         html: verificationEmailHtml(`${appUrl}/verify-email?token=${token}`),
       })
     } catch (err) {

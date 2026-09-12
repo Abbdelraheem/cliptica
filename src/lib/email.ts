@@ -44,7 +44,7 @@ export async function sendEmail(opts: { to: string; subject: string; html: strin
 }
 
 /* ============================================================
-   NOLOGY EMAIL DESIGN SYSTEM
+   CLIPTICA EMAIL DESIGN SYSTEM
    Onyx + charcoal surfaces, forge-orange accent (#FF5A1F),
    pearl text, Manrope/Inter stack. Inline styles only so the
    template renders reliably across email clients.

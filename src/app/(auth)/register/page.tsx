@@ -88,7 +88,7 @@ export default function RegisterPage() {
 
         {/* Form card */}
         <div className="rounded-3xl border border-hair bg-gradient-to-b from-pearl/[0.05] to-pearl/[0.01] p-9 backdrop-blur-xl">
-          <Link href="/" className="mb-8 flex justify-center md:hidden" aria-label="NOLOGY home">
+          <Link href="/" className="mb-8 flex justify-center md:hidden" aria-label="Cliptica home">
             <Wordmark size={26} />
           </Link>
 

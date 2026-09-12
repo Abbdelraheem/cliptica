@@ -164,7 +164,7 @@ export default function BillingPage() {
 
       <p className="mt-8 text-center text-sm font-light text-mist">
         Need invoice history or a custom tier?{' '}
-        <a href="mailto:support@getnology.com" className="text-gold underline underline-offset-4">Contact support</a>
+        <a href="mailto:support@cliptica.com" className="text-gold underline underline-offset-4">Contact support</a>
       </p>
     </div>
   )

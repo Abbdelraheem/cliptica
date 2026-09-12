@@ -44,7 +44,7 @@ export function MarketingLayout({ children }: { children: ReactNode }) {
               : 'border-hair bg-[#0a0a0a]/55 shadow-[0_10px_50px_rgba(0,0,0,0.35)]'
           }`}
         >
-          <Link href="/" aria-label="NOLOGY home" className="shrink-0">
+          <Link href="/" aria-label="Cliptica home" className="shrink-0">
             <Wordmark />
           </Link>
 
@@ -122,7 +122,7 @@ export function MarketingLayout({ children }: { children: ReactNode }) {
                 title: 'Company',
                 links: [
                   ['About', '#'],
-                  ['Contact', 'mailto:support@getnology.com'],
+                  ['Contact', 'mailto:support@cliptica.com'],
                   ['Terms', '/terms'],
                   ['Privacy', '/privacy'],
                   ['Refund Policy', '/refund-policy'],

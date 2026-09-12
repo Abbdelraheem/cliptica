@@ -118,7 +118,7 @@ export function DashboardLayout({ children }: { children: ReactNode }) {
         }`}
       >
         <div className="hidden items-center border-b border-hair/50 px-5 py-5 lg:flex">
-          <Link href="/dashboard" aria-label="NOLOGY dashboard">
+          <Link href="/dashboard" aria-label="Cliptica dashboard">
             <Wordmark size={30} />
           </Link>
         </div>

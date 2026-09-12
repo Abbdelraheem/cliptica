@@ -7,7 +7,7 @@ export default function NotFound() {
       <div className="amb" aria-hidden="true" />
 
       <div className="relative z-[2]">
-        <Link href="/" className="mb-10 inline-flex" aria-label="NOLOGY home">
+        <Link href="/" className="mb-10 inline-flex" aria-label="Cliptica home">
           <Wordmark size={30} />
         </Link>
 

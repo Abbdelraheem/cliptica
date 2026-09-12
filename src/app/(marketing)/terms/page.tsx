@@ -91,8 +91,8 @@ export default function TermsPage() {
             <h2 className="text-xl font-semibold text-pearl">8. Contact Us</h2>
             <p>
               If you have any questions regarding these Terms, please contact our support team at{' '}
-              <a href="mailto:support@getnology.com" className="text-gold underline underline-offset-4">
-                support@getnology.com
+              <a href="mailto:support@cliptica.com" className="text-gold underline underline-offset-4">
+                support@cliptica.com
               </a>.
             </p>
           </section>

@@ -74,7 +74,7 @@ export default function PrivacyPage() {
             <p>
               To permanently delete your account, project history, and associated video assets, submit an account deletion request via our{' '}
               <a
-                href="mailto:support@getnology.com?subject=Account%20Deletion%20Request"
+                href="mailto:support@cliptica.com?subject=Account%20Deletion%20Request"
                 className="text-gold underline underline-offset-4"
               >
                 Account Deletion Form
@@ -87,8 +87,8 @@ export default function PrivacyPage() {
             <h2 className="text-xl font-semibold text-pearl">6. Contact Data Protection</h2>
             <p>
               For any questions regarding our privacy practices or data handling, reach our team at{' '}
-              <a href="mailto:support@getnology.com" className="text-gold underline underline-offset-4">
-                support@getnology.com
+              <a href="mailto:support@cliptica.com" className="text-gold underline underline-offset-4">
+                support@cliptica.com
               </a>.
             </p>
           </section>

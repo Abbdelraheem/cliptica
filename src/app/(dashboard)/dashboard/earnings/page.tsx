@@ -70,7 +70,7 @@ export default function EarningsPage() {
     const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }))
     const a = document.createElement('a')
     a.href = url
-    a.download = `nology-payouts-${new Date().toISOString().slice(0, 10)}.csv`
+    a.download = `cliptica-payouts-${new Date().toISOString().slice(0, 10)}.csv`
     a.click()
     URL.revokeObjectURL(url)
   }

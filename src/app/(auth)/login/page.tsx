@@ -87,7 +87,7 @@ export default function LoginPage() {
       <div className="amb" aria-hidden="true" />
 
       <div className="relative z-[2] w-full max-w-md">
-        <Link href="/" className="mb-10 flex justify-center" aria-label="NOLOGY home">
+        <Link href="/" className="mb-10 flex justify-center" aria-label="Cliptica home">
           <Wordmark size={30} />
         </Link>
 
@@ -156,7 +156,7 @@ export default function LoginPage() {
           </div>
 
           <p className="mt-7 text-center text-sm font-light text-mist">
-            New to NOLOGY?{' '}
+            New to Cliptica?{' '}
             <Link href="/register" className="text-gold underline underline-offset-4 hover:text-champagne">
               Create an account
             </Link>
