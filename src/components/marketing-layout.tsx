@@ -113,15 +113,15 @@ export function MarketingLayout({ children }: { children: ReactNode }) {
                 title: 'Resources',
                 links: [
                   ['FAQ', '/#faq'],
-                  ['Help Center', '#'],
+                  ['Help Center', 'mailto:support@cliptica.com?subject=Cliptica%20Help%20Center'],
                   ['Caption Styles', '/#features'],
-                  ['Changelog', '#'],
+                  ['Changelog', '/#features'],
                 ],
               },
               {
                 title: 'Company',
                 links: [
-                  ['About', '#'],
+                  ['About', '/#how'],
                   ['Contact', 'mailto:support@cliptica.com'],
                   ['Terms', '/terms'],
                   ['Privacy', '/privacy'],

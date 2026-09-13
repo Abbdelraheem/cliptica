@@ -600,7 +600,7 @@ function Pricing() {
         Cheaper than <span className="gold-text">one edit</span>
       </h2>
       <p className="mt-4 max-w-lg text-mist rv">
-        1 credit ≈ 1 minute of source video. Credits refresh every monthly billing cycle.
+        1 credit = 1 final video. Credits refresh every monthly billing cycle.
       </p>
       <div className="mt-14 grid gap-6 lg:grid-cols-3">
         {PLANS.map((p, i) => (
@@ -669,7 +669,7 @@ const FAQS: [string, string][] = [
   ],
   [
     'What do credits get spent on?',
-    'Credits are consumed per minute of source video when a project runs. Failed renders are automatically refunded to your balance.',
+    'Credits are consumed per final video clip generated when a project runs. Failed renders are automatically refunded to your balance.',
   ],
   [
     'Do you support languages other than English?',

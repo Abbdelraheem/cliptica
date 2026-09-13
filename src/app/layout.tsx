@@ -2,6 +2,8 @@ import type { Metadata, Viewport } from 'next'
 import { Manrope, Inter } from 'next/font/google'
 import './globals.css'
 import { Providers } from './providers'
+import { CookieConsent } from '@/components/cookie-consent'
+import { Analytics } from '@/components/analytics'
 
 const manrope = Manrope({
   variable: '--font-display',
@@ -15,6 +17,7 @@ const inter = Inter({
 })
 
 export const metadata: Metadata = {
+  metadataBase: new URL(process.env.NEXTAUTH_URL || 'https://cliptica.com'),
   title: {
     default: 'Cliptica — One video in. A week of clips out.',
     template: '%s | Cliptica',
@@ -40,9 +43,11 @@ export const metadata: Metadata = {
     description: 'AI clipping engine for creators.',
   },
   icons: {
-    icon: '/favicon.ico',
-    shortcut: '/favicon-16x16.png',
-    apple: '/apple-touch-icon.png',
+    icon: [
+      { url: '/icon.svg', type: 'image/svg+xml' },
+      { url: '/favicon.ico', sizes: 'any' },
+    ],
+    apple: '/icon.svg',
   },
   manifest: '/site.webmanifest',
 }
@@ -66,7 +71,11 @@ export default function RootLayout({
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
       </head>
       <body className="grain min-h-full bg-onyx text-pearl antialiased">
-        <Providers>{children}</Providers>
+        <Providers>
+          {children}
+          <CookieConsent />
+          <Analytics />
+        </Providers>
       </body>
     </html>
   )

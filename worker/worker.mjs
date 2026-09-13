@@ -151,6 +151,7 @@ async function syncConfigInto() {
   CFG.groqKey = c.groq_api_key || process.env.GROQ_API_KEY || CFG.groqKey
   CFG.openaiKey = c.openai_api_key || process.env.OPENAI_API_KEY || CFG.openaiKey
   CFG.whisperModel = c.whisper_model || process.env.WHISPER_MODEL || CFG.whisperModel
+  CFG.aiSimulationMode = c.ai_simulation_mode || process.env.AI_SIMULATION_MODE || CFG.aiSimulationMode
 }
 
 async function sh(cmd, args, opts) {
@@ -348,7 +349,46 @@ json.dump({"language": info.language, "segments": out, "words": words}, open(sys
   return JSON.parse(await readFile(jsonPath, 'utf8'))
 }
 
+function generateSimulatedTranscript(fileDuration = 60) {
+  const sampleWords = [
+    'Welcome', 'to', 'the', 'ultimate', 'breakthrough', 'moment.',
+    'Nobody', 'thought', 'this', 'was', 'possible', 'until', 'now.',
+    'Here', 'is', 'the', 'exact', 'secret', 'that', 'changed', 'everything.',
+    'Watch', 'closely', 'because', 'this', 'will', 'blow', 'your', 'mind.',
+    'The', 'number', 'one', 'mistake', 'creators', 'make', 'is', 'waiting.',
+    'Take', 'action', 'today', 'and', 'scale', 'your', 'content', 'instantly.'
+  ]
+  const words = []
+  const segments = []
+  let t = 1.0
+  let segStart = 1.0
+  let segWords = []
+
+  for (let i = 0; i < sampleWords.length && t < Math.max(30, fileDuration - 5); i++) {
+    const dur = 0.35 + Math.random() * 0.25
+    words.push({ start: Number(t.toFixed(2)), end: Number((t + dur).toFixed(2)), text: sampleWords[i] })
+    segWords.push(sampleWords[i])
+    t += dur + 0.1
+    if (segWords.length >= 6 || i === sampleWords.length - 1) {
+      segments.push({
+        start: Number(segStart.toFixed(2)),
+        end: Number(t.toFixed(2)),
+        text: segWords.join(' ')
+      })
+      segStart = t + 0.5
+      t += 0.5
+      segWords = []
+    }
+  }
+
+  return { language: 'en', segments, words }
+}
+
 async function transcribe(file, dir, language = 'auto') {
+  if (process.env.AI_SIMULATION_MODE === 'true' || CFG.aiSimulationMode === 'true') {
+    console.log('[worker] [SIMULATION] AI_SIMULATION_MODE enabled: generating fast synthetic transcript in <1s')
+    return generateSimulatedTranscript()
+  }
   try {
     if (CFG.groqKey) {
       const t0 = Date.now()
@@ -356,9 +396,14 @@ async function transcribe(file, dir, language = 'auto') {
       const r = await transcribeGroq(mp3, language)
       console.log(`[worker] Groq transcription done in ${((Date.now() - t0) / 1000).toFixed(0)}s (${r.words.length} words, lang=${language})`)
       return r
+    } else {
+      console.warn('[worker] No GROQ_API_KEY configured. Falling back to local whisper on CPU (this takes several minutes).')
     }
   } catch (e) {
     console.error('[worker] Groq failed, falling back to local whisper:', e.message)
+    if (e.message.includes('401') || e.message.includes('Invalid API Key') || e.message.includes('invalid_api_key')) {
+      console.error('[worker] ⚠️ GROQ_API_KEY is invalid, expired, or unauthorized. Update GROQ_API_KEY in the database Settings table or .env.production!')
+    }
   }
   try {
     return await transcribeLocal(file, dir)
