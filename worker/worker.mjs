@@ -507,8 +507,13 @@ function generateCandidateMoments(transcript, duration, from = 0, targetLen = 38
 
 async function llmScoreMoments(candidates, instructions) {
   const providers = []
-  if (CFG.groqKey)
-    providers.push({ name: 'groq', url: 'https://api.groq.com/openai/v1/chat/completions', key: CFG.groqKey, model: process.env.GROQ_SCORE_MODEL ?? 'llama-3.3-70b-versatile' })
+  if (CFG.groqKey) {
+    const primaryModel = process.env.GROQ_SCORE_MODEL || 'allam-2-7b'
+    providers.push({ name: `groq-${primaryModel}`, url: 'https://api.groq.com/openai/v1/chat/completions', key: CFG.groqKey, model: primaryModel })
+    if (primaryModel !== 'qwen/qwen3.8-27b') {
+      providers.push({ name: 'groq-qwen3.8-27b', url: 'https://api.groq.com/openai/v1/chat/completions', key: CFG.groqKey, model: 'qwen/qwen3.8-27b' })
+    }
+  }
   if (CFG.openaiKey)
     providers.push({ name: 'openai', url: 'https://api.openai.com/v1/chat/completions', key: CFG.openaiKey, model: 'gpt-4o-mini' })
 

@@ -60,6 +60,9 @@ export async function POST(req: NextRequest) {
 
     // 2. Test chat completion endpoint with fast model
     const chatT0 = Date.now()
+    const preferredModels = ['allam-2-7b', 'qwen/qwen3.8-27b', 'groq/compound-mini', 'llama-3.3-70b-versatile']
+    const chatModel = preferredModels.find(m => modelIds.includes(m)) || modelIds[0] || 'allam-2-7b'
+
     const chatRes = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -67,7 +70,7 @@ export async function POST(req: NextRequest) {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'llama-3.3-70b-versatile',
+        model: chatModel,
         messages: [{ role: 'user', content: 'Reply with the word OK.' }],
         max_tokens: 10,
       }),
