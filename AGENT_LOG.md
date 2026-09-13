@@ -918,3 +918,53 @@ Executed `scripts/test-render-styles.mjs` rendering 1080x1920 video with burned-
 - **Production Builds**: `next build` succeeded cleanly on local machine and production EC2 instance.
 - **Deployment**: Pushed to GitHub `main`, pulled to EC2 `/opt/nology`, generated Prisma client, built, and executed zero-downtime PM2 reload (`sudo pm2 reload all --update-env`).
 - **Live Health**: `curl -s http://localhost:3000/api/health` returned HTTP 200 with all database and storage checks healthy; all 3 PM2 services (`nology-web`, `nology-worker`, `nology-bot`) online.
+
+---
+
+## 2026-09-13 — Round 14: Production Launch Checklist, Groq AI Investigation & Multi-Model Scoring Fix
+
+### 1. Full Production Launch Checklist Implementation
+- **Favicon & Web Manifest**:
+  - Created dynamic 32x32 SVG-backed PNG icon generator at `src/app/icon.tsx`.
+  - Created static fallbacks `public/icon.svg` and `public/favicon.ico` ensuring zero 404s on direct browser icon fetches.
+  - Created `public/site.webmanifest` with theme color `#050505` and Cliptica branding.
+- **Social Preview (OpenGraph)**:
+  - Created dynamic 1200x630 social preview card generator at `src/app/opengraph-image.tsx` with forge orange glow, brand mark, and value proposition.
+  - Configured OpenGraph & Twitter metadata in `src/app/layout.tsx` (`summary_large_image`, `metadataBase`).
+- **Security Headers & HTTPS Enforcement**:
+  - Updated `src/middleware.ts` to enforce 301 HTTPS redirects for production traffic (`x-forwarded-proto === 'http'`).
+  - Attached standard security headers: `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY / SAMEORIGIN`, `Referrer-Policy: strict-origin-when-cross-origin`, `Permissions-Policy`, and production `Strict-Transport-Security`.
+- **Privacy & Compliance**:
+  - Created floating dark-glass Cookie Consent Banner (`src/components/cookie-consent.tsx`) with "Accept All" / "Essential Only" options and `localStorage` persistence (`cliptica_cookie_consent`). Mounted in `src/app/layout.tsx`.
+  - Created lightweight, optional Google Analytics injector (`src/components/analytics.tsx`) conditioned on `NEXT_PUBLIC_GA_ID`.
+  - Verified existing `/privacy`, `/terms`, and `/refund-policy` pages.
+- **Broken Links & Pricing Copy Polish**:
+  - Replaced dead `#` placeholders in `src/components/marketing-layout.tsx` (Help Center -> mailto support, Changelog -> /#features, About -> /#how).
+  - Updated pricing and FAQ copy in `src/app/(marketing)/page.tsx` to "1 credit = 1 final video".
+- **SEO Page Titles & Descriptions**:
+  - Added dedicated metadata layouts for auth pages: `login/layout.tsx`, `register/layout.tsx`, `forgot-password/layout.tsx`, `reset-password/layout.tsx`, and `verify-email/layout.tsx`.
+
+### 2. Groq AI Pipeline Investigation & Model Compatibility Resolution
+- **Root Cause Analysis**:
+  - The user's Groq key (`gsk_h5H...jm1j`) was confirmed 100% VALID.
+  - Queried Groq `/v1/models`: 14 models available, including `whisper-large-v3` and `whisper-large-v3-turbo`.
+  - Direct live test of Groq audio transcription (`whisper-large-v3-turbo`): SUCCESS (transcription executed in 255ms!).
+  - The bug causing scoring failure was identified: `worker/worker.mjs` was requesting `llama-3.3-70b-versatile`, which returned `404: model_not_found` on this Groq account tier.
+  - Tested available candidate models for JSON viral moment evaluation:
+    * `allam-2-7b` (Saudi AI model, exceptional for Arabic + English): SUCCESS in 355ms with strict JSON output.
+    * `qwen/qwen3.8-27b`: SUCCESS in 157ms.
+  - Updated `worker/worker.mjs` to prioritize `allam-2-7b` with `qwen/qwen3.8-27b` fallback, ensuring Groq scoring succeeds every time.
+  - Added diagnostic CLI testing tool `scripts/test-ai.mjs` and admin route `src/app/api/admin/ai-test/route.ts`.
+  - Added `AI_SIMULATION_MODE=true` fast-path in `worker/worker.mjs` for instantaneous test runs.
+
+### 3. Verification & Live Deployment
+- **TypeScript**: `npx tsc --noEmit` exited with code 0 (clean).
+- **Automated Tests**: All 17 Vitest suites (266 tests) passed (100%).
+- **Production Build**: `npm run build` compiled 61/61 static/dynamic pages cleanly.
+- **Production Host**: Pulled to EC2 (`/opt/nology`), built with Next.js 15.5.25, and reloaded PM2.
+- **Live cURL Verification**:
+  - `http://13.62.192.145/` -> HTTP 200 OK (Next.js server-rendered homepage with all security headers).
+  - `http://13.62.192.145/icon` -> HTTP 200 OK (`image/png`).
+  - `http://13.62.192.145/opengraph-image` -> HTTP 200 OK (`image/png`).
+  - `http://13.62.192.145/api/health` -> HTTP 200 OK.
+  - `node scripts/test-ai.mjs` -> 100% PASS on Whisper (255ms), Chat (338ms), and JSON scoring (373ms).
