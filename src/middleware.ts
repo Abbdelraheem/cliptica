@@ -56,19 +56,6 @@ async function rateLimitLoginCallback(request: NextRequest): Promise<NextRespons
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
 
-  // Force HTTPS in production (behind reverse proxy / AWS ALB / Cloudflare)
-  const proto = request.headers.get('x-forwarded-proto')
-  const host = request.headers.get('host')
-  if (
-    process.env.NODE_ENV === 'production' &&
-    proto === 'http' &&
-    host &&
-    !host.includes('localhost') &&
-    !host.includes('127.0.0.1')
-  ) {
-    return NextResponse.redirect(`https://${host}${request.nextUrl.pathname}${request.nextUrl.search}`, 301)
-  }
-
   if (pathname.startsWith('/api/auth/callback')) {
     const limited = await rateLimitLoginCallback(request)
     if (limited) return limited
@@ -106,9 +93,6 @@ export async function middleware(request: NextRequest) {
   response.headers.set('X-Frame-Options', 'SAMEORIGIN')
   response.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin')
   response.headers.set('Permissions-Policy', 'camera=(), microphone=(), geolocation=()')
-  if (process.env.NODE_ENV === 'production') {
-    response.headers.set('Strict-Transport-Security', 'max-age=63072000; includeSubDomains; preload')
-  }
 
   return response
 }
