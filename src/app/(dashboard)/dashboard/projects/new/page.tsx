@@ -507,10 +507,21 @@ export default function NewProjectPage() {
               placeholder="https://www.youtube.com/watch?v=…"
               className="input-lux !pl-11"
             />
-            <p className="mt-2 text-xs leading-relaxed text-mist-2">
-              Heads up: YouTube limits automated downloads, so links can fail or stall.
-              If it does — download the video and upload it above; that always works.
-            </p>
+            <div className="mt-2.5 flex items-start gap-2 rounded-xl border border-hair-soft bg-surface/80 p-3 text-xs leading-relaxed text-mist-2">
+              <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-gold" />
+              <div>
+                <span className="font-semibold text-pearl">Pro Tip: </span>
+                If YouTube stalls or triggers bot verification, switch to the{' '}
+                <button
+                  type="button"
+                  onClick={() => setTab('upload')}
+                  className="font-semibold text-gold underline underline-offset-2 hover:text-champagne"
+                >
+                  Direct Video Upload
+                </button>{' '}
+                tab. Direct upload finishes in 2 seconds and completely bypasses YouTube bot checks!
+              </div>
+            </div>
           </div>
         )}
 

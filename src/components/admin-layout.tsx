@@ -34,8 +34,10 @@ export function AdminLayout({ children }: { children: ReactNode }) {
   const { data: session } = useSession()
   const [mobileOpen, setMobileOpen] = useState(false)
 
-  const isActive = (href: string) =>
-    pathname === href || pathname.startsWith(href + '/')
+  const isActive = (href: string) => {
+    if (href === '/admin') return pathname === '/admin'
+    return pathname === href || pathname.startsWith(href + '/')
+  }
 
   return (
     <div className="min-h-screen bg-onyx text-pearl">

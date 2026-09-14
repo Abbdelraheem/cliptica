@@ -163,8 +163,24 @@ async function sh(cmd, args, opts) {
  * (server IP is a flagged AWS datacenter; faking a real browser TLS fingerprint is what gets past the
  * "Sign in to confirm you're not a bot" wall), plus optional cookies file / proxy given via extra. */
 function ytdlpArgs(extra) {
-  const args = ['--js-runtimes', 'node', '--js-runtimes', 'deno', '--impersonate', 'Safari-18.4']
-  if (process.env.YTDLP_COOKIES) args.push('--cookies', process.env.YTDLP_COOKIES)
+  const args = [
+    '--js-runtimes',
+    'node',
+    '--js-runtimes',
+    'deno',
+    '--impersonate',
+    'Safari-18.4',
+    '--extractor-args',
+    'youtube:player_client=mweb,tv_embedded,web_creator',
+  ]
+  const cookiePath =
+    process.env.YTDLP_COOKIES ||
+    (existsSync('/opt/nology/cookies.txt')
+      ? '/opt/nology/cookies.txt'
+      : existsSync('cookies.txt')
+      ? 'cookies.txt'
+      : null)
+  if (cookiePath) args.push('--cookies', cookiePath)
   return args.concat(extra)
 }
 
@@ -180,7 +196,7 @@ async function download(url, dir) {
       ytdlpArgs([
         ...(proxy ? ['--proxy', proxy] : []),
         '--socket-timeout',
-        proxy ? '10' : '20',
+        proxy ? '10' : '15',
         '--retries',
         '1',
         '--fragment-retries',
@@ -199,7 +215,7 @@ async function download(url, dir) {
         out,
         url,
       ]),
-      { timeout: proxy ? 45000 : 1000 * 60 * 5 }
+      { timeout: proxy ? 20000 : 1000 * 60 * 5 }
     )
 
   // Direct first — most stable when YouTube isn't flagging the IP.
@@ -219,10 +235,10 @@ async function download(url, dir) {
     )
   }
 
-  // Rotate the prioritized proxy pool. Success is authoritative; on failure
-  // keep the last non-network error (bot-wall etc.) for the job report.
+  // Rotate top-priority proxies only (max 3) with short timeouts to avoid 10-minute freezes.
   let lastErr = null
-  const proxies = await ytProxyPool()
+  const allProxies = await ytProxyPool()
+  const proxies = allProxies.slice(0, 3)
   for (const proxy of proxies) {
     const pStart = Date.now()
     const redacted = redactProxy(proxy)
@@ -244,6 +260,14 @@ async function download(url, dir) {
       )
     }
   }
+
+  const errCategory = categorizeDownloadError(lastErr)
+  if (errCategory === 'bot-detection') {
+    throw new Error(
+      'YouTube blocked access with bot detection. Please use the Direct Video Upload tab (2s instant upload without limits) or configure cookies in /opt/nology/cookies.txt.'
+    )
+  }
+
   throw lastErr ?? new Error('all download paths failed')
 }
 

@@ -5,7 +5,7 @@ import { useCallback, useEffect, useState } from 'react'
 import {
   ArrowLeft, Loader2, AlertTriangle, Download, Sparkles,
   Captions, ScanFace, Clock, Flame,
-  Copy, Check, Share2, Scissors, Zap, Send, ExternalLink, X,
+  Copy, Check, Share2, Scissors, Zap, Send, ExternalLink, X, Trash2,
 } from 'lucide-react'
 import { ConnectionSummary } from '@/lib/social/types'
 
@@ -259,6 +259,25 @@ export default function ProjectDetail({ projectId }: { projectId: string }) {
     }
   }
 
+  const handleDeleteClip = async (clipId: string) => {
+    if (!confirm('Are you sure you want to discard this clip?')) return
+    try {
+      const res = await fetch(`/api/projects/${projectId}/clips/${clipId}`, {
+        method: 'DELETE',
+      })
+      if (!res.ok) throw new Error('Failed to delete clip')
+      setProject((cur) => {
+        if (!cur) return cur
+        return {
+          ...cur,
+          clips: cur.clips.filter((c) => c.id !== clipId),
+        }
+      })
+    } catch {
+      alert('Could not delete clip')
+    }
+  }
+
   const load = useCallback(() => {
     if (!projectId) return Promise.reject(new Error('No project id given'))
     return fetch(`/api/projects/${projectId}`)
@@ -489,15 +508,16 @@ export default function ProjectDetail({ projectId }: { projectId: string }) {
                     {isFinal ? (
                       <>
                         <Check className="h-4 w-4" />
-                        <span>الفيديو النهائي المعتمد (Selected Final Clip)</span>
+                        <span>Selected Final Video</span>
                       </>
                     ) : (
                       <>
                         <Sparkles className="h-4 w-4" />
-                        <span>اختر هذا المقطع كفيديو نهائي (Select as Final)</span>
+                        <span>Select as Final Video</span>
                       </>
                     )}
                   </button>
+                  <p className="text-[10px] text-center text-mist-2">1 credit = 1 final video</p>
 
                   <div className="flex gap-2">
                     <button
@@ -510,7 +530,7 @@ export default function ProjectDetail({ projectId }: { projectId: string }) {
                       title="Adjust clip start/end timestamps and caption style"
                     >
                       <Scissors className="h-3.5 w-3.5 text-champagne" />
-                      <span>{editingClipId === c.id ? 'Close' : 'Adjust Trim'}</span>
+                      <span>{editingClipId === c.id ? 'Close' : 'Studio Editor'}</span>
                     </button>
 
                     <button
@@ -550,6 +570,16 @@ export default function ProjectDetail({ projectId }: { projectId: string }) {
                     >
                       <Send className="h-3.5 w-3.5" />
                       <span>Publish</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteClip(c.id)}
+                      disabled={c.status === 'GENERATING'}
+                      className="btn-lux btn-outline !py-1.5 !px-2 !text-xs !font-normal text-mist-2 hover:!border-red-400/50 hover:!text-red-400"
+                      title="Discard / Delete this clip"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
                     </button>
                   </div>
 

@@ -73,3 +73,31 @@ export async function GET(
     return NextResponse.json({ error: 'Failed to fetch project' }, { status: 500 })
   }
 }
+
+export async function DELETE(
+  _request: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const session = await auth()
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const { id } = await params
+    const project = await prisma.project.findFirst({
+      where: { id, userId: session.user.id },
+      select: { id: true },
+    })
+
+    if (!project) {
+      return NextResponse.json({ error: 'Project not found' }, { status: 404 })
+    }
+
+    await prisma.project.delete({ where: { id } })
+    return NextResponse.json({ success: true })
+  } catch (error) {
+    console.error('Project delete error:', error)
+    return NextResponse.json({ error: 'Failed to delete project' }, { status: 500 })
+  }
+}

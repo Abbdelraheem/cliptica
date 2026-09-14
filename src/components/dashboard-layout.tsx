@@ -14,6 +14,7 @@ import {
   LogOut,
   Menu,
   X,
+  ShieldCheck,
 } from 'lucide-react'
 import { Wordmark } from '@/components/logo'
 import { getDeviceId } from '@/lib/fingerprint'
@@ -32,6 +33,7 @@ export function DashboardLayout({ children }: { children: ReactNode }) {
   const { data: session } = useSession()
   const [mobileOpen, setMobileOpen] = useState(false)
   const [liveCredits, setLiveCredits] = useState<number | null>(null)
+  const [liveRole, setLiveRole] = useState<string | null>(null)
   const deviceChecked = useRef(false)
 
   // Fetch real-time live credits from DB so deductions/topups reflect immediately
@@ -44,6 +46,9 @@ export function DashboardLayout({ children }: { children: ReactNode }) {
           const data = await res.json()
           if (typeof data?.user?.credits === 'number') {
             setLiveCredits(data.user.credits)
+          }
+          if (typeof data?.user?.role === 'string') {
+            setLiveRole(data.user.role)
           }
         }
       } catch {}
@@ -62,6 +67,14 @@ export function DashboardLayout({ children }: { children: ReactNode }) {
   }, [pathname])
 
   const displayCredits = liveCredits ?? session?.user?.credits ?? 0
+  const currentRole = (liveRole ?? (session?.user as { role?: string })?.role ?? 'FREE').toUpperCase()
+  const maxCredits =
+    currentRole === 'STUDIO' || currentRole === 'ADMIN'
+      ? 1200
+      : currentRole === 'CLIPPER'
+      ? 300
+      : 40
+  const creditPercent = Math.min(100, Math.max(0, Math.round((displayCredits / maxCredits) * 100)))
 
   // One-account-per-device enforcement — runs on every dashboard entry.
   // Catches OAuth (Google/GitHub) accounts that bypassed the form flows.
@@ -89,8 +102,10 @@ export function DashboardLayout({ children }: { children: ReactNode }) {
     }
   }, [])
 
-  const isActive = (href: string) =>
-    pathname === href || pathname.startsWith(href + '/')
+  const isActive = (href: string) => {
+    if (href === '/dashboard') return pathname === '/dashboard'
+    return pathname === href || pathname.startsWith(href + '/')
+  }
 
   return (
     <div className="min-h-screen bg-onyx text-pearl">
@@ -124,6 +139,19 @@ export function DashboardLayout({ children }: { children: ReactNode }) {
         </div>
 
         <nav className="flex-1 space-y-1 overflow-y-auto p-3 pt-20 lg:pt-3" aria-label="Dashboard navigation">
+          {currentRole === 'ADMIN' && (
+            <Link
+              href="/admin"
+              onClick={() => setMobileOpen(false)}
+              className="group mb-2 flex items-center gap-3 rounded-xl border border-gold/40 bg-gold/10 px-3 py-2.5 text-sm font-semibold text-gold transition-all duration-200 hover:bg-gold/20"
+            >
+              <ShieldCheck className="h-[18px] w-[18px] text-gold" />
+              <span>Admin Panel</span>
+              <span className="ml-auto rounded bg-gold/25 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-gold">
+                Admin
+              </span>
+            </Link>
+          )}
           {NAV_ITEMS.map((item) => {
             const active = isActive(item.href)
             return (
@@ -152,16 +180,25 @@ export function DashboardLayout({ children }: { children: ReactNode }) {
 
         <div className="border-t border-hair/50 p-3">
           <div className="mb-3 rounded-xl border border-hair/50 bg-surface p-3">
-            <p className="text-xs uppercase tracking-widest text-mist-2">Credits</p>
-            <p className="font-display text-2xl font-semibold text-gold">
-              {displayCredits}
-            </p>
-            <div className="mt-2 h-1 overflow-hidden rounded-full bg-pearl/10">
+            <div className="flex items-center justify-between">
+              <p className="text-xs uppercase tracking-widest text-mist-2">Credits</p>
+              <span className="text-[11px] font-medium uppercase text-champagne/80">
+                {currentRole === 'ADMIN' ? 'Admin' : currentRole === 'STUDIO' ? 'Studio' : currentRole === 'CLIPPER' ? 'Clipper' : 'Free'}
+              </span>
+            </div>
+            <div className="mt-1 flex items-baseline justify-between">
+              <p className="font-display text-2xl font-semibold text-gold">
+                {displayCredits}
+              </p>
+              <span className="font-mono text-xs text-mist-2">/ {maxCredits}</span>
+            </div>
+            <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-pearl/10">
               <div
-                className="h-full rounded-full bg-gradient-to-r from-gold to-champagne transition-all"
-                style={{ width: `${Math.min(100, (displayCredits / 1200) * 100)}%` }}
+                className="h-full rounded-full bg-gradient-to-r from-gold to-champagne transition-all duration-300"
+                style={{ width: `${creditPercent}%` }}
               />
             </div>
+            <p className="mt-2 text-[10px] text-mist-2">1 credit = 1 final video</p>
           </div>
           <button
             onClick={() => signOut({ callbackUrl: '/login' })}
