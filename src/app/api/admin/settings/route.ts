@@ -134,9 +134,11 @@ export async function PATCH(request: Request) {
       try {
         const content = String(parsed.data.youtube_cookies || '').trim()
         if (content) {
-          await writeFile('/opt/nology/cookies.txt', content, 'utf8')
+          await writeFile('/opt/nology/cookies.txt', content, { encoding: 'utf8', mode: 0o666 })
+          await writeFile('/opt/nology/youtube-cookies.txt', content, { encoding: 'utf8', mode: 0o666 }).catch(() => {})
         } else {
           await unlink('/opt/nology/cookies.txt').catch(() => {})
+          await unlink('/opt/nology/youtube-cookies.txt').catch(() => {})
         }
       } catch {
         /* ignore file sync failure on dev environments */

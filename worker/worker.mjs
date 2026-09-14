@@ -182,23 +182,23 @@ async function sh(cmd, args, opts) {
  * (server IP is a flagged AWS datacenter; faking a real browser TLS fingerprint is what gets past the
  * "Sign in to confirm you're not a bot" wall), plus optional cookies file / proxy given via extra. */
 function ytdlpArgs(extra) {
+  const denoPath = existsSync('/usr/local/bin/deno') ? 'deno:/usr/local/bin/deno' : 'deno'
+  const nodePath = existsSync('/usr/bin/node') ? 'node:/usr/bin/node' : 'node'
   const args = [
     '--js-runtimes',
-    'node',
+    nodePath,
     '--js-runtimes',
-    'deno',
+    denoPath,
     '--impersonate',
     'Safari-18.4',
     '--extractor-args',
-    'youtube:player_client=mweb,tv_embedded,web_creator',
+    'youtube:player_client=mweb,web_creator,android',
   ]
   const cookiePath =
+    (existsSync('/opt/nology/cookies.txt') ? '/opt/nology/cookies.txt' : null) ||
     process.env.YTDLP_COOKIES ||
-    (existsSync('/opt/nology/cookies.txt')
-      ? '/opt/nology/cookies.txt'
-      : existsSync('cookies.txt')
-      ? 'cookies.txt'
-      : null)
+    (existsSync('/opt/nology/youtube-cookies.txt') ? '/opt/nology/youtube-cookies.txt' : null) ||
+    (existsSync('cookies.txt') ? 'cookies.txt' : null)
   if (cookiePath) args.push('--cookies', cookiePath)
   return args.concat(extra)
 }
@@ -238,6 +238,7 @@ async function download(url, dir) {
     )
 
   // Direct first — most stable when YouTube isn't flagging the IP.
+  let directErr = null
   const t0 = Date.now()
   try {
     await attempt(null)
@@ -245,6 +246,7 @@ async function download(url, dir) {
     console.log(`[worker:download] proxy=direct duration_ms=${dur} outcome=success`)
     return await findFile(dir, /^source\./)
   } catch (e) {
+    directErr = e
     const dur = Date.now() - t0
     const errType = categorizeDownloadError(e)
     console.warn(
@@ -280,14 +282,16 @@ async function download(url, dir) {
     }
   }
 
-  const errCategory = categorizeDownloadError(lastErr)
-  if (errCategory === 'bot-detection') {
+  const isBotBlocked =
+    categorizeDownloadError(directErr) === 'bot-detection' ||
+    categorizeDownloadError(lastErr) === 'bot-detection'
+  if (isBotBlocked) {
     throw new Error(
-      'YouTube blocked access with bot detection. Please use the Direct Video Upload tab (2s instant upload without limits) or configure cookies in /opt/nology/cookies.txt.'
+      'YouTube blocked access with bot detection. Please use the Direct Video Upload tab (2s instant upload without limits) or update YouTube cookies in /admin/settings.'
     )
   }
 
-  throw lastErr ?? new Error('all download paths failed')
+  throw lastErr ?? directErr ?? new Error('all download paths failed')
 }
 
 /** Uploaded files live in R2 — pull them with the same AWS creds. */
