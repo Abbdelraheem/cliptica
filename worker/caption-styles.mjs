@@ -346,7 +346,81 @@ export const CAPTION_STYLES = {
     buildAnimation: () =>
       `\\fad(20,20)\\t(0,35,\\alpha&H60&)\\t(35,70,\\alpha&H00&)\\t(70,105,\\alpha&H80&)\\t(105,140,\\alpha&H00&\\fscx112\\fscy112)\\t(140,200,\\fscx100\\fscy100)`,
   },
+
+  // === ARABIC & REGIONAL CATEGORY ===
+  arabic_luxury: {
+    id: 'arabic_luxury',
+    name: 'Arabic Luxury',
+    category: 'Arabic',
+    desc: 'Royal champagne & gold kinetic typography tailored for Arabic podcasts, interviews & luxury shorts.',
+    sample: 'أسرار النجاح الحقيقي',
+    fontName: 'DejaVu Sans',
+    fontSizeRatio: 0.086,
+    primaryColor: '&H00E8F0F8', // Pearl White
+    outlineColor: '&H00080810', // Deep obsidian
+    backColor: '&H0000D7FF',    // Gold highlight
+    bold: -1,
+    borderStyle: 1,
+    outlineRatio: 0.014,
+    shadow: 3,
+    alignment: 5, // Center
+    posYRatio: 0.72,
+    wordsPerCard: 3,
+    uppercase: false,
+    buildAnimation: () =>
+      `\\fad(50,50)\\t(0,80,\\fscx114\\fscy114)\\t(80,160,\\fscx100\\fscy100)`,
+  },
+
+  arabic_viral: {
+    id: 'arabic_viral',
+    name: 'Arabic Viral Impact',
+    category: 'Arabic',
+    desc: 'Punchy high-contrast yellow on black outline designed for maximum retention on Reels & TikTok.',
+    sample: 'تخيل الصدمة!',
+    fontName: 'DejaVu Sans',
+    fontSizeRatio: 0.096,
+    primaryColor: '&H0000D7FF', // Golden Yellow
+    outlineColor: '&H00000000', // Pitch Black
+    backColor: '&HB4000000',
+    bold: -1,
+    borderStyle: 1,
+    outlineRatio: 0.016,
+    shadow: 4,
+    alignment: 5,
+    posYRatio: 0.68,
+    wordsPerCard: 2,
+    uppercase: false,
+    buildAnimation: () => `\\fad(30,30)\\t(0,70,\\fscx120\\fscy120)\\t(70,140,\\fscx100\\fscy100)`,
+  },
+
+  arabic_clean: {
+    id: 'arabic_clean',
+    name: 'Arabic Clean Minimal',
+    category: 'Arabic',
+    desc: 'Elegant lower-third phrase layout with subtle fade, ideal for documentaries and educational videos.',
+    sample: 'البدايات دائماً هي الأصعب',
+    fontName: 'DejaVu Sans',
+    fontSizeRatio: 0.056,
+    primaryColor: '&H00FFFFFF',
+    outlineColor: '&H00151515',
+    backColor: '&H70000000',
+    bold: 0,
+    borderStyle: 1,
+    outlineRatio: 0.007,
+    shadow: 2,
+    alignment: 2, // Bottom Center
+    posYRatio: 0.84,
+    wordsPerCard: 4,
+    uppercase: false,
+    buildAnimation: () => `\\fad(70,70)`,
+  },
 }
+
+const ARABIC_HYPE = new Set([
+  'تخيل', 'الصدمة', 'صدمة', 'سر', 'السر', 'أخيرا', 'أخيراً', 'مستحيل', 'كارثة', 'رهيب', 'خطير',
+  'فلوس', 'ارباح', 'أرباح', 'ثروة', 'ركز', 'انتبه', 'دقيقة', 'شاهد', 'شوف', 'فضيحة',
+  'حقيقة', 'معلومة', 'قنبلة', 'مهم', 'ياجماعة', 'اسمع'
+])
 
 export function getCaptionStyle(styleId) {
   return CAPTION_STYLES[styleId] ?? CAPTION_STYLES.hormozi
@@ -379,7 +453,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 `
 }
 
-export function buildKaraokeAss(words, start, end, emoji = null, styleId = 'hormozi', W = 1080, H = 1920) {
+export function buildKaraokeAss(words, start, end, emoji = null, styleId = 'hormozi', W = 1080, H = 1920, hookHeadline = null) {
   const style = getCaptionStyle(styleId)
   const inWin = (words ?? []).filter((w) => w.end > start && w.start < end && w.text)
   if (!inWin.length) return null
@@ -400,6 +474,18 @@ export function buildKaraokeAss(words, start, end, emoji = null, styleId = 'horm
   if (cur.length) cards.push(cur)
 
   let events = ''
+
+  // 1. Opening Viral Hook Title Card (first 2.4 seconds at top-third)
+  if (hookHeadline) {
+    const cleanHook = String(hookHeadline).replace(/[{}]/g, '').trim()
+    if (cleanHook.length > 0) {
+      const hookY = Math.round(H * 0.22)
+      const hookFontSize = Math.round(W * 0.056)
+      events += `Dialogue: 2,0:00:00.00,0:00:02.40,MainStyle,,0,0,0,,{\\an8\\fad(80,240)\\pos(${W / 2},${hookY})\\fs${hookFontSize}\\c&H0000D7FF&\\bord4\\3c&H00000000&\\shad3}⚡ ${cleanHook}\n`
+    }
+  }
+
+  // 2. Emoji Accent
   if (emoji) {
     events += `Dialogue: 1,0:00:00.00,0:00:00.80,MainStyle,,0,0,0,,{\\fad(80,120)\\pos(${W / 2},${Math.round(H * 0.34)})}${emoji}\n`
   }
@@ -426,7 +512,17 @@ export function buildKaraokeAss(words, start, end, emoji = null, styleId = 'horm
         })
         .join(' ')
     } else {
-      rawText = card.map((w) => w.text.replace(/[{}]/g, '')).join(' ')
+      rawText = card
+        .map((w) => {
+          const cleanWord = w.text.replace(/[{}]/g, '')
+          const norm = cleanWord.replace(/^[^\w\u0600-\u06FF]+|[^\w\u0600-\u06FF]+$/g, '')
+          // Highlight viral Arabic hype words in brilliant gold
+          if (ARABIC_HYPE.has(norm)) {
+            return `{\\c&H0000D7FF&}${cleanWord}{\\c${style.primaryColor}}`
+          }
+          return cleanWord
+        })
+        .join(' ')
       if (style.uppercase) rawText = rawText.toUpperCase()
     }
 

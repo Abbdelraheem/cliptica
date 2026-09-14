@@ -253,10 +253,11 @@ export default function AdminUsersPage() {
                 <div className="flex items-center gap-2 md:justify-end">
                   <span className="text-sm font-medium text-gold">{u.credits}</span>
                   <button
-                    onClick={() => { setEditing({ user: u, mode: 'credits' }); setAmount('50'); setReason('') }}
-                    className="rounded-md border border-hair/50 px-1.5 py-0.5 text-[10px] text-mist transition-colors hover:text-gold"
+                    onClick={() => { setEditing({ user: u, mode: 'credits' }); setAmount('100'); setReason('هدية ترحيبية / Welcome VIP Gift') }}
+                    title="Gift or adjust credits"
+                    className="flex items-center gap-1 rounded-md border border-gold/40 bg-gold/10 px-2 py-0.5 text-[11px] font-semibold text-gold transition-colors hover:bg-gold/25"
                   >
-                    adjust
+                    <Gift className="h-3 w-3" /> أهدِ كريديت
                   </button>
                 </div>
                 <span className={`text-center text-[10px] uppercase tracking-widest ${u.subscriptionStatus === 'active' ? 'text-emerald-300' : 'text-mist-2'}`}>
@@ -299,9 +300,9 @@ export default function AdminUsersPage() {
 
                 <div className="grid grid-cols-3 gap-2.5">
                   {[
-                    { id: 'CLIPPER' as const, name: 'Clipper', desc: '100 clips/mo', badge: '$19/mo' },
-                    { id: 'STUDIO' as const, name: 'Studio', desc: '400 clips/mo', badge: '$49/mo' },
-                    { id: 'FREE' as const, name: 'Free', desc: '40 free clips', badge: 'Reset' },
+                    { id: 'CLIPPER' as const, name: 'Starter', desc: '150 clips/mo', badge: '$29/mo' },
+                    { id: 'STUDIO' as const, name: 'Pro Creator', desc: '400 clips/mo', badge: '$59/mo' },
+                    { id: 'FREE' as const, name: 'Free', desc: '30 free clips', badge: 'Reset' },
                   ].map((p) => (
                     <button
                       key={p.id}
@@ -329,7 +330,7 @@ export default function AdminUsersPage() {
                       className="h-4 w-4 rounded border-hair bg-onyx text-gold focus:ring-gold"
                     />
                     <span>
-                      Deposit plan credits immediately ({selectedPlan === 'CLIPPER' ? '+100 credits' : '+400 credits'})
+                      Deposit plan credits immediately ({selectedPlan === 'CLIPPER' ? '+150 credits' : '+400 credits'})
                     </span>
                   </label>
                 )}
@@ -382,16 +383,16 @@ export default function AdminUsersPage() {
             ) : (
               <div className="mt-5 space-y-4">
                 <div>
-                  <label className="mb-1.5 block text-xs uppercase tracking-widest text-mist-2">Quick presets</label>
-                  <div className="flex gap-2">
-                    {[10, 25, 50, 100, 500].map((preset) => (
+                  <label className="mb-1.5 block text-xs uppercase tracking-widest text-mist-2">Quick presets / اختيارات سريعة</label>
+                  <div className="grid grid-cols-6 gap-1.5">
+                    {[25, 50, 100, 250, 500, 1000].map((preset) => (
                       <button
                         key={preset}
                         type="button"
                         onClick={() => setAmount(String(preset))}
-                        className={`flex-1 rounded-lg border py-1.5 text-xs font-medium transition-colors ${
+                        className={`rounded-lg border py-1.5 text-xs font-medium transition-colors ${
                           amount === String(preset)
-                            ? 'border-gold bg-gold/20 text-gold'
+                            ? 'border-gold bg-gold/20 text-gold font-bold'
                             : 'border-hair/50 bg-black/20 text-mist hover:text-pearl'
                         }`}
                       >
@@ -425,11 +426,33 @@ export default function AdminUsersPage() {
                   </div>
                   <p className="mt-2 text-xs font-light text-mist">
                     Current balance: <span className="text-gold">{editing.user.credits}</span> →{' '}
-                    <span className="text-gold">{Math.max(0, editing.user.credits + (Number(amount) || 0))}</span>
+                    <span className="text-gold font-bold">{Math.max(0, editing.user.credits + (Number(amount) || 0))}</span>
                   </p>
                 </div>
+
                 <div>
-                  <label className="mb-1.5 block text-xs uppercase tracking-widest text-mist-2">Reason (ledger)</label>
+                  <label className="mb-1.5 block text-xs uppercase tracking-widest text-mist-2">Quick reason / سبب الإهداء</label>
+                  <div className="flex flex-wrap gap-1.5 mb-2">
+                    {[
+                      'هدية ترحيبية / Welcome Gift',
+                      'VIP Creator Bonus',
+                      'تعويض دعم فني / Support',
+                      'شحن تجريبي / Free Trial',
+                    ].map((chip) => (
+                      <button
+                        key={chip}
+                        type="button"
+                        onClick={() => setReason(chip)}
+                        className={`rounded-md border px-2 py-1 text-[11px] transition-colors ${
+                          reason === chip
+                            ? 'border-gold bg-gold/15 text-gold'
+                            : 'border-hair/50 bg-black/20 text-mist hover:border-hair hover:text-pearl'
+                        }`}
+                      >
+                        {chip}
+                      </button>
+                    ))}
+                  </div>
                   <input
                     value={reason}
                     onChange={(e) => setReason(e.target.value)}
@@ -437,13 +460,14 @@ export default function AdminUsersPage() {
                     className="input-lux"
                   />
                 </div>
+
                 <button
                   onClick={() => creditsMutation.mutate({ id: editing.user.id })}
                   disabled={!Number(amount) || creditsMutation.isPending}
-                  className="btn-lux btn-gold flex w-full items-center justify-center gap-2"
+                  className="btn-lux btn-gold flex w-full items-center justify-center gap-2 font-bold"
                 >
                   <Coins className="h-4 w-4" />
-                  {creditsMutation.isPending ? 'Saving…' : 'Apply credits'}
+                  {creditsMutation.isPending ? 'Saving…' : Number(amount) > 0 ? `🎁 إهداء ${amount} كريديت` : `خصم ${Math.abs(Number(amount))} كريديت`}
                 </button>
               </div>
             )}

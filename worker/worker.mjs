@@ -573,6 +573,7 @@ async function llmScoreMoments(candidates, instructions) {
     '- score: Overall weighted viral potential (0-100).\n' +
     'If the candidate text is in Arabic, write the "title" (3-6 words) and "reason" in Arabic.\n' +
     'Return strict JSON {"moments":[{"index":<int>,"score":<0-100>,"hookScore":<0-100>,"retentionScore":<0-100>,"shareScore":<0-100>,"title":"<=6 punchy words",' +
+    '"hookHeadline":"3-5 words ultra viral headline card to show in first 2 seconds",' +
     '"reason":"one sentence why it performs","emoji":"one fitting emoji"}]}.\n' +
     `Return exactly the ${CFG.clipsPerVideo} strongest moments, best first.`
   if (instructions?.trim()) {
@@ -607,6 +608,7 @@ async function llmScoreMoments(candidates, instructions) {
           retentionScore: Math.max(0, Math.min(100, Math.round(m.retentionScore ?? m.score))),
           shareScore: Math.max(0, Math.min(100, Math.round(m.shareScore ?? m.score))),
           title: String(m.title ?? '').slice(0, 80),
+          hookHeadline: String(m.hookHeadline ?? m.title ?? '').slice(0, 80),
           reason: String(m.reason ?? ''),
           emoji: String(m.emoji ?? '').slice(0, 4),
         }))
@@ -730,7 +732,16 @@ async function renderClip(src, moment, dir, idx, transcript, mode = 'smart', cap
 
   // captions
   const assPath = path.join(dir, `cap${idx}.ass`)
-  const karaoke = buildKaraokeAss(transcript.words ?? [], moment.start, moment.end, moment.emoji, captionStyle, W, H)
+  const karaoke = buildKaraokeAss(
+    transcript.words ?? [],
+    moment.start,
+    moment.end,
+    moment.emoji,
+    captionStyle,
+    W,
+    H,
+    moment.hookHeadline || moment.title
+  )
   await writeFile(assPath, karaoke ?? buildPhraseAss(moment.text, moment.start, moment.end, captionStyle, W, H))
   const escAss = assPath.replace(/\\/g, '/').replace(/:/g, '\\:')
 

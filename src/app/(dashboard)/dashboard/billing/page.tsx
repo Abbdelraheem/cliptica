@@ -1,34 +1,77 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import Link from 'next/link'
 import { useSession } from 'next-auth/react'
-import { Check } from 'lucide-react'
+import { useSearchParams } from 'next/navigation'
+import { Check, Zap, ShieldCheck } from 'lucide-react'
 
 const PLANS = [
   {
+    key: 'free',
     name: 'Free',
     role: 'FREE',
     price: '$0',
     period: '/ forever',
-    credits: '40 credits to start',
-    items: ['Karaoke captions (Hormozi Pop)', '720p exports with mark', 'Up to 3 videos / day'],
+    credits: '30 credits to start',
+    items: ['Arabic & English captions', '720p exports with mark', 'Up to 3 videos / day'],
   },
   {
-    name: 'Clipper',
+    key: 'clipper',
+    name: 'Starter',
     role: 'CLIPPER',
-    price: '$19',
+    price: '$29',
     period: '/ mo',
-    credits: '300 credits / month',
-    items: ['No watermark · 1080p 60fps', 'Campaign hub + ledger', 'Dynamic zooms & viral hook pacing'],
+    credits: '150 credits / month',
+    featured: true,
+    items: [
+      'No watermark · 1080p high bitrate',
+      'Opening AI Hook cards & Title overlays',
+      'Arabic Luxury & Viral kinetic styles',
+      'Campaign hub + full editor access',
+    ],
   },
   {
-    name: 'Studio',
+    key: 'studio',
+    name: 'Pro Creator',
     role: 'STUDIO',
-    price: '$49',
+    price: '$59',
     period: '/ mo',
-    credits: '1,200 credits / month',
-    items: ['Priority rendering queue', 'Auto-Pilot watchlists', 'Brand presets & style packs'],
+    credits: '400 credits / month',
+    items: [
+      '400 credits / month',
+      'Priority rendering queue',
+      'Auto-Pilot channel watchlists',
+      'Brand presets & custom fonts',
+    ],
+  },
+]
+
+const CREDIT_PACKS = [
+  {
+    id: 'pack_50',
+    name: '50 Credits',
+    price: '$15',
+    rate: '$0.30 / credit',
+    desc: 'Perfect for quick testing and short video projects.',
+    credits: 50,
+  },
+  {
+    id: 'pack_150',
+    name: '150 Credits',
+    price: '$35',
+    rate: '$0.23 / credit',
+    desc: 'Most popular for active creators & weekly posting.',
+    credits: 150,
+    popular: true,
+  },
+  {
+    id: 'pack_500',
+    name: '500 Credits',
+    price: '$89',
+    rate: '$0.17 / credit',
+    desc: 'Best value for high-volume clipping & channels.',
+    credits: 500,
+    bestValue: true,
   },
 ]
 
@@ -56,39 +99,61 @@ export default function BillingPage() {
   const displayCredits = liveCredits ?? session?.user?.credits ?? 0
   const userRole = (session?.user?.role ?? 'FREE').toUpperCase()
 
-  async function upgrade(plan: string) {
+  const searchParams = useSearchParams()
+  const isSuccessPack = searchParams.get('success') === 'pack'
+  const addedCredits = searchParams.get('credits')
+
+  async function upgrade(planKey: string) {
     setError('')
-    setLoading(plan)
+    setLoading(planKey)
     try {
-      // Checkout is a server-side GET redirect (to Stripe Checkout). Navigate
-      // the browser there directly — no JSON round-trip needed.
-      window.location.href = `/api/billing/checkout?plan=${encodeURIComponent(plan)}`
+      window.location.href = `/api/billing/checkout?plan=${encodeURIComponent(planKey)}`
     } catch {
       setError('Could not start checkout. Please try again.')
       setLoading(null)
     }
   }
 
+  async function buyPack(packId: string) {
+    setError('')
+    setLoading(packId)
+    try {
+      window.location.href = `/api/billing/checkout?pack=${encodeURIComponent(packId)}`
+    } catch {
+      setError('Could not start credit pack purchase. Please try again.')
+      setLoading(null)
+    }
+  }
+
   return (
     <div className="mx-auto max-w-6xl">
-      <p className="text-xs uppercase tracking-[0.3em] text-champagne">Membership</p>
-      <h1 className="display-md mt-2.5">Billing</h1>
+      <p className="text-xs uppercase tracking-[0.3em] text-champagne">Membership & Credits</p>
+      <h1 className="display-md mt-2.5">Billing & Plans</h1>
+
+      {isSuccessPack && (
+        <div className="mt-6 flex items-center gap-3 rounded-xl border border-emerald-500/40 bg-emerald-500/10 p-4 text-emerald-300">
+          <ShieldCheck className="h-5 w-5 shrink-0" />
+          <p className="text-sm">
+            تمت عملية الدفع بنجاح! تم إضافة <strong>+{addedCredits ?? ''} كريديت</strong> إلى حسابك فوراً.
+          </p>
+        </div>
+      )}
 
       {/* Credits balance */}
-      <div className="glass-card mt-10 flex flex-wrap items-center justify-between gap-6 !p-8">
+      <div className="glass-card mt-8 flex flex-wrap items-center justify-between gap-6 !p-8">
         <div>
-          <p className="text-sm font-light text-mist">Credits remaining</p>
+          <p className="text-sm font-light text-mist">Credits remaining / الرصيد المتاح</p>
           <p className="stat-value mt-1">{displayCredits}</p>
           <div className="mt-3 h-1.5 w-56 overflow-hidden rounded-full bg-pearl/10">
             <div
               className="h-full rounded-full bg-gradient-to-r from-gold to-champagne transition-all"
-              style={{ width: `${Math.min(100, (displayCredits / 1200) * 100)}%` }}
+              style={{ width: `${Math.min(100, (displayCredits / 800) * 100)}%` }}
             />
           </div>
         </div>
         <div className="text-right">
           <p className="max-w-xs text-sm font-light leading-relaxed text-mist">
-            1 كريديت لكل فيديو نهائي. الرصيد الشهري غير المستخدم يترحل لـ 30 يوماً.
+            1 كريديت لكل عملية معالجة فيديو كاملة تنتج 3-6 مقاطع فايرال. رصيدك لا ينتهي ويبقى متاحاً في حسابك دائماً.
           </p>
           {(userRole === 'CLIPPER' || userRole === 'STUDIO') && (
             <a
@@ -108,63 +173,131 @@ export default function BillingPage() {
       )}
 
       {/* Plans */}
-      <div className="mt-12 grid gap-6 md:grid-cols-3">
-        {PLANS.map((plan) => {
-          const isCurrent = userRole === plan.role || (userRole === 'ADMIN' && plan.role === 'STUDIO')
-          return (
-            <div key={plan.name} className={`price-ring ${plan.name === 'Clipper' ? 'feat' : ''}`}>
-              {isCurrent && (
-                <span className="absolute right-5 top-5 rounded-full border border-champagne/40 bg-champagne/10 px-3 py-1 text-[10px] uppercase tracking-widest text-champagne">
-                  Current plan
-                </span>
-              )}
-              <p className="text-xs uppercase tracking-[0.24em] text-champagne">{plan.name}</p>
-              <p className="mt-3.5 font-display text-4xl font-semibold">
-                {plan.price}
-                <small className="ml-1 align-middle font-body text-sm font-light text-mist">{plan.period}</small>
-              </p>
-              <p className="mt-2 text-sm font-light text-gold">{plan.credits}</p>
-              <ul className="my-6 grid gap-2.5">
-                {plan.items.map((item) => (
-                  <li key={item} className="flex items-start gap-2.5 text-sm font-light text-mist">
-                    <Check className="mt-0.5 h-4 w-4 shrink-0 text-champagne" />
-                    {item}
-                  </li>
-                ))}
-              </ul>
-              {isCurrent ? (
-                plan.role === 'FREE' ? (
-                  <button disabled className="btn-lux btn-outline w-full opacity-50">Current plan</button>
+      <div className="mt-12">
+        <h2 className="font-display text-2xl font-semibold">Monthly Subscriptions</h2>
+        <p className="mt-1 text-sm font-light text-mist">
+          Choose a recurring plan for continuous content generation and best monthly value.
+        </p>
+
+        <div className="mt-6 grid gap-6 md:grid-cols-3">
+          {PLANS.map((plan) => {
+            const isCurrent = userRole === plan.role || (userRole === 'ADMIN' && plan.role === 'STUDIO')
+            return (
+              <div key={plan.name} className={`price-ring relative ${plan.featured ? 'feat' : ''}`}>
+                {isCurrent && (
+                  <span className="absolute right-5 top-5 rounded-full border border-champagne/40 bg-champagne/10 px-3 py-1 text-[10px] uppercase tracking-widest text-champagne">
+                    Current plan
+                  </span>
+                )}
+                {plan.featured && !isCurrent && (
+                  <span className="absolute right-5 top-5 rounded-full border border-gold/40 bg-gold/15 px-3 py-1 text-[10px] font-semibold uppercase tracking-widest text-gold">
+                    Most Popular
+                  </span>
+                )}
+                <p className="text-xs uppercase tracking-[0.24em] text-champagne">{plan.name}</p>
+                <p className="mt-3.5 font-display text-4xl font-semibold">
+                  {plan.price}
+                  <small className="ml-1 align-middle font-body text-sm font-light text-mist">{plan.period}</small>
+                </p>
+                <p className="mt-2 text-sm font-medium text-gold">{plan.credits}</p>
+                <ul className="my-6 grid gap-2.5">
+                  {plan.items.map((item) => (
+                    <li key={item} className="flex items-start gap-2.5 text-sm font-light text-mist">
+                      <Check className="mt-0.5 h-4 w-4 shrink-0 text-champagne" />
+                      {item}
+                    </li>
+                  ))}
+                </ul>
+                {isCurrent ? (
+                  plan.role === 'FREE' ? (
+                    <button disabled className="btn-lux btn-outline w-full opacity-50">Current plan</button>
+                  ) : (
+                    <a href="/api/billing/portal" className="btn-lux btn-outline w-full text-center block">
+                      Manage subscription
+                    </a>
+                  )
                 ) : (
-                  <a href="/api/billing/portal" className="btn-lux btn-outline w-full text-center block">
-                    Manage subscription
-                  </a>
-                )
-              ) : (
-                <div className="space-y-2.5">
-                  <button
-                    onClick={() => upgrade(plan.name.toLowerCase())}
-                    disabled={loading !== null}
-                    className={`btn-lux w-full ${plan.name === 'Clipper' ? 'btn-gold' : 'btn-outline'} disabled:opacity-60`}
-                  >
-                    {loading === plan.name.toLowerCase() ? 'Redirecting…' : `Upgrade to ${plan.name}`}
-                  </button>
-                  <p className="text-center text-[11px] leading-tight text-mist-2">
-                    By continuing you agree to our{' '}
-                    <Link href="/terms" className="underline underline-offset-2 hover:text-white">Terms</Link>
-                    {' '}and{' '}
-                    <Link href="/privacy" className="underline underline-offset-2 hover:text-white">Privacy Policy</Link>.
-                  </p>
-                </div>
-              )}
-            </div>
-          )
-        })}
+                  <div className="space-y-2.5">
+                    <button
+                      onClick={() => upgrade(plan.key)}
+                      disabled={loading !== null}
+                      className={`btn-lux w-full ${plan.featured ? 'btn-gold' : 'btn-outline'} disabled:opacity-60`}
+                    >
+                      {loading === plan.key ? 'Redirecting…' : `Upgrade to ${plan.name}`}
+                    </button>
+                    <p className="text-center text-[11px] leading-tight text-mist-2">
+                      Secure payment via Stripe · Cancel anytime
+                    </p>
+                  </div>
+                )}
+              </div>
+            )
+          })}
+        </div>
       </div>
 
-      <p className="mt-8 text-center text-sm font-light text-mist">
+      {/* Pay As You Go Credit Packs */}
+      <div className="mt-16 rounded-3xl border border-hair/50 bg-onyx-2 p-8 shadow-2xl">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <div className="flex items-center gap-2 text-xs uppercase tracking-[0.24em] text-gold">
+              <Zap className="h-4 w-4" />
+              <span>One-Time Top Up</span>
+            </div>
+            <h2 className="font-display text-2xl font-semibold mt-1">Pay-As-You-Go Credit Packs</h2>
+            <p className="mt-1 text-sm font-light text-mist">
+              لا ترغب باشتراك شهري متجدد؟ اشحن رصيدك لمرة واحدة ويبقى صالحاً في حسابك دائماً.
+            </p>
+          </div>
+        </div>
+
+        <div className="mt-8 grid gap-5 md:grid-cols-3">
+          {CREDIT_PACKS.map((pack) => (
+            <div
+              key={pack.id}
+              className={`relative rounded-2xl border p-6 transition-all ${
+                pack.popular
+                  ? 'border-gold bg-gold/5 shadow-lg shadow-gold/5'
+                  : 'border-hair/50 bg-black/30 hover:border-hair'
+              }`}
+            >
+              {pack.popular && (
+                <span className="absolute -top-3 right-5 rounded-full border border-gold bg-gold px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-black">
+                  POPULAR
+                </span>
+              )}
+              {pack.bestValue && (
+                <span className="absolute -top-3 right-5 rounded-full border border-sky-400 bg-sky-500/20 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-sky-300">
+                  BEST VALUE
+                </span>
+              )}
+
+              <div className="flex items-baseline justify-between">
+                <h3 className="font-display text-xl font-bold text-pearl">{pack.name}</h3>
+                <span className="font-display text-2xl font-bold text-gold">{pack.price}</span>
+              </div>
+              <p className="mt-1 text-xs font-mono text-champagne">{pack.rate}</p>
+              <p className="mt-3 text-xs leading-relaxed text-mist">{pack.desc}</p>
+
+              <button
+                onClick={() => buyPack(pack.id)}
+                disabled={loading !== null}
+                className={`btn-lux mt-6 w-full text-xs font-semibold ${
+                  pack.popular ? 'btn-gold' : 'btn-outline'
+                } disabled:opacity-50`}
+              >
+                {loading === pack.id ? 'Redirecting…' : `Buy ${pack.credits} Credits`}
+              </button>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <p className="mt-10 text-center text-sm font-light text-mist">
         Need invoice history or a custom tier?{' '}
-        <a href="mailto:support@cliptica.com" className="text-gold underline underline-offset-4">Contact support</a>
+        <a href="mailto:support@cliptica.com" className="text-gold underline underline-offset-4">
+          Contact support
+        </a>
       </p>
     </div>
   )

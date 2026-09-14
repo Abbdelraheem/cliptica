@@ -100,9 +100,30 @@ export async function POST(request: Request) {
 
 async function handleCheckoutCompleted(tx: Tx, session: Stripe.Checkout.Session) {
   const userId = session.metadata?.userId
-  const planKey = session.metadata?.plan as keyof typeof PLANS
+  if (!userId) return
 
-  if (!userId || !planKey) return
+  // Handle one-time credit pack purchase
+  if (session.metadata?.type === 'credit_pack') {
+    const credits = parseInt(session.metadata.credits || '0', 10)
+    if (credits > 0) {
+      await tx.user.update({
+        where: { id: userId },
+        data: { credits: { increment: credits } },
+      })
+      await tx.creditTransaction.create({
+        data: {
+          userId,
+          amount: credits,
+          type: 'purchase',
+          description: `Purchased Credit Pack (+${credits} credits)`,
+        },
+      })
+    }
+    return
+  }
+
+  const planKey = session.metadata?.plan as keyof typeof PLANS
+  if (!planKey || !PLANS[planKey]) return
 
   // Role + subscription mapping only. Credits are granted by the initial
   // invoice via `invoice.payment_succeeded` — granting here would double the

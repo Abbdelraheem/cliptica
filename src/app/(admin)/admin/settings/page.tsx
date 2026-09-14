@@ -5,7 +5,7 @@ import { useMutation } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import {
   AlertTriangle, Save, RotateCcw, Sparkles, Cpu, Coins,
-  Clock, Shield, CheckCircle2, Loader2, Play, Layers
+  Shield, CheckCircle2, Loader2, Play, Layers
 } from 'lucide-react'
 
 type SettingsState = Record<string, boolean | number | string>
