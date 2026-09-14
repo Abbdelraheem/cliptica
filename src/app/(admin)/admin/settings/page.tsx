@@ -3,9 +3,11 @@
 import { useEffect, useState } from 'react'
 import { useMutation } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { AlertTriangle, Save, RotateCcw } from 'lucide-react'
+import {
+  AlertTriangle, Save, RotateCcw, Sparkles, Cpu, Coins,
+  Clock, Shield, CheckCircle2, Loader2, Play, Layers
+} from 'lucide-react'
 
-type Setting = { key: string; kind: 'bool' | 'number' | 'string'; label: string; enabled: boolean }
 type SettingsState = Record<string, boolean | number | string>
 
 const DEFAULTS: SettingsState = {
@@ -13,16 +15,26 @@ const DEFAULTS: SettingsState = {
   min_credits_required: 1,
   max_upload_mb: 500,
   clips_per_video: 3,
-  clip_target_seconds: 38,
+  clip_min_seconds: 15,
+  clip_max_seconds: 90,
+  clip_target_seconds: 45,
   render_parallel: 4,
   stale_job_minutes: 30,
+  groq_score_model: 'allam-2-7b',
+  whisper_model: 'whisper-large-v3-turbo',
+  groq_api_key: '',
+  openai_api_key: '',
+  free_starting_credits: 40,
+  clipper_monthly_credits: 300,
+  studio_monthly_credits: 1200,
   youtube_cookies: '',
 }
 
 export default function AdminSettingsPage() {
   const [settings, setSettings] = useState<SettingsState | null>(null)
-  const [keys, setKeys] = useState<Setting[]>([])
   const [dirty, setDirty] = useState(false)
+  const [testingAi, setTestingAi] = useState(false)
+  const [aiResult, setAiResult] = useState<{ success?: boolean; latencyMs?: number; error?: string } | null>(null)
 
   useEffect(() => {
     fetch('/api/admin/settings')
@@ -32,7 +44,6 @@ export default function AdminSettingsPage() {
       })
       .then((d) => {
         setSettings(d.settings)
-        setKeys(d.keys)
       })
       .catch(() => toast.error('Could not load settings'))
   }, [])
@@ -50,10 +61,33 @@ export default function AdminSettingsPage() {
     onSuccess: (d) => {
       setSettings(d.settings)
       setDirty(false)
-      toast.success('Settings saved')
+      toast.success('Settings saved and synchronized with worker')
     },
     onError: () => toast.error('Could not save settings'),
   })
+
+  const testAi = async () => {
+    setTestingAi(true)
+    setAiResult(null)
+    try {
+      const res = await fetch('/api/admin/ai-test', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ key: settings?.groq_api_key || undefined }),
+      })
+      const data = await res.json()
+      setAiResult(data)
+      if (data.success) {
+        toast.success(`Groq AI operational! Latency: ${data.latencyMs}ms (${data.modelsCount ?? data.models?.length ?? 0} models available)`)
+      } else {
+        toast.error(`Groq AI check failed: ${data.error || 'Authentication error'}`)
+      }
+    } catch {
+      toast.error('Network error reaching AI test endpoint')
+    } finally {
+      setTestingAi(false)
+    }
+  }
 
   const setValue = (key: string, value: boolean | number | string) => {
     setSettings((s) => ({ ...s, [key]: value }))
@@ -67,22 +101,23 @@ export default function AdminSettingsPage() {
 
   if (!settings) {
     return (
-      <div className="mx-auto max-w-3xl">
-        <div className="h-6 w-40 animate-pulse rounded bg-surface" />
-        <div className="mt-4 h-40 animate-pulse rounded-2xl bg-surface" />
+      <div className="mx-auto max-w-4xl py-12">
+        <div className="h-6 w-48 animate-pulse rounded bg-surface" />
+        <div className="mt-4 h-64 animate-pulse rounded-2xl bg-surface" />
       </div>
     )
   }
 
-  const numSettings = keys.filter((k) => k.kind === 'number')
-  const boolSettings = keys.filter((k) => k.kind === 'bool')
-
   return (
-    <div className="mx-auto max-w-3xl">
-      <div className="flex flex-wrap items-end justify-between gap-4">
+    <div className="mx-auto max-w-4xl pb-16">
+      {/* Header */}
+      <div className="flex flex-wrap items-end justify-between gap-4 border-b border-hair/50 pb-6">
         <div>
-          <p className="text-xs uppercase tracking-[0.3em] text-champagne">Platform</p>
-          <h1 className="display-md mt-2.5">Settings</h1>
+          <p className="text-xs uppercase tracking-[0.3em] text-champagne">Platform Command Center</p>
+          <h1 className="display-md mt-2">Engine & System Settings</h1>
+          <p className="mt-1 text-xs text-mist font-light">
+            Granular control over AI models, dynamic moment bounds, worker scaling, and credit limits.
+          </p>
         </div>
         <div className="flex gap-3">
           <button onClick={reset} className="btn-lux flex items-center gap-2 border border-hair/50 text-mist hover:text-pearl">
@@ -99,69 +134,322 @@ export default function AdminSettingsPage() {
         </div>
       </div>
 
-      <div className="mt-8 space-y-5">
-        {/* Toggles */}
+      <div className="mt-8 space-y-6">
+
+        {/* 1. AI Scoring & Transcription Engine */}
         <section className="glass-card !p-6">
-          <h2 className="font-display text-lg font-semibold">Behavior</h2>
-          <div className="mt-4 divide-y divide-hair/30">
-            {boolSettings.map((k) => (
-              <div key={k.key} className="flex items-center justify-between py-3.5">
-                <div>
-                  <p className="font-medium">{k.label}</p>
-                  <p className="font-mono text-[10px] uppercase tracking-widest text-mist-2">{k.key}</p>
-                </div>
-                <button
-                  role="switch"
-                  aria-checked={Boolean(settings[k.key])}
-                  onClick={() => setValue(k.key, !settings[k.key])}
-                  className={`relative h-7 w-12 rounded-full transition-colors ${
-                    settings[k.key] ? 'bg-gradient-to-r from-champagne to-gold' : 'bg-surface'
-                  }`}
-                >
-                  <span
-                    className={`absolute top-1 h-5 w-5 rounded-full bg-white shadow transition-all ${
-                      settings[k.key] ? 'left-6' : 'left-1'
-                    }`}
-                  />
-                </button>
+          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-hair/30 pb-4">
+            <div className="flex items-center gap-2.5">
+              <Cpu className="h-5 w-5 text-gold" />
+              <div>
+                <h2 className="font-display text-lg font-semibold">AI Intelligence Engine</h2>
+                <p className="text-xs text-mist font-light">Models used for word transcription and viral hook evaluation</p>
               </div>
-            ))}
+            </div>
+            <button
+              type="button"
+              onClick={testAi}
+              disabled={testingAi}
+              className="btn-lux btn-outline flex items-center gap-2 !py-1.5 !px-3 text-xs"
+            >
+              {testingAi ? <Loader2 className="h-3.5 w-3.5 animate-spin text-gold" /> : <Play className="h-3.5 w-3.5 text-gold" />}
+              <span>Test AI Connection</span>
+            </button>
+          </div>
+
+          {aiResult && (
+            <div className={`mt-4 rounded-xl p-3 text-xs border ${aiResult.success ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300' : 'bg-red-500/10 border-red-500/30 text-red-300'}`}>
+              <div className="flex items-center gap-2 font-medium">
+                {aiResult.success ? <CheckCircle2 className="h-4 w-4 text-emerald-400" /> : <AlertTriangle className="h-4 w-4 text-red-400" />}
+                <span>{aiResult.success ? `Groq API is verified and active (Response time: ${aiResult.latencyMs}ms)` : `Connection failed: ${aiResult.error}`}</span>
+              </div>
+            </div>
+          )}
+
+          <div className="mt-5 grid gap-4 sm:grid-cols-2">
+            <div className="rounded-xl border border-hair/40 bg-surface/40 p-4">
+              <label className="text-xs font-semibold uppercase tracking-wider text-mist">Groq AI Scoring Model</label>
+              <p className="text-[11px] text-mist-2 mt-0.5">Primary model for evaluating viral hooks & storytelling</p>
+              <select
+                value={String(settings.groq_score_model || 'allam-2-7b')}
+                onChange={(e) => setValue('groq_score_model', e.target.value)}
+                className="input-lux mt-2 w-full text-xs"
+              >
+                <option value="allam-2-7b">allam-2-7b (Arabic & English Optimized · Ultra Fast ~300ms)</option>
+                <option value="qwen/qwen3.8-27b">qwen/qwen3.8-27b (Multi-lingual Deep Reasoning ~160ms)</option>
+                <option value="llama-3.3-70b-versatile">llama-3.3-70b-versatile (Large Versatile)</option>
+              </select>
+            </div>
+
+            <div className="rounded-xl border border-hair/40 bg-surface/40 p-4">
+              <label className="text-xs font-semibold uppercase tracking-wider text-mist">Transcription Model</label>
+              <p className="text-[11px] text-mist-2 mt-0.5">High-accuracy audio-to-text with word timestamp tokens</p>
+              <select
+                value={String(settings.whisper_model || 'whisper-large-v3-turbo')}
+                onChange={(e) => setValue('whisper_model', e.target.value)}
+                className="input-lux mt-2 w-full text-xs"
+              >
+                <option value="whisper-large-v3-turbo">whisper-large-v3-turbo (Groq API · 250ms)</option>
+                <option value="whisper-large-v3">whisper-large-v3 (Standard Large)</option>
+                <option value="base">Local CPU Whisper (base)</option>
+              </select>
+            </div>
+
+            <div className="rounded-xl border border-hair/40 bg-surface/40 p-4">
+              <label className="text-xs font-semibold uppercase tracking-wider text-mist">Groq API Key Override</label>
+              <p className="text-[11px] text-mist-2 mt-0.5">Leave empty to use system environment default</p>
+              <input
+                type="password"
+                value={String(settings.groq_api_key || '')}
+                onChange={(e) => setValue('groq_api_key', e.target.value)}
+                placeholder="gsk_..."
+                className="input-lux mt-2 font-mono text-xs w-full"
+              />
+            </div>
+
+            <div className="rounded-xl border border-hair/40 bg-surface/40 p-4">
+              <label className="text-xs font-semibold uppercase tracking-wider text-mist">OpenAI Fallback Key</label>
+              <p className="text-[11px] text-mist-2 mt-0.5">Secondary fallback for candidate scoring if Groq is offline</p>
+              <input
+                type="password"
+                value={String(settings.openai_api_key || '')}
+                onChange={(e) => setValue('openai_api_key', e.target.value)}
+                placeholder="sk-..."
+                className="input-lux mt-2 font-mono text-xs w-full"
+              />
+            </div>
           </div>
         </section>
 
-        {/* Numbers */}
+        {/* 2. Dynamic Viral Moments & Pacing */}
         <section className="glass-card !p-6">
-          <h2 className="font-display text-lg font-semibold">Limits & sizing</h2>
-          <div className="mt-2 grid gap-4 sm:grid-cols-2">
-            {numSettings.map((k) => (
-              <div key={k.key} className="rounded-xl border border-hair/40 bg-surface/40 p-4">
-                <label className="text-sm font-medium">{k.label}</label>
-                <p className="font-mono text-[10px] uppercase tracking-widest text-mist-2">{k.key}</p>
-                <input
-                  type="number"
-                  value={Number(settings[k.key])}
-                  min={0}
-                  onChange={(e) => setValue(k.key, Number(e.target.value))}
-                  className="input-lux mt-3"
-                />
-              </div>
-            ))}
-          </div>
-        </section>
-
-        {/* YouTube Bot Bypass Cookies */}
-        <section className="glass-card !p-6">
-          <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex items-center gap-2.5 border-b border-hair/30 pb-4">
+            <Sparkles className="h-5 w-5 text-gold" />
             <div>
-              <h2 className="font-display text-lg font-semibold flex items-center gap-2">
-                <span>YouTube Ingestion & Bot Bypass</span>
-                <span className="rounded-full border border-gold/40 bg-gold/10 px-2 py-0.5 text-[10px] font-bold text-gold uppercase tracking-wider">
-                  Bot Wall Bypass
-                </span>
-              </h2>
-              <p className="mt-1 text-xs text-mist leading-relaxed">
-                Paste your authenticated YouTube <code className="text-gold">cookies.txt</code> content below. This allows the server to download any YouTube video without ever encountering bot checks or &quot;Sign in to confirm you are not a bot&quot; freezes.
+              <h2 className="font-display text-lg font-semibold">Dynamic Viral Moment Pacing</h2>
+              <p className="text-xs text-mist font-light">
+                Allows the AI to dynamically adapt each clip to its natural narrative length (15s to 90s) without rigid cuts
               </p>
+            </div>
+          </div>
+
+          <div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="rounded-xl border border-hair/40 bg-surface/40 p-4">
+              <label className="text-xs font-semibold uppercase tracking-wider text-mist">Min Clip Length</label>
+              <p className="text-[10px] text-mist-2">Minimum duration in seconds</p>
+              <input
+                type="number"
+                min={5}
+                max={40}
+                value={Number(settings.clip_min_seconds ?? 15)}
+                onChange={(e) => setValue('clip_min_seconds', Number(e.target.value))}
+                className="input-lux mt-2 font-mono"
+              />
+              <span className="text-[10px] text-mist-2 mt-1 block">Default: 15s</span>
+            </div>
+
+            <div className="rounded-xl border border-hair/40 bg-surface/40 p-4">
+              <label className="text-xs font-semibold uppercase tracking-wider text-mist">Max Clip Length</label>
+              <p className="text-[10px] text-mist-2">Storytelling ceiling in seconds</p>
+              <input
+                type="number"
+                min={30}
+                max={180}
+                value={Number(settings.clip_max_seconds ?? 90)}
+                onChange={(e) => setValue('clip_max_seconds', Number(e.target.value))}
+                className="input-lux mt-2 font-mono"
+              />
+              <span className="text-[10px] text-gold font-medium mt-1 block">Up to 90s for Shorts/Reels</span>
+            </div>
+
+            <div className="rounded-xl border border-hair/40 bg-surface/40 p-4">
+              <label className="text-xs font-semibold uppercase tracking-wider text-mist">Target Anchor</label>
+              <p className="text-[10px] text-mist-2">Median target length in seconds</p>
+              <input
+                type="number"
+                min={15}
+                max={120}
+                value={Number(settings.clip_target_seconds ?? 45)}
+                onChange={(e) => setValue('clip_target_seconds', Number(e.target.value))}
+                className="input-lux mt-2 font-mono"
+              />
+              <span className="text-[10px] text-mist-2 mt-1 block">Default: 45s</span>
+            </div>
+
+            <div className="rounded-xl border border-hair/40 bg-surface/40 p-4">
+              <label className="text-xs font-semibold uppercase tracking-wider text-mist">Clips Per Video</label>
+              <p className="text-[10px] text-mist-2">Moments selected by AI</p>
+              <input
+                type="number"
+                min={1}
+                max={10}
+                value={Number(settings.clips_per_video ?? 3)}
+                onChange={(e) => setValue('clips_per_video', Number(e.target.value))}
+                className="input-lux mt-2 font-mono"
+              />
+              <span className="text-[10px] text-mist-2 mt-1 block">Default: 3 clips</span>
+            </div>
+          </div>
+        </section>
+
+        {/* 3. Credit Rules & Plan Allocations */}
+        <section className="glass-card !p-6">
+          <div className="flex items-center gap-2.5 border-b border-hair/30 pb-4">
+            <Coins className="h-5 w-5 text-gold" />
+            <div>
+              <h2 className="font-display text-lg font-semibold">Credit Economics & Plan Balances</h2>
+              <p className="text-xs text-mist font-light">Controls credit allocations and progress bar baselines across plans</p>
+            </div>
+          </div>
+
+          <div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="rounded-xl border border-hair/40 bg-surface/40 p-4">
+              <label className="text-xs font-semibold uppercase tracking-wider text-mist">Free Starting Credits</label>
+              <p className="text-[10px] text-mist-2">Initial deposit for new signups</p>
+              <input
+                type="number"
+                min={0}
+                value={Number(settings.free_starting_credits ?? 40)}
+                onChange={(e) => setValue('free_starting_credits', Number(e.target.value))}
+                className="input-lux mt-2 font-mono"
+              />
+              <span className="text-[10px] text-gold mt-1 block">Shows as 40/40 (100% full)</span>
+            </div>
+
+            <div className="rounded-xl border border-hair/40 bg-surface/40 p-4">
+              <label className="text-xs font-semibold uppercase tracking-wider text-mist">Clipper Monthly</label>
+              <p className="text-[10px] text-mist-2">$19/mo plan credit allocation</p>
+              <input
+                type="number"
+                min={1}
+                value={Number(settings.clipper_monthly_credits ?? 300)}
+                onChange={(e) => setValue('clipper_monthly_credits', Number(e.target.value))}
+                className="input-lux mt-2 font-mono"
+              />
+              <span className="text-[10px] text-mist-2 mt-1 block">Default: 300 credits</span>
+            </div>
+
+            <div className="rounded-xl border border-hair/40 bg-surface/40 p-4">
+              <label className="text-xs font-semibold uppercase tracking-wider text-mist">Studio Monthly</label>
+              <p className="text-[10px] text-mist-2">$49/mo plan credit allocation</p>
+              <input
+                type="number"
+                min={1}
+                value={Number(settings.studio_monthly_credits ?? 1200)}
+                onChange={(e) => setValue('studio_monthly_credits', Number(e.target.value))}
+                className="input-lux mt-2 font-mono"
+              />
+              <span className="text-[10px] text-mist-2 mt-1 block">Default: 1,200 credits</span>
+            </div>
+
+            <div className="rounded-xl border border-hair/40 bg-surface/40 p-4">
+              <label className="text-xs font-semibold uppercase tracking-wider text-mist">Min Credits To Run</label>
+              <p className="text-[10px] text-mist-2">Minimum required balance</p>
+              <input
+                type="number"
+                min={1}
+                value={Number(settings.min_credits_required ?? 1)}
+                onChange={(e) => setValue('min_credits_required', Number(e.target.value))}
+                className="input-lux mt-2 font-mono"
+              />
+              <span className="text-[10px] text-mist-2 mt-1 block">1 credit = 1 final video</span>
+            </div>
+          </div>
+        </section>
+
+        {/* 4. Rendering Engine & Server Specs */}
+        <section className="glass-card !p-6">
+          <div className="flex items-center gap-2.5 border-b border-hair/30 pb-4">
+            <Layers className="h-5 w-5 text-gold" />
+            <div>
+              <h2 className="font-display text-lg font-semibold">Video Rendering & Processing Engine</h2>
+              <p className="text-xs text-mist font-light">FFmpeg encoding concurrency and facial tracking controls</p>
+            </div>
+          </div>
+
+          <div className="mt-5 grid gap-4 sm:grid-cols-3">
+            <div className="rounded-xl border border-hair/40 bg-surface/40 p-4">
+              <label className="text-xs font-semibold uppercase tracking-wider text-mist">Parallel Workers</label>
+              <p className="text-[10px] text-mist-2">Concurrent FFmpeg render lanes</p>
+              <input
+                type="number"
+                min={1}
+                max={8}
+                value={Number(settings.render_parallel ?? 4)}
+                onChange={(e) => setValue('render_parallel', Number(e.target.value))}
+                className="input-lux mt-2 font-mono"
+              />
+              <span className="text-[10px] text-mist-2 mt-1 block">Optimized for EC2 CPU cores</span>
+            </div>
+
+            <div className="rounded-xl border border-hair/40 bg-surface/40 p-4">
+              <label className="text-xs font-semibold uppercase tracking-wider text-mist">Max Direct Upload (MB)</label>
+              <p className="text-[10px] text-mist-2">Max allowed video file size</p>
+              <input
+                type="number"
+                min={50}
+                max={4000}
+                value={Number(settings.max_upload_mb ?? 500)}
+                onChange={(e) => setValue('max_upload_mb', Number(e.target.value))}
+                className="input-lux mt-2 font-mono"
+              />
+              <span className="text-[10px] text-mist-2 mt-1 block">Default: 500 MB (Cloudflare R2)</span>
+            </div>
+
+            <div className="rounded-xl border border-hair/40 bg-surface/40 p-4">
+              <label className="text-xs font-semibold uppercase tracking-wider text-mist">Stale Job Threshold</label>
+              <p className="text-[10px] text-mist-2">Minutes before auto-cleanup</p>
+              <input
+                type="number"
+                min={5}
+                max={120}
+                value={Number(settings.stale_job_minutes ?? 30)}
+                onChange={(e) => setValue('stale_job_minutes', Number(e.target.value))}
+                className="input-lux mt-2 font-mono"
+              />
+              <span className="text-[10px] text-mist-2 mt-1 block">Auto-recovers interrupted jobs</span>
+            </div>
+          </div>
+
+          <div className="mt-4 flex items-center justify-between rounded-xl border border-hair/40 bg-surface/40 p-4">
+            <div>
+              <p className="font-medium text-sm">InsightFace AI Dominant-Speaker Tracking</p>
+              <p className="text-xs text-mist-2">Follows moving speakers dynamically across 9:16 vertical canvas</p>
+            </div>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={Boolean(settings.pipeline_premium)}
+              onClick={() => setValue('pipeline_premium', !settings.pipeline_premium)}
+              className={`relative h-7 w-12 rounded-full transition-colors ${
+                settings.pipeline_premium ? 'bg-gradient-to-r from-champagne to-gold' : 'bg-surface'
+              }`}
+            >
+              <span
+                className={`absolute top-1 h-5 w-5 rounded-full bg-white shadow transition-all ${
+                  settings.pipeline_premium ? 'left-6' : 'left-1'
+                }`}
+              />
+            </button>
+          </div>
+        </section>
+
+        {/* 5. YouTube Bot Wall Bypass Cookies */}
+        <section className="glass-card !p-6">
+          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-hair/30 pb-4">
+            <div className="flex items-center gap-2.5">
+              <Shield className="h-5 w-5 text-gold" />
+              <div>
+                <h2 className="font-display text-lg font-semibold flex items-center gap-2">
+                  <span>YouTube Bot Wall Bypass</span>
+                  <span className="rounded-full border border-gold/40 bg-gold/10 px-2 py-0.5 text-[10px] font-bold text-gold uppercase tracking-wider">
+                    {settings.youtube_cookies ? 'Active' : 'Unconfigured'}
+                  </span>
+                </h2>
+                <p className="text-xs text-mist font-light">
+                  Paste your exported YouTube <code className="text-gold">cookies.txt</code> to bypass YouTube datacenter bot detection completely
+                </p>
+              </div>
             </div>
           </div>
 
@@ -174,14 +462,14 @@ export default function AdminSettingsPage() {
               className="input-lux font-mono text-xs w-full leading-relaxed resize-y"
             />
             <p className="mt-2 text-[11px] text-mist-2">
-              💡 <strong>How to get this:</strong> Install the free Chrome/Edge extension <span className="text-champagne font-medium">Get cookies.txt LOCALLY</span>, visit YouTube while logged in, click Export, and paste the text above.
+              💡 <strong>How to get this:</strong> Install the free Chrome/Edge extension <span className="text-champagne font-medium">Get cookies.txt LOCALLY</span>, visit YouTube while logged in, click Export, and paste the text above. Automatically synced to <code className="text-white/80">/opt/nology/cookies.txt</code> on save.
             </p>
           </div>
         </section>
 
         <p className="flex items-start gap-2 rounded-xl border border-champagne/20 bg-champagne/5 px-4 py-3 text-xs font-light text-mist">
           <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-champagne" />
-          These settings are read at runtime by the worker and web app. Changes apply to new jobs immediately.
+          Settings are read in real-time by the worker and web app. Changes apply immediately to subsequent video clipping jobs.
         </p>
       </div>
     </div>

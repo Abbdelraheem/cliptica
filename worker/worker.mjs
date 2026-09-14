@@ -102,20 +102,26 @@ const CFG = {
 const ENV_DEFAULTS = {
   pipeline_premium: process.env.PIPELINE_PREMIUM !== '0',
   clips_per_video: Number(process.env.CLIPS_PER_VIDEO ?? 3),
-  clip_target_seconds: Number(process.env.CLIP_TARGET_SECONDS ?? 38),
+  clip_min_seconds: Number(process.env.CLIP_MIN_SECONDS ?? 15),
+  clip_max_seconds: Number(process.env.CLIP_MAX_SECONDS ?? 90),
+  clip_target_seconds: Number(process.env.CLIP_TARGET_SECONDS ?? 45),
   render_parallel: Number(process.env.RENDER_PARALLEL ?? 4),
   stale_job_minutes: Number(process.env.STALE_JOB_MINUTES ?? 30),
+  groq_score_model: process.env.GROQ_SCORE_MODEL || 'allam-2-7b',
 }
 
 const SETTING_PARSE = {
   pipeline_premium: (v) => v === 'true',
   clips_per_video: (v) => Math.max(1, Number(v) || 3),
-  clip_target_seconds: (v) => Math.max(5, Number(v) || 38),
+  clip_min_seconds: (v) => Math.max(5, Number(v) || 15),
+  clip_max_seconds: (v) => Math.min(180, Math.max(20, Number(v) || 90)),
+  clip_target_seconds: (v) => Math.max(5, Number(v) || 45),
   render_parallel: (v) => Math.max(1, Math.min(8, Number(v) || 4)),
   stale_job_minutes: (v) => Math.max(1, Number(v) || 30),
   groq_api_key: (v) => String(v || '').trim(),
   openai_api_key: (v) => String(v || '').trim(),
   whisper_model: (v) => String(v || '').trim(),
+  groq_score_model: (v) => String(v || '').trim(),
   youtube_cookies: (v) => String(v || '').trim(),
 }
 
@@ -147,11 +153,14 @@ async function syncConfigInto() {
   const c = await cfg()
   CFG.premium = c.pipeline_premium
   CFG.clipsPerVideo = c.clips_per_video
-  CFG.clipLength = c.clip_target_seconds
+  CFG.clipMinLength = c.clip_min_seconds ?? 15
+  CFG.clipMaxLength = c.clip_max_seconds ?? 90
+  CFG.clipLength = c.clip_target_seconds ?? 45
   CFG.renderParallel = c.render_parallel
   CFG.groqKey = c.groq_api_key || process.env.GROQ_API_KEY || CFG.groqKey
   CFG.openaiKey = c.openai_api_key || process.env.OPENAI_API_KEY || CFG.openaiKey
   CFG.whisperModel = c.whisper_model || process.env.WHISPER_MODEL || CFG.whisperModel
+  CFG.groqScoreModel = c.groq_score_model || process.env.GROQ_SCORE_MODEL || 'allam-2-7b'
   CFG.aiSimulationMode = c.ai_simulation_mode || process.env.AI_SIMULATION_MODE || CFG.aiSimulationMode
 
   if (c.youtube_cookies) {
@@ -451,19 +460,16 @@ async function transcribe(file, dir, language = 'auto') {
 
 /**
  * Semantic & pause-aware candidate generation.
- * Groups whisper segments by natural sentence endings (. ? ! ؟ …) or silence gaps (>0.6s),
- * ensuring every clip starts with a clean sentence (hook) and ends on a completed thought
- * without cutting words or sentences in half.
+ * Rather than imposing an arbitrary fixed cut (e.g. 12s), this allows the AI to discover natural
+ * viral moments of variable length (from minDur up to maxDur, e.g. 15s to 90s).
+ * Every candidate begins on a clean sentence hook and concludes on a completed thought.
  */
-function generateCandidateMoments(transcript, duration, from = 0, targetLen = 38) {
-  const minDur = Math.max(20, Math.round(targetLen * 0.65))
-  const maxDur = Math.min(75, Math.round(targetLen * 1.45))
+function generateCandidateMoments(transcript, duration, from = 0, minDur = 15, maxDur = 90) {
   const segs = (transcript.segments ?? []).filter((s) => s.start >= Math.max(0, from - 2))
 
   if (!segs.length) {
-    // Time-based fallback when transcript has no segments
-    const win = targetLen
     const fallback = []
+    const win = Math.min(60, Math.max(minDur, 45))
     for (let s = Math.max(0, from); s + win <= duration && fallback.length < 50; s += win / 2) {
       fallback.push({ start: Math.round(s), end: Math.round(s + win), text: '' })
     }
@@ -476,14 +482,14 @@ function generateCandidateMoments(transcript, duration, from = 0, targetLen = 38
     const text = (segs[idx].text || '').trim()
     const endsWithPunct = /[.?!؟…]$/.test(text)
     const gap = segs[idx + 1].start - segs[idx].end
-    return endsWithPunct || gap >= 0.6
+    return endsWithPunct || gap >= 0.5
   }
 
   const candidates = []
   const usedRanges = []
 
   // Step through segment by segment
-  for (let i = 0; i < segs.length && candidates.length < 50; i++) {
+  for (let i = 0; i < segs.length && candidates.length < 60; i++) {
     const startSeg = segs[i]
     if (startSeg.start < from) continue
 
@@ -502,9 +508,9 @@ function generateCandidateMoments(transcript, duration, from = 0, targetLen = 38
           const wordCount = fullText.split(/\s+/).filter(Boolean).length
 
           // Avoid dead silence or tiny blips
-          if (wordCount >= 18) {
+          if (wordCount >= 16) {
             const overlap = usedRanges.some(
-              (r) => Math.abs(r.start - clipStart) < 12 && Math.abs(r.end - clipEnd) < 12
+              (r) => Math.abs(r.start - clipStart) < 6 && Math.abs(r.end - clipEnd) < 6
             )
             if (!overlap) {
               candidates.push({
@@ -523,15 +529,16 @@ function generateCandidateMoments(transcript, duration, from = 0, targetLen = 38
 
   // Fallback if semantic grouping produced too few candidates
   if (candidates.length < 3) {
-    const win = targetLen
-    for (let s = Math.max(0, from); s + win < duration && candidates.length < 40; s += win / 2) {
-      const text = segs
-        .filter((x) => x.start >= s - 1 && x.end <= s + win + 1)
-        .map((x) => x.text)
-        .join(' ')
-        .trim()
-      if (text.split(/\s+/).length > 20) {
-        candidates.push({ start: Math.round(s), end: Math.round(s + win), text })
+    for (const win of [30, 45, 60]) {
+      for (let s = Math.max(0, from); s + win < duration && candidates.length < 40; s += win / 2) {
+        const text = segs
+          .filter((x) => x.start >= s - 1 && x.end <= s + win + 1)
+          .map((x) => x.text)
+          .join(' ')
+          .trim()
+        if (text.split(/\s+/).length > 15) {
+          candidates.push({ start: Math.round(s), end: Math.round(s + win), text })
+        }
       }
     }
   }
@@ -542,7 +549,7 @@ function generateCandidateMoments(transcript, duration, from = 0, targetLen = 38
 async function llmScoreMoments(candidates, instructions) {
   const providers = []
   if (CFG.groqKey) {
-    const primaryModel = process.env.GROQ_SCORE_MODEL || 'allam-2-7b'
+    const primaryModel = CFG.groqScoreModel || process.env.GROQ_SCORE_MODEL || 'allam-2-7b'
     providers.push({ name: `groq-${primaryModel}`, url: 'https://api.groq.com/openai/v1/chat/completions', key: CFG.groqKey, model: primaryModel })
     if (primaryModel !== 'qwen/qwen3.8-27b') {
       providers.push({ name: 'groq-qwen3.8-27b', url: 'https://api.groq.com/openai/v1/chat/completions', key: CFG.groqKey, model: 'qwen/qwen3.8-27b' })
@@ -552,16 +559,17 @@ async function llmScoreMoments(candidates, instructions) {
     providers.push({ name: 'openai', url: 'https://api.openai.com/v1/chat/completions', key: CFG.openaiKey, model: 'gpt-4o-mini' })
 
   let system =
-    'You are a master viral video editor for TikTok, Instagram Reels, and YouTube Shorts. ' +
+    'You are a master viral video editor for TikTok, Instagram Reels, and YouTube Shorts.\n' +
     'Analyze the provided speech moments (which may be in Arabic, English, or mixed) and evaluate their virality.\n' +
+    'IMPORTANT: Every moment has its own natural dynamic duration (from 15 seconds up to 90 seconds). Evaluate each moment by its complete narrative hook, development, and punchline — do not force a fixed length.\n' +
     'For each moment evaluate three distinct sub-scores from 0 to 100:\n' +
     '- hookScore: Power of the first 3 seconds to halt scrolling (provocative question, shocking statement, mystery, or curiosity gap).\n' +
     '- retentionScore: Pacing, storytelling flow, and lack of fluff that keeps viewers watching until the end.\n' +
     '- shareScore: Relatability, quote-worthiness, surprising value, or emotional impact.\n' +
     '- score: Overall weighted viral potential (0-100).\n' +
-    'If the candidate text is in Arabic, write the "title" (3-6 words) and "reason" in Arabic. ' +
+    'If the candidate text is in Arabic, write the "title" (3-6 words) and "reason" in Arabic.\n' +
     'Return strict JSON {"moments":[{"index":<int>,"score":<0-100>,"hookScore":<0-100>,"retentionScore":<0-100>,"shareScore":<0-100>,"title":"<=6 punchy words",' +
-    '"reason":"one sentence why it performs","emoji":"one fitting emoji"}]}. ' +
+    '"reason":"one sentence why it performs","emoji":"one fitting emoji"}]}.\n' +
     `Return exactly the ${CFG.clipsPerVideo} strongest moments, best first.`
   if (instructions?.trim()) {
     system += ` The uploader added these instructions — follow them strictly when picking and ranking: "${instructions.trim().slice(0, 500)}"`
@@ -674,7 +682,9 @@ function heuristicScoreMoments(candidates) {
 }
 
 async function scoreMoments(transcript, duration, from = 0, instructions = null) {
-  const candidates = generateCandidateMoments(transcript, duration, from, CFG.clipLength)
+  const minDur = CFG.clipMinLength ?? 15
+  const maxDur = CFG.clipMaxLength ?? 90
+  const candidates = generateCandidateMoments(transcript, duration, from, minDur, maxDur)
   if (!candidates.length) return []
   return (await llmScoreMoments(candidates, instructions)) ?? heuristicScoreMoments(candidates)
 }
