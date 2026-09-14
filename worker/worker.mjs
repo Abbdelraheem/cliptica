@@ -234,7 +234,7 @@ async function download(url, dir) {
         out,
         url,
       ]),
-      { timeout: proxy ? 20000 : 1000 * 60 * 5 }
+      { timeout: 1000 * 60 * 5 }
     )
 
   // Direct first — most stable when YouTube isn't flagging the IP.
