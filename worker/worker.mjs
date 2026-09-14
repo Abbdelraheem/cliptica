@@ -116,6 +116,7 @@ const SETTING_PARSE = {
   groq_api_key: (v) => String(v || '').trim(),
   openai_api_key: (v) => String(v || '').trim(),
   whisper_model: (v) => String(v || '').trim(),
+  youtube_cookies: (v) => String(v || '').trim(),
 }
 
 let configCache = null
@@ -152,6 +153,15 @@ async function syncConfigInto() {
   CFG.openaiKey = c.openai_api_key || process.env.OPENAI_API_KEY || CFG.openaiKey
   CFG.whisperModel = c.whisper_model || process.env.WHISPER_MODEL || CFG.whisperModel
   CFG.aiSimulationMode = c.ai_simulation_mode || process.env.AI_SIMULATION_MODE || CFG.aiSimulationMode
+
+  if (c.youtube_cookies) {
+    try {
+      const cookieFile = '/opt/nology/cookies.txt'
+      if (!existsSync(cookieFile) || readFileSync(cookieFile, 'utf8') !== c.youtube_cookies) {
+        await writeFile(cookieFile, c.youtube_cookies, 'utf8')
+      }
+    } catch {}
+  }
 }
 
 async function sh(cmd, args, opts) {

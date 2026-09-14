@@ -2,6 +2,7 @@ import { getAdminSession } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
+import { writeFile, unlink } from 'fs/promises'
 
 type SettingValue = string | boolean | number
 
@@ -13,6 +14,7 @@ const SETTING_KEYS = [
   'clip_target_seconds',
   'render_parallel',
   'stale_job_minutes',
+  'youtube_cookies',
 ] as const
 
 type SettingKey = (typeof SETTING_KEYS)[number]
@@ -25,6 +27,7 @@ const KNOWN_KEYS: { key: SettingKey; kind: 'bool' | 'number' | 'string'; label: 
   { key: 'clip_target_seconds', kind: 'number', label: 'Clip target length (s)' },
   { key: 'render_parallel', kind: 'number', label: 'Parallel renders' },
   { key: 'stale_job_minutes', kind: 'number', label: 'Stale job threshold (min)' },
+  { key: 'youtube_cookies', kind: 'string', label: 'YouTube Cookies (Netscape format)' },
 ]
 
 const defaults: Record<string, SettingValue> = {
@@ -35,6 +38,7 @@ const defaults: Record<string, SettingValue> = {
   clip_target_seconds: 38,
   render_parallel: 4,
   stale_job_minutes: 30,
+  youtube_cookies: '',
 }
 
 function parseValue(key: string, raw: string | null, kind: 'bool' | 'number' | 'string'): SettingValue {
@@ -98,6 +102,19 @@ export async function PATCH(request: Request) {
         })
       })
     )
+
+    if (parsed.data.youtube_cookies !== undefined) {
+      try {
+        const content = String(parsed.data.youtube_cookies || '').trim()
+        if (content) {
+          await writeFile('/opt/nology/cookies.txt', content, 'utf8')
+        } else {
+          await unlink('/opt/nology/cookies.txt').catch(() => {})
+        }
+      } catch {
+        /* ignore file sync failure on dev environments */
+      }
+    }
 
     const rows = await prisma.setting.findMany()
     const store = new Map(rows.map((r) => [r.key, r.value]))

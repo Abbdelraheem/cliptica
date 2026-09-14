@@ -6,7 +6,7 @@ import { toast } from 'sonner'
 import { AlertTriangle, Save, RotateCcw } from 'lucide-react'
 
 type Setting = { key: string; kind: 'bool' | 'number' | 'string'; label: string; enabled: boolean }
-type SettingsState = Record<string, boolean | number>
+type SettingsState = Record<string, boolean | number | string>
 
 const DEFAULTS: SettingsState = {
   pipeline_premium: true,
@@ -16,6 +16,7 @@ const DEFAULTS: SettingsState = {
   clip_target_seconds: 38,
   render_parallel: 4,
   stale_job_minutes: 30,
+  youtube_cookies: '',
 }
 
 export default function AdminSettingsPage() {
@@ -54,7 +55,7 @@ export default function AdminSettingsPage() {
     onError: () => toast.error('Could not save settings'),
   })
 
-  const setValue = (key: string, value: boolean | number) => {
+  const setValue = (key: string, value: boolean | number | string) => {
     setSettings((s) => ({ ...s, [key]: value }))
     setDirty(true)
   }
@@ -145,6 +146,36 @@ export default function AdminSettingsPage() {
                 />
               </div>
             ))}
+          </div>
+        </section>
+
+        {/* YouTube Bot Bypass Cookies */}
+        <section className="glass-card !p-6">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <h2 className="font-display text-lg font-semibold flex items-center gap-2">
+                <span>YouTube Ingestion & Bot Bypass</span>
+                <span className="rounded-full border border-gold/40 bg-gold/10 px-2 py-0.5 text-[10px] font-bold text-gold uppercase tracking-wider">
+                  Bot Wall Bypass
+                </span>
+              </h2>
+              <p className="mt-1 text-xs text-mist leading-relaxed">
+                Paste your authenticated YouTube <code className="text-gold">cookies.txt</code> content below. This allows the server to download any YouTube video without ever encountering bot checks or &quot;Sign in to confirm you are not a bot&quot; freezes.
+              </p>
+            </div>
+          </div>
+
+          <div className="mt-4">
+            <textarea
+              rows={5}
+              value={String(settings.youtube_cookies || '')}
+              onChange={(e) => setValue('youtube_cookies', e.target.value)}
+              placeholder="# Netscape HTTP Cookie File&#10;# Exported using 'Get cookies.txt LOCALLY' extension&#10;.youtube.com  TRUE  /  TRUE  1789322654  LOGIN_INFO  ..."
+              className="input-lux font-mono text-xs w-full leading-relaxed resize-y"
+            />
+            <p className="mt-2 text-[11px] text-mist-2">
+              💡 <strong>How to get this:</strong> Install the free Chrome/Edge extension <span className="text-champagne font-medium">Get cookies.txt LOCALLY</span>, visit YouTube while logged in, click Export, and paste the text above.
+            </p>
           </div>
         </section>
 
