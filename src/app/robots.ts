@@ -1,7 +1,8 @@
 import { MetadataRoute } from 'next'
+import { SITE_URL } from '@/lib/seo/constants'
 
 export default function robots(): MetadataRoute.Robots {
-  const baseUrl = process.env.NEXTAUTH_URL || 'https://cliptica.com'
+  const baseUrl = SITE_URL
 
   return {
     rules: [
@@ -10,7 +11,24 @@ export default function robots(): MetadataRoute.Robots {
         allow: '/',
         disallow: ['/api/', '/admin/', '/dashboard/'],
       },
+      // Explicit AI Answer Engine & Web Agent permissions
+      {
+        userAgent: [
+          'GPTBot',
+          'OAI-SearchBot',
+          'ChatGPT-User',
+          'ClaudeBot',
+          'anthropic-ai',
+          'PerplexityBot',
+          'Google-Extended',
+          'Applebot',
+          'Bingbot',
+        ],
+        allow: '/',
+        disallow: ['/api/', '/admin/', '/dashboard/'],
+      },
     ],
     sitemap: `${baseUrl}/sitemap.xml`,
+    host: baseUrl,
   }
 }

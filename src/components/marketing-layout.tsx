@@ -3,15 +3,24 @@
 import { ReactNode, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { Wordmark } from '@/components/logo'
+import { LanguageSwitcher } from '@/components/language-switcher'
+import { type Locale, DEFAULT_LOCALE } from '@/lib/seo/constants'
 
 const NAV_LINKS = [
   ['How It Works', '/#how'],
   ['Features', '/#features'],
   ['Pricing', '/#pricing'],
+  ['Compare', '/compare'],
   ['FAQ', '/#faq'],
 ] as const
 
-export function MarketingLayout({ children }: { children: ReactNode }) {
+export function MarketingLayout({
+  children,
+  locale = DEFAULT_LOCALE,
+}: {
+  children: ReactNode
+  locale?: Locale
+}) {
   const [scrolled, setScrolled] = useState(false)
 
   useEffect(() => {
@@ -44,30 +53,34 @@ export function MarketingLayout({ children }: { children: ReactNode }) {
               : 'border-hair bg-[#0a0a0a]/55 shadow-[0_10px_50px_rgba(0,0,0,0.35)]'
           }`}
         >
-          <Link href="/" aria-label="Cliptica home" className="shrink-0">
+          <Link href={locale === DEFAULT_LOCALE ? '/' : `/${locale}`} aria-label="Cliptica home" className="shrink-0">
             <Wordmark />
           </Link>
 
           <nav className="hidden items-center gap-7 lg:flex" aria-label="Main navigation">
-            {NAV_LINKS.map(([label, href]) => (
-              <Link
-                key={label}
-                href={href}
-                className="text-sm text-mist transition-colors duration-300 hover:text-white"
-              >
-                {label}
-              </Link>
-            ))}
+            {NAV_LINKS.map(([label, href]) => {
+              const targetHref = locale === DEFAULT_LOCALE ? href : href.startsWith('/#') ? `/${locale}${href}` : `/${locale}${href}`
+              return (
+                <Link
+                  key={label}
+                  href={targetHref}
+                  className="text-sm text-mist transition-colors duration-300 hover:text-white"
+                >
+                  {label}
+                </Link>
+              )
+            })}
           </nav>
 
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-2">
+            <LanguageSwitcher currentLocale={locale} />
             <Link
               href="/login"
-              className="hidden rounded-xl px-4 py-2 text-sm text-mist transition-colors duration-300 hover:text-white sm:block"
+              className="hidden rounded-xl px-3.5 py-2 text-sm text-mist transition-colors duration-300 hover:text-white sm:block"
             >
               Log In
             </Link>
-            <Link href="/register" className="btn-lux btn-primary !rounded-xl !px-5 !py-2.5 !text-sm">
+            <Link href="/register" className="btn-lux btn-primary !rounded-xl !px-4 !py-2 !text-sm">
               Start Free
             </Link>
           </div>

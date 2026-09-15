@@ -53,8 +53,33 @@ async function rateLimitLoginCallback(request: NextRequest): Promise<NextRespons
   )
 }
 
+import { isCrawler, COUNTRY_TO_LOCALE, isValidLocale } from '@/lib/seo/constants'
+
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
+
+  // Locale routing for public root '/' — crawlers are NEVER redirected
+  if (pathname === '/') {
+    const userAgent = request.headers.get('user-agent')
+    if (!isCrawler(userAgent)) {
+      const cookieLocale = request.cookies.get('NEXT_LOCALE')?.value
+      if (cookieLocale && cookieLocale !== 'en' && isValidLocale(cookieLocale)) {
+        return NextResponse.redirect(new URL(`/${cookieLocale}`, request.url), 307)
+      }
+
+      if (!cookieLocale) {
+        const country = (
+          request.headers.get('x-vercel-ip-country') ||
+          request.headers.get('cf-ipcountry') ||
+          request.headers.get('x-country-code')
+        )?.toUpperCase()
+
+        if (country && COUNTRY_TO_LOCALE[country] && COUNTRY_TO_LOCALE[country] !== 'en') {
+          return NextResponse.redirect(new URL(`/${COUNTRY_TO_LOCALE[country]}`, request.url), 307)
+        }
+      }
+    }
+  }
 
   if (pathname.startsWith('/api/auth/callback')) {
     const limited = await rateLimitLoginCallback(request)
@@ -103,6 +128,7 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
+    '/',
     '/dashboard/:path*',
     '/admin/:path*',
     '/api/projects/:path*',
