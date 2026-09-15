@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import {
   Radio, Plus, Trash2, CheckCircle2, AlertCircle, Loader2,
-  ExternalLink, Youtube
+  ExternalLink, Youtube, Pause, Play
 } from 'lucide-react'
 
 type AutoPilotChannel = {
@@ -111,6 +111,26 @@ export default function AutoPilotPage() {
       }
     } catch {
       alert('Failed to remove channel')
+    }
+  }
+
+  const handleToggleActive = async (id: string, currentActive: boolean) => {
+    try {
+      const res = await fetch('/api/user/autopilot', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ channelId: id, isActive: !currentActive }),
+      })
+      if (res.ok) {
+        setChannels((prev) =>
+          prev.map((c) => (c.id === id ? { ...c, isActive: !currentActive } : c))
+        )
+      } else {
+        const d = await res.json()
+        alert(d.error || 'Failed to update channel status')
+      }
+    } catch {
+      alert('Failed to update channel status')
     }
   }
 
@@ -265,18 +285,28 @@ export default function AutoPilotPage() {
                 className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-hair/50 bg-onyx-2 p-5 transition-all hover:border-gold/30"
               >
                 <div className="flex items-center gap-3.5">
-                  <div className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gold/10 text-gold border border-gold/20">
-                    <Radio className="h-5 w-5" />
-                    <span className="absolute -top-1 -right-1 h-3 w-3 rounded-full bg-emerald-500 border-2 border-black" />
+                  <div className={`relative flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border ${
+                    ch.isActive ? 'bg-gold/10 text-gold border-gold/20' : 'bg-onyx-3 text-mist/60 border-hair/40'
+                  }`}>
+                    <Radio className={`h-5 w-5 ${ch.isActive ? 'animate-pulse' : 'opacity-40'}`} />
+                    <span className={`absolute -top-1 -right-1 h-3 w-3 rounded-full border-2 border-black ${
+                      ch.isActive ? 'bg-emerald-500' : 'bg-amber-500/80'
+                    }`} />
                   </div>
                   <div>
                     <div className="flex items-center gap-2">
                       <h3 className="font-display text-sm font-semibold text-pearl">
                         {ch.channelTitle || 'قناة يوتيوب'}
                       </h3>
-                      <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-bold text-emerald-400 border border-emerald-500/20">
-                        مراقبة نشطة
-                      </span>
+                      {ch.isActive ? (
+                        <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-bold text-emerald-400 border border-emerald-500/20">
+                          مراقبة نشطة
+                        </span>
+                      ) : (
+                        <span className="rounded-full bg-amber-500/10 px-2 py-0.5 text-[10px] font-bold text-amber-400 border border-amber-500/20">
+                          متوقف مؤقتاً
+                        </span>
+                      )}
                     </div>
                     <a
                       href={ch.channelUrl}
@@ -303,14 +333,38 @@ export default function AutoPilotPage() {
                       {ch.lastCheckedAt ? new Date(ch.lastCheckedAt).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' }) : 'قيد الانتظار'}
                     </p>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => handleDelete(ch.id)}
-                    className="rounded-xl border border-hair/40 bg-black/40 p-2 text-mist hover:border-red-400/40 hover:text-red-400"
-                    title="حذف من الطيار الآلي"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => handleToggleActive(ch.id, ch.isActive)}
+                      className={`inline-flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-medium transition-colors ${
+                        ch.isActive
+                          ? 'border-hair/40 bg-black/40 text-mist hover:border-amber-400/40 hover:text-amber-400'
+                          : 'border-gold/30 bg-gold/10 text-champagne hover:bg-gold/20'
+                      }`}
+                      title={ch.isActive ? 'إيقاف المراقبة مؤقتاً' : 'استئناف المراقبة'}
+                    >
+                      {ch.isActive ? (
+                        <>
+                          <Pause className="h-3.5 w-3.5" />
+                          <span>إيقاف</span>
+                        </>
+                      ) : (
+                        <>
+                          <Play className="h-3.5 w-3.5" />
+                          <span>استئناف</span>
+                        </>
+                      )}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleDelete(ch.id)}
+                      className="rounded-xl border border-hair/40 bg-black/40 p-2 text-mist hover:border-red-400/40 hover:text-red-400"
+                      title="حذف من الطيار الآلي"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </div>
                 </div>
               </div>
             ))}

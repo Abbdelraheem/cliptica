@@ -992,3 +992,14 @@ Executed `scripts/test-render-styles.mjs` rendering 1080x1920 video with burned-
   - Added pre-download URL duration probe using `probeUrlDuration` and `exceedsPlanMinutes`. If oversized, logs the event, advances `lastVideoId` to avoid redundant sweeps, and skips without burning credits.
 - **Verification**:
   - `node --check worker/worker.mjs` validated cleanly.
+
+### 3. Feat: AutoPilot Channel Pause/Resume Toggle
+- **Context**:
+  - Creators needed the ability to temporarily pause an AutoPilot channel without completely deleting and reconfiguring it.
+- **Changes**:
+  - `src/app/api/user/autopilot/route.ts`: Added `PATCH` handler accepting `{ channelId: string, isActive: boolean }`, enforcing authentication and channel ownership.
+  - `src/app/(dashboard)/dashboard/autopilot/page.tsx`: Added `handleToggleActive` function with optimistic UI updates and interactive Pause ("إيقاف") / Resume ("استئناف") toggle button on each channel card. Updated visual indicators for active (emerald pulse) vs paused (amber) status.
+  - `tests/autopilot.test.ts`: Added unit tests verifying PATCH authentication, ownership validation, payload parsing, and state updates.
+- **Verification**:
+  - `npx tsc --noEmit` clean.
+  - `npx vitest run tests/autopilot.test.ts` passed 3/3 tests.

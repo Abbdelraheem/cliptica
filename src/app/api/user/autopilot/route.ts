@@ -87,3 +87,37 @@ export async function DELETE(request: Request) {
 
   return NextResponse.json({ success: true })
 }
+
+export async function PATCH(request: Request) {
+  const session = await getServerSession(authOptions)
+  if (!session?.user?.id) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
+  try {
+    const body = await request.json()
+    const { channelId, isActive } = body
+    if (!channelId || typeof isActive !== 'boolean') {
+      return NextResponse.json({ error: 'channelId and boolean isActive are required' }, { status: 400 })
+    }
+
+    const channel = await prisma.autoPilotChannel.findUnique({
+      where: { id: channelId },
+    })
+
+    if (!channel || channel.userId !== session.user.id) {
+      return NextResponse.json({ error: 'Channel not found' }, { status: 404 })
+    }
+
+    const updated = await prisma.autoPilotChannel.update({
+      where: { id: channelId },
+      data: { isActive },
+    })
+
+    return NextResponse.json({ success: true, channel: updated })
+  } catch (err: unknown) {
+    console.error('AutoPilot update error:', err)
+    return NextResponse.json({ error: 'Failed to update AutoPilot watcher' }, { status: 500 })
+  }
+}
+
