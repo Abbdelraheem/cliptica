@@ -4,7 +4,6 @@ import { NextResponse } from 'next/server'
 import { apiMutationLimiter, enforceRateLimit } from '@/lib/rate-limit'
 import { parseClipFrom, normaliseVideoUrl, projectCreateSchema } from '@/lib/validation'
 import { planForRole } from '@/lib/stripe'
-import { getSettingNumber } from '@/lib/settings'
 
 const createSchema = projectCreateSchema
 
@@ -90,12 +89,11 @@ export async function POST(request: Request) {
     const startOfDay = new Date()
     startOfDay.setHours(0, 0, 0, 0)
 
-    const [minCredits, todaysCount] = await Promise.all([
-      getSettingNumber('min_credits_required', process.env.MIN_CREDITS_REQUIRED, 1),
-      plan
-        ? prisma.project.count({ where: { userId: session.user.id, createdAt: { gte: startOfDay } } })
-        : Promise.resolve(0),
-    ])
+    // Exactly 1 credit per video generation operation (flat per-video pricing model).
+    const minCredits = 1
+    const todaysCount = plan
+      ? await prisma.project.count({ where: { userId: session.user.id, createdAt: { gte: startOfDay } } })
+      : 0
 
     if (user.credits < minCredits) {
       return NextResponse.json(

@@ -968,3 +968,17 @@ Executed `scripts/test-render-styles.mjs` rendering 1080x1920 video with burned-
   - `http://13.62.192.145/opengraph-image` -> HTTP 200 OK (`image/png`).
   - `http://13.62.192.145/api/health` -> HTTP 200 OK.
   - `node scripts/test-ai.mjs` -> 100% PASS on Whisper (255ms), Chat (338ms), and JSON scoring (373ms).
+
+## 2026-09-15 — Round 10: Credit Model Parity, AutoPilot Safeguards & Pricing Alignment
+
+### 1. Fix: Credit Reservation vs Settlement Desync & Source Duration Limits
+- **Root Cause**:
+  - `src/app/api/projects/route.ts` reserved `minCredits` upfront (which could be dynamic or read from setting `min_credits_required`), while `worker/worker.mjs` hardcoded `creditsSpent = 1` at completion. Any reservation > 1 resulted in automatic adjustment refunds at settlement, while users with < `minCredits` were blocked even if they had enough for a 1-credit operation.
+  - In `worker/credits.mjs`, `PLAN_MAX_MINUTES.STUDIO` was set to 180 min instead of matching `src/lib/stripe.ts` (120 min), and hard platform ceiling `MAX_SOURCE_MINUTES = 180` was not enforced across all paths.
+- **Changes**:
+  - `src/app/api/projects/route.ts`: Enforce strict 1 credit reservation per video project upfront (`minCredits = 1`). Cleaned up unused import.
+  - `worker/credits.mjs`: Aligned `PLAN_MAX_MINUTES.STUDIO` to 120 minutes, added `MAX_SOURCE_MINUTES = 180` ceiling in `exceedsPlanMinutes`.
+  - `tests/credits.test.mjs`: Aligned STUDIO cap expectation to 120m.
+  - `tests/credit-reservation-settlement.test.ts`: Created new test suite verifying 1:1 reservation/settlement parity and duration limits across all plans.
+- **Verification**:
+  - Vitest: `tests/credits.test.mjs` and `tests/credit-reservation-settlement.test.ts` passed 13/13 tests cleanly.

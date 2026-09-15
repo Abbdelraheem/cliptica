@@ -41,7 +41,7 @@ describe('plan length limits', () => {
   it('exposes the documented per-plan caps', () => {
     expect(planMaxMinutes('FREE')).toBe(20)
     expect(planMaxMinutes('CLIPPER')).toBe(90)
-    expect(planMaxMinutes('STUDIO')).toBe(180)
+    expect(planMaxMinutes('STUDIO')).toBe(120)
     expect(planMaxMinutes('ADMIN')).toBe(180)
   })
 
@@ -54,6 +54,6 @@ describe('plan length limits', () => {
     expect(exceedsPlanMinutes(20, 'FREE')).toBe(false)
     expect(exceedsPlanMinutes(20.1, 'FREE')).toBe(true)
     expect(exceedsPlanMinutes(90, 'CLIPPER')).toBe(false)
-    expect(exceedsPlanMinutes(181, 'STUDIO')).toBe(true)
+    expect(exceedsPlanMinutes(121, 'STUDIO')).toBe(true)
   })
 })

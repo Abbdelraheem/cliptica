@@ -14,13 +14,14 @@ export function calcCredits(durationSeconds) {
   return Math.max(1, Math.ceil(durationSeconds / 60))
 }
 
-/** Max SOURCE length (minutes) a role's plan may process. */
-export const PLAN_MAX_MINUTES = { FREE: 20, CLIPPER: 90, STUDIO: 180, ADMIN: 180 }
+/** Max SOURCE length (minutes) a role's plan may process. Hard ceiling is 180m. */
+export const MAX_SOURCE_MINUTES = 180
+export const PLAN_MAX_MINUTES = { FREE: 20, CLIPPER: 90, STUDIO: 120, ADMIN: 180 }
 
 export function planMaxMinutes(role) {
   return PLAN_MAX_MINUTES[role] ?? PLAN_MAX_MINUTES.FREE
 }
 
 export function exceedsPlanMinutes(minutes, role) {
-  return minutes > planMaxMinutes(role)
+  return minutes > planMaxMinutes(role) || minutes > MAX_SOURCE_MINUTES
 }
