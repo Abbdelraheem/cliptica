@@ -69,7 +69,7 @@ describe('Billing Redirects and Error Safe URLs', () => {
 
     expect(res.status).toBe(307)
     const location = res.headers.get('location')
-    expect(location).toContain('/dashboard/billing?error=invalid_plan')
+    expect(location).toContain('/dashboard/billing?error=invalid_selection')
   })
 
   it('portal: unauthenticated user redirects safely to /login', async () => {

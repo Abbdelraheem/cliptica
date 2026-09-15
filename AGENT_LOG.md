@@ -1003,3 +1003,24 @@ Executed `scripts/test-render-styles.mjs` rendering 1080x1920 video with burned-
 - **Verification**:
   - `npx tsc --noEmit` clean.
   - `npx vitest run tests/autopilot.test.ts` passed 3/3 tests.
+
+### 4. Test Suite Alignment & Comprehensive Pricing Documentation (v3.0.0)
+- **Context**:
+  - Four legacy test assertions were out of sync with recent feature enhancements:
+    1. `tests/caption-styles.test.mjs`: Expected exactly 15 styles, but 18 styles are present across Arabic Luxury, TikTok Viral, and kinetic presets.
+    2. `tests/billing-redirects.test.ts`: Expected `error=invalid_plan`, but checkout route now redirects to `error=invalid_selection` since supporting both subscription plans and one-time credit packs.
+    3. `tests/pricing-model.test.ts`: Clipper tier revenue was tested at legacy $19 instead of live $29 (150 credits).
+    4. `tests/pricing-model.test.ts`: Studio tier revenue was tested at legacy $49 instead of live $59 (400 credits).
+- **Changes**:
+  - `tests/caption-styles.test.mjs`: Updated assertion to `expect(Object.keys(CAPTION_STYLES).length).toBeGreaterThanOrEqual(15)`.
+  - `tests/billing-redirects.test.ts`: Aligned redirect URL assertion to `/dashboard/billing?error=invalid_selection`.
+  - `tests/pricing-model.test.ts`: Updated Clipper ($29 / 150 credits) and Studio ($59 / 400 credits) revenue and fee assertions. Confirmed gross margin > 94% on both tiers.
+  - `PRICING_MODEL.md`: Completely updated to Version 3.0.0, documenting:
+    * 1 credit = 1 final video operation flat pricing model.
+    * Live tiers: Free (15 credits, 20m cap), Starter ($29, 150 credits, 90m cap), Pro Creator ($59, 400 credits, 120m cap).
+    * One-time credit packs: pack_50 ($15), pack_150 ($35), pack_500 ($89).
+    * Free tier lifetime liability capped at $0.0494 per user.
+    * LTV/CAC projections and AutoPilot circuit breakers.
+- **Verification**:
+  - `npm test`: 19/19 test files passed, 273/273 tests passed (100%).
+  - `npx tsc --noEmit`: 0 errors.

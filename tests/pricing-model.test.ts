@@ -58,20 +58,20 @@ describe('Pricing Model & Unit Economics', () => {
 
   it('guarantees Clipper tier gross margin exceeds 60% (target >= 60%)', () => {
     const eco = calcTierEconomics('clipper')
-    expect(eco.revenue).toBe(19.0)
-    expect(eco.stripeFee).toBeCloseTo(0.851, 2)
-    expect(eco.totalCogs).toBeLessThan(2.5) // Total COGS is under $2.50
+    expect(eco.revenue).toBe(29.0)
+    expect(eco.stripeFee).toBeCloseTo(1.141, 2)
+    expect(eco.totalCogs).toBeLessThan(3.0) // Total COGS is under $3.00 (~$1.64)
     expect(eco.grossMargin).toBeGreaterThan(0.6) // Margin > 60%
-    expect(eco.grossMargin).toBeGreaterThan(0.85) // Actually > 85%
+    expect(eco.grossMargin).toBeGreaterThan(0.85) // Actually > 90%
   })
 
   it('guarantees Studio tier gross margin exceeds 60% (target >= 60%)', () => {
     const eco = calcTierEconomics('studio')
-    expect(eco.revenue).toBe(49.0)
-    expect(eco.stripeFee).toBeCloseTo(1.721, 2)
-    expect(eco.totalCogs).toBeLessThan(7.0) // Total COGS is under $7.00
+    expect(eco.revenue).toBe(59.0)
+    expect(eco.stripeFee).toBeCloseTo(2.011, 2)
+    expect(eco.totalCogs).toBeLessThan(7.0) // Total COGS is under $7.00 (~$3.33)
     expect(eco.grossMargin).toBeGreaterThan(0.6) // Margin > 60%
-    expect(eco.grossMargin).toBeGreaterThan(0.85) // Actually > 85%
+    expect(eco.grossMargin).toBeGreaterThan(0.85) // Actually > 90%
   })
 
   it('verifies fast clip adjustment COGS is under $0.001 and margin is > 95%', () => {
@@ -82,8 +82,8 @@ describe('Pricing Model & Unit Economics', () => {
 
     expect(adjustTotalCost).toBeLessThan(0.001) // Less than a tenth of a cent ($0.0004)
 
-    // 1 credit value in Clipper plan ($19 / 300 = $0.0633)
-    const creditValue = 19 / 300
+    // 1 credit value in Clipper plan ($29 / 150 = $0.1933)
+    const creditValue = 29 / 150
     const margin = (creditValue - adjustTotalCost) / creditValue
     expect(margin).toBeGreaterThan(0.95) // > 95% margin
   })

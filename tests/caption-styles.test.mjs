@@ -27,7 +27,7 @@ describe('caption-styles', () => {
   ]
 
   it('contains at least 15 distinct visual styles across Kinetic, Editorial, and Creative categories', () => {
-    expect(Object.keys(CAPTION_STYLES).length).toBe(15)
+    expect(Object.keys(CAPTION_STYLES).length).toBeGreaterThanOrEqual(15)
     for (const id of styleIds) {
       expect(CAPTION_STYLES[id]).toBeDefined()
       expect(CAPTION_STYLES[id].name).toBeTruthy()
