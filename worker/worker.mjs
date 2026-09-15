@@ -773,6 +773,13 @@ async function renderClip(src, moment, dir, idx, transcript, mode = 'smart', cap
 
   let vfCore
   switch (mode) {
+    case 'split':
+    case 'podcast_split': {
+      const halfH = Math.round(H / 2)
+      // 2-Speaker Podcast Vertical Split: Host on top, Guest on bottom
+      vfCore = `split[left][right];[left]crop=iw/2:ih:0:0,scale=${W}:${halfH}:force_original_aspect_ratio=increase,crop=${W}:${halfH}[top];[right]crop=iw/2:ih:iw/2:0,scale=${W}:${halfH}:force_original_aspect_ratio=increase,crop=${W}:${halfH}[bottom];[top][bottom]vstack`
+      break
+    }
     case 'blur':
       // original framing kept, bars filled with a soft blurred copy of the shot
       vfCore = `split[a][b];[a]scale=${W}:${H}:force_original_aspect_ratio=increase,crop=${W}:${H},gblur=sigma=28[bgb];[b]scale=${W}:-2[fg];[bgb][fg]overlay=(W-w)/2:(H-h)/2`
@@ -1235,6 +1242,101 @@ async function claimNextJob() {
   return prisma.processingJob.findUnique({ where: { id: candidate.id } })
 }
 
+/** Auto-Pilot YouTube channel monitor */
+async function checkAutoPilotChannels() {
+  try {
+    const halfHourAgo = new Date(Date.now() - 30 * 60_000)
+    const channels = await prisma.autoPilotChannel.findMany({
+      where: {
+        isActive: true,
+        OR: [
+          { lastCheckedAt: null },
+          { lastCheckedAt: { lt: halfHourAgo } },
+        ],
+      },
+      take: 4,
+    })
+
+    if (!channels.length) return
+
+    for (const ch of channels) {
+      try {
+        console.log(`[autopilot] checking channel: ${ch.channelUrl}`)
+        await prisma.autoPilotChannel.update({
+          where: { id: ch.id },
+          data: { lastCheckedAt: new Date() },
+        })
+
+        const urlToProbe = ch.channelUrl.endsWith('/videos') ? ch.channelUrl : `${ch.channelUrl.replace(/\/$/, '')}/videos`
+        const out = await sh('yt-dlp', [
+          '--flat-playlist',
+          '--playlist-end', '1',
+          '--print', '%(id)s||%(title)s',
+          urlToProbe,
+        ], { timeout: 35_000 }).catch(() => null)
+
+        if (!out || !out.trim()) continue
+        const [videoId, videoTitle] = out.trim().split('||')
+        if (!videoId || videoId === ch.lastVideoId) continue
+
+        console.log(`[autopilot] new upload detected on ${ch.channelUrl}: ${videoId} ("${videoTitle}")`)
+
+        const owner = await prisma.user.findUnique({
+          where: { id: ch.userId },
+          select: { credits: true },
+        })
+
+        if (!owner || owner.credits < 1) {
+          console.log(`[autopilot] user ${ch.userId} has insufficient credits (${owner?.credits ?? 0})`)
+          continue
+        }
+
+        await prisma.$transaction(async (tx) => {
+          await tx.user.update({
+            where: { id: ch.userId },
+            data: { credits: { decrement: 1 } },
+          })
+          await tx.creditTransaction.create({
+            data: {
+              userId: ch.userId,
+              amount: -1,
+              type: 'usage',
+              description: `Auto-Pilot: "${(videoTitle || 'New Video').slice(0, 60)}"`,
+            },
+          })
+          const p = await tx.project.create({
+            data: {
+              userId: ch.userId,
+              title: videoTitle || `AutoPilot: ${ch.channelTitle || 'New Video'}`,
+              sourceUrl: `https://www.youtube.com/watch?v=${videoId}`,
+              duration: 0,
+              framing: ch.framing || 'smart',
+              language: 'auto',
+              captionStyle: ch.captionStyle || 'arabic_luxury',
+              aspectRatio: ch.aspectRatio || '9:16',
+              status: 'PENDING',
+              creditsUsed: 1,
+            },
+          })
+          await tx.processingJob.create({
+            data: { projectId: p.id, type: 'clip_generation', status: 'queued' },
+          })
+          await tx.autoPilotChannel.update({
+            where: { id: ch.id },
+            data: { lastVideoId: videoId },
+          })
+        })
+
+        console.log(`[autopilot] enqueued project for video ${videoId} from channel ${ch.channelUrl}`)
+      } catch (chErr) {
+        console.error(`[autopilot] error inspecting ${ch.channelUrl}:`, chErr.message)
+      }
+    }
+  } catch (err) {
+    console.error('[autopilot] sweep failed:', err.message)
+  }
+}
+
 async function loop() {
   await syncConfigInto()
   const envFlags = {
@@ -1251,11 +1353,12 @@ async function loop() {
     // time — refresh the live config each loop (cheap, 60s cache).
     await syncConfigInto()
 
-    // Periodic stale-job recovery & orphan directory cleanup:
+    // Periodic stale-job recovery, orphan directory cleanup, & autopilot sweep:
     if (Date.now() - lastSweep >= 5 * 60_000) {
       lastSweep = Date.now()
       await recoverStale()
       await cleanOrphanTempDirs()
+      await checkAutoPilotChannels()
     }
 
     try {

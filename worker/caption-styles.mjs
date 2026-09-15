@@ -422,6 +422,25 @@ const ARABIC_HYPE = new Set([
   'حقيقة', 'معلومة', 'قنبلة', 'مهم', 'ياجماعة', 'اسمع'
 ])
 
+const REACTION_STICKERS = [
+  { words: ['فلوس', 'ارباح', 'أرباح', 'ثروة', 'دولار', 'money', 'dollar', 'cash', 'rich', 'profit'], emoji: '💰' },
+  { words: ['صاروخ', 'انفجار', 'انطلق', 'rocket', 'moon', 'growth', 'fast', 'سرعة'], emoji: '🚀' },
+  { words: ['نار', 'حريقة', 'ولعت', 'fire', 'hot', 'viral', 'رهيب', 'أسطوري'], emoji: '🔥' },
+  { words: ['انتبه', 'احذر', 'خطر', 'كارثة', 'warning', 'danger', 'stop', 'إياك'], emoji: '⚠️' },
+  { words: ['فكرة', 'سر', 'السر', 'حل', 'idea', 'secret', 'smart', 'ذكاء'], emoji: '💡' },
+  { words: ['ملايين', 'مليون', 'أرقام', 'نمو', 'chart', 'upgrade', 'مبيعات'], emoji: '📈' },
+]
+
+function findStickerForText(text) {
+  const norm = text.toLowerCase().replace(/^[^\w\u0600-\u06FF]+|[^\w\u0600-\u06FF]+$/g, '')
+  for (const s of REACTION_STICKERS) {
+    if (s.words.some((w) => norm.includes(w) || w.includes(norm))) {
+      return s.emoji
+    }
+  }
+  return null
+}
+
 export function getCaptionStyle(styleId) {
   return CAPTION_STYLES[styleId] ?? CAPTION_STYLES.hormozi
 }
@@ -492,6 +511,9 @@ export function buildKaraokeAss(words, start, end, emoji = null, styleId = 'horm
 
   const posX = Math.round(W / 2)
   const posY = Math.round(H * style.posYRatio)
+  const stickerY = Math.round(H * (style.posYRatio > 0.6 ? style.posYRatio - 0.16 : style.posYRatio + 0.16))
+  const stickerFontSize = Math.round(W * 0.08)
+  let lastStickerTime = -5
 
   cards.forEach((card, i) => {
     // Relative to clip start since FFmpeg cut input resets PTS to 00:00:00
@@ -501,6 +523,19 @@ export function buildKaraokeAss(words, start, end, emoji = null, styleId = 'horm
         ? Math.min(card[card.length - 1].end, end)
         : Math.min(card[card.length - 1].end, cards[i + 1][0]?.start ?? end)
     let ce = Math.max(cs + 0.35, rawCe - start)
+
+    // Dynamic Visual Reaction Sticker / GIF-style pop cue
+    if (cs - lastStickerTime >= 4.0) {
+      for (const w of card) {
+        const matched = findStickerForText(w.text)
+        if (matched) {
+          lastStickerTime = cs
+          const stDur = Math.min(0.85, ce - cs)
+          events += `Dialogue: 3,${tsAss(cs)},${tsAss(cs + stDur)},MainStyle,,0,0,0,,{\\an5\\fad(60,100)\\pos(${posX},${stickerY})\\fs${stickerFontSize}\\t(0,80,\\fscx135\\fscy135)\\t(80,170,\\fscx100\\fscy100)}${matched}\n`
+          break
+        }
+      }
+    }
 
     let rawText
     if (style.id === 'two_tone') {

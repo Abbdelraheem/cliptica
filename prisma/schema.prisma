@@ -54,7 +54,7 @@ model User {
   avatar               String?
   passwordHash         String?
   role                 UserRole  @default(FREE)
-  credits              Int       @default(40)
+  credits              Int       @default(15)
   stripeCustomerId     String?
   stripeSubscriptionId String?
   stripePriceId        String?
@@ -80,6 +80,7 @@ model User {
   emailVerificationTokens EmailVerificationToken[]
   socialConnections       SocialConnection[]
   socialPublishLogs       SocialPublishLog[]
+  autoPilotChannels       AutoPilotChannel[]
   referredByAffiliateId   String?
   referredByAffiliate     Affiliate? @relation("UserReferral", fields: [referredByAffiliateId], references: [id], onDelete: SetNull)
   referredAt              DateTime?
@@ -436,5 +437,27 @@ model ReferralConversion {
 
   @@index([affiliateId, type, createdAt])
   @@index([userId])
+}
+
+model AutoPilotChannel {
+  id             String    @id @default(cuid())
+  userId         String
+  channelUrl     String
+  channelTitle   String?
+  lastCheckedAt  DateTime?
+  lastVideoId    String?
+  isActive       Boolean   @default(true)
+  clipsPerVideo  Int       @default(3)
+  captionStyle   String    @default("hormozi")
+  aspectRatio    String    @default("9:16")
+  framing        String    @default("crop")
+  autoApprove    Boolean   @default(true)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([isActive])
 }
 

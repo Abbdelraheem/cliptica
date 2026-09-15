@@ -15,6 +15,7 @@ import {
   Menu,
   X,
   ShieldCheck,
+  Radio,
 } from 'lucide-react'
 import { Wordmark } from '@/components/logo'
 import { getDeviceId } from '@/lib/fingerprint'
@@ -22,6 +23,7 @@ import { getDeviceId } from '@/lib/fingerprint'
 const NAV_ITEMS = [
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
   { name: 'Projects', href: '/dashboard/projects', icon: FolderOpen },
+  { name: 'Auto-Pilot', href: '/dashboard/autopilot', icon: Radio },
   { name: 'Campaigns', href: '/dashboard/campaigns', icon: Megaphone },
   { name: 'Earnings', href: '/dashboard/earnings', icon: BarChart3 },
   { name: 'Billing', href: '/dashboard/billing', icon: CreditCard },

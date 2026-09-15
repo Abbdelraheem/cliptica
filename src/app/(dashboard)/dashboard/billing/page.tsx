@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useSession } from 'next-auth/react'
 import { useSearchParams } from 'next/navigation'
-import { Check, Zap, ShieldCheck } from 'lucide-react'
+import { Check, Zap, ShieldCheck, Gift, Copy, CheckCircle2, Users } from 'lucide-react'
 
 const PLANS = [
   {
@@ -12,7 +12,7 @@ const PLANS = [
     role: 'FREE',
     price: '$0',
     period: '/ forever',
-    credits: '30 credits to start',
+    credits: '15 credits to start',
     items: ['Arabic & English captions', '720p exports with mark', 'Up to 3 videos / day'],
   },
   {
@@ -80,6 +80,13 @@ export default function BillingPage() {
   const [loading, setLoading] = useState<string | null>(null)
   const [error, setError] = useState('')
   const [liveCredits, setLiveCredits] = useState<number | null>(null)
+  const [referral, setReferral] = useState<{
+    code: string
+    referralUrl: string
+    signupsCount: number
+    earnedCredits: number
+  } | null>(null)
+  const [copiedRef, setCopiedRef] = useState(false)
 
   useEffect(() => {
     let cancelled = false
@@ -91,6 +98,16 @@ export default function BillingPage() {
         }
       })
       .catch(() => {})
+
+    fetch('/api/user/referral')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (!cancelled && d?.code) {
+          setReferral(d)
+        }
+      })
+      .catch(() => {})
+
     return () => {
       cancelled = true
     }
@@ -163,6 +180,80 @@ export default function BillingPage() {
               Stripe Customer Portal
             </a>
           )}
+        </div>
+      </div>
+
+      {/* Referral Program Card */}
+      <div className="mt-8 rounded-3xl border border-champagne/30 bg-gradient-to-br from-champagne/10 via-onyx-2 to-black p-6 md:p-8 shadow-xl">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-gold/15 text-gold border border-gold/30">
+              <Gift className="h-5 w-5" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs uppercase tracking-[0.2em] font-semibold text-champagne">Viral Referral Program</span>
+                <span className="rounded-full bg-gold/20 px-2 py-0.5 text-[10px] font-bold text-gold">+5 Credits / Friend</span>
+              </div>
+              <h3 className="font-display text-xl font-bold text-pearl mt-0.5">
+                ادعُ أصدقاءك وصنّاع المحتوى واكسب رصيداً مجانياً
+              </h3>
+            </div>
+          </div>
+          {referral && (
+            <div className="flex items-center gap-4">
+              <div className="rounded-xl border border-hair/50 bg-black/40 px-4 py-2 text-center">
+                <p className="text-[10px] uppercase tracking-wider text-mist">الأصدقاء المنضمون</p>
+                <p className="font-display text-lg font-bold text-pearl flex items-center justify-center gap-1 mt-0.5">
+                  <Users className="h-3.5 w-3.5 text-champagne" />
+                  {referral.signupsCount}
+                </p>
+              </div>
+              <div className="rounded-xl border border-gold/40 bg-gold/10 px-4 py-2 text-center">
+                <p className="text-[10px] uppercase tracking-wider text-gold">أرباحك المكتسبة</p>
+                <p className="font-display text-lg font-bold text-gold mt-0.5">
+                  +{referral.earnedCredits} كريديت
+                </p>
+              </div>
+            </div>
+          )}
+        </div>
+
+        <p className="mt-3 max-w-2xl text-xs sm:text-sm font-light text-mist leading-relaxed">
+          شارك رابط دعوتك الحصري: أي صانع محتوى يسجل من خلالك، يحصل هو على <strong>15 كريديت مجاناً</strong> لتجربة المنصة، وتحصل أنت تلقائياً على <strong>+5 كريديت فوراً</strong> في حسابك تضاف بدون أي حدود.
+        </p>
+
+        <div className="mt-5 flex flex-col sm:flex-row items-stretch sm:items-center gap-3 max-w-2xl">
+          <input
+            type="text"
+            readOnly
+            value={referral?.referralUrl || 'Loading referral link…'}
+            className="flex-1 rounded-xl border border-hair/60 bg-black/60 px-4 py-2.5 text-xs sm:text-sm font-mono text-pearl focus:outline-none focus:border-champagne/80"
+          />
+          <button
+            type="button"
+            onClick={() => {
+              if (referral?.referralUrl) {
+                navigator.clipboard.writeText(referral.referralUrl)
+                setCopiedRef(true)
+                setTimeout(() => setCopiedRef(false), 2500)
+              }
+            }}
+            disabled={!referral}
+            className="btn-lux btn-gold !py-2.5 !px-5 inline-flex items-center justify-center gap-2 shrink-0 text-xs font-semibold"
+          >
+            {copiedRef ? (
+              <>
+                <CheckCircle2 className="h-4 w-4 text-black" />
+                تم النسخ!
+              </>
+            ) : (
+              <>
+                <Copy className="h-4 w-4 text-black" />
+                نسخ رابط الدعوة
+              </>
+            )}
+          </button>
         </div>
       </div>
 

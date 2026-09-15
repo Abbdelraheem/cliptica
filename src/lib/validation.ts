@@ -60,6 +60,9 @@ export const VALID_CAPTION_STYLES = [
   'typewriter',
   'two_tone',
   'glitch_flicker',
+  'arabic_luxury',
+  'arabic_viral',
+  'arabic_clean',
 ] as const
 
 export const clipAdjustSchema = z
@@ -119,7 +122,7 @@ export function normaliseVideoUrl(input?: string | null): string | null {
   }
 }
 
-export const PROJECT_FRAMINGS = ['smart', 'face', 'center', 'blur', 'letter', 'variety'] as const
+export const PROJECT_FRAMINGS = ['smart', 'face', 'center', 'blur', 'letter', 'variety', 'split', 'podcast_split'] as const
 export const PROJECT_LANGUAGES = ['auto', 'en', 'ar', 'es', 'fr', 'de', 'tr', 'hi', 'pt'] as const
 export const PROJECT_ASPECT_RATIOS = ['9:16', '1:1', '16:9'] as const
 

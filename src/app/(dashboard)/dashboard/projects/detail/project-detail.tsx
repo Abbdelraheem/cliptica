@@ -54,6 +54,10 @@ const STAGE_COPY: Record<string, string> = {
 }
 
 const CAPTION_PRESET_OPTIONS = [
+  // === ARABIC NATIVE ===
+  { id: 'arabic_luxury', category: 'Arabic Luxury', name: 'عربي ملكي ذهبي (Arabic Luxury)' },
+  { id: 'arabic_viral', category: 'Arabic Luxury', name: 'عربي تيك توك فايرال (Arabic Viral)' },
+  { id: 'arabic_clean', category: 'Arabic Luxury', name: 'عربي كلاسيك نقي (Arabic Clean)' },
   // === KINETIC ===
   { id: 'hormozi', category: 'Kinetic', name: 'Hormozi Pop (Yellow High-Impact)' },
   { id: 'bold_impact', category: 'Kinetic', name: 'Bold Impact (Punchy Gold Uppercase)' },
@@ -92,6 +96,10 @@ export default function ProjectDetail({ projectId }: { projectId: string }) {
   })
   const [adjusting, setAdjusting] = useState(false)
   const [adjustError, setAdjustError] = useState<string | null>(null)
+
+  // Viral Export Kit Modal state
+  const [exportKitClip, setExportKitClip] = useState<Clip | null>(null)
+  const [copiedKitField, setCopiedKitField] = useState<string | null>(null)
 
   // Direct publishing state
   const [publishingClip, setPublishingClip] = useState<Clip | null>(null)
@@ -231,19 +239,6 @@ export default function ProjectDetail({ projectId }: { projectId: string }) {
       setAdjustError(e instanceof Error ? e.message : 'Failed to adjust clip')
     } finally {
       setAdjusting(false)
-    }
-  }
-
-  const copySocialKit = async (c: Clip) => {
-    const hook = c.description || 'Watch this viral highlight.'
-    const hashtags = '#shorts #viral #fyp #reels #trending #growth'
-    const postText = `${c.title}\n\n${hook}\n\n${hashtags}`
-    try {
-      await navigator.clipboard.writeText(postText)
-      setCopiedId(`kit-${c.id}`)
-      setTimeout(() => setCopiedId(null), 2500)
-    } catch {
-      /* ignore clipboard rejection */
     }
   }
 
@@ -535,15 +530,13 @@ export default function ProjectDetail({ projectId }: { projectId: string }) {
 
                     <button
                       type="button"
-                      onClick={() => copySocialKit(c)}
-                      className="btn-lux btn-outline !py-1.5 !px-2.5 !text-xs !font-normal"
-                      title="Copy viral title, hook, and trending hashtags for TikTok/Shorts/Reels"
+                      onClick={() => setExportKitClip(c)}
+                      disabled={c.status === 'GENERATING'}
+                      className="btn-lux btn-outline !py-1.5 !px-2.5 !text-xs !font-normal flex items-center gap-1.5 text-gold border-gold/30 hover:!border-gold hover:bg-gold/10"
+                      title="حزمة النشر الفايرال المتكاملة (عناوين، وصف، هاشتاقات، وأفضل الأوقات)"
                     >
-                      {copiedId === `kit-${c.id}` ? (
-                        <Check className="h-3.5 w-3.5 text-emerald-400" />
-                      ) : (
-                        <Copy className="h-3.5 w-3.5 text-champagne" />
-                      )}
+                      <Sparkles className="h-3.5 w-3.5 text-gold" />
+                      <span>حزمة الفايرال</span>
                     </button>
 
                     {(c.exportUrl || c.videoUrl) && (
@@ -959,6 +952,205 @@ export default function ProjectDetail({ projectId }: { projectId: string }) {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Viral Social Export Kit Modal */}
+      {exportKitClip && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-in fade-in duration-200">
+          <div className="relative w-full max-w-2xl rounded-3xl border border-gold/30 bg-onyx-2 p-6 md:p-8 shadow-2xl overflow-y-auto max-h-[90vh]">
+            <button
+              onClick={() => setExportKitClip(null)}
+              className="absolute right-5 top-5 rounded-full p-2 text-mist hover:bg-white/10 hover:text-white"
+            >
+              <X className="h-5 w-5" />
+            </button>
+
+            <div className="flex items-center gap-3">
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-gold/15 text-gold border border-gold/30">
+                <Sparkles className="h-5 w-5" />
+              </div>
+              <div>
+                <span className="text-xs uppercase tracking-[0.2em] font-semibold text-gold">Viral Social Kit</span>
+                <h3 className="font-display text-xl font-bold text-pearl mt-0.5">
+                  حزمة النشر الفايرال المتكاملة
+                </h3>
+              </div>
+            </div>
+
+            <p className="mt-2 text-xs sm:text-sm text-mist font-light leading-relaxed">
+              كل ما تحتاجه لنشر هذا المقطع على TikTok وInstagram Reels وYouTube Shorts لتحقيق أعلى انتشار وتفاعل.
+            </p>
+
+            <div className="mt-6 space-y-4">
+              {/* 1. Viral Title */}
+              <div className="rounded-2xl border border-hair/60 bg-black/40 p-4">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-xs font-semibold uppercase tracking-wider text-champagne">
+                    1. عنوان جاذب ومثير (Hook Title)
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      navigator.clipboard.writeText(exportKitClip.title)
+                      setCopiedKitField('title')
+                      setTimeout(() => setCopiedKitField(null), 2000)
+                    }}
+                    className="btn-lux btn-outline !py-1 !px-2.5 !text-[11px] inline-flex items-center gap-1 text-champagne"
+                  >
+                    {copiedKitField === 'title' ? (
+                      <>
+                        <Check className="h-3.5 w-3.5 text-emerald-400" />
+                        <span>تم النسخ</span>
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="h-3.5 w-3.5" />
+                        <span>نسخ العنوان</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+                <p className="text-sm font-medium text-pearl">{exportKitClip.title}</p>
+              </div>
+
+              {/* 2. SEO Video Description */}
+              <div className="rounded-2xl border border-hair/60 bg-black/40 p-4">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-xs font-semibold uppercase tracking-wider text-champagne">
+                    2. وصف الفيديو التفاعلي (Description & CTA)
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const desc = `${exportKitClip.description || exportKitClip.title}\n\n💬 شاركنا رأيك بالتعليقات، هل توافق هذا الرأي؟\n🔥 تابع الحساب لمزيد من المقاطع القوية يومياً!`
+                      navigator.clipboard.writeText(desc)
+                      setCopiedKitField('desc')
+                      setTimeout(() => setCopiedKitField(null), 2000)
+                    }}
+                    className="btn-lux btn-outline !py-1 !px-2.5 !text-[11px] inline-flex items-center gap-1 text-champagne"
+                  >
+                    {copiedKitField === 'desc' ? (
+                      <>
+                        <Check className="h-3.5 w-3.5 text-emerald-400" />
+                        <span>تم النسخ</span>
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="h-3.5 w-3.5" />
+                        <span>نسخ الوصف</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+                <p className="text-xs text-mist font-light whitespace-pre-line leading-relaxed">
+                  {exportKitClip.description || exportKitClip.title}
+                  {'\n\n💬 شاركنا رأيك بالتعليقات، هل توافق هذا الرأي؟\n🔥 تابع الحساب لمزيد من المقاطع القوية يومياً!'}
+                </p>
+              </div>
+
+              {/* 3. Trending Hashtags */}
+              <div className="rounded-2xl border border-hair/60 bg-black/40 p-4">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-xs font-semibold uppercase tracking-wider text-champagne">
+                    3. الهاشتاقات المتصدرة (Trending Tags)
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const tags = '#Shorts #Reels #TikTok #Viral #اكسبلور #ترند #فيديو_اليوم #fyp #explore'
+                      navigator.clipboard.writeText(tags)
+                      setCopiedKitField('tags')
+                      setTimeout(() => setCopiedKitField(null), 2000)
+                    }}
+                    className="btn-lux btn-outline !py-1 !px-2.5 !text-[11px] inline-flex items-center gap-1 text-champagne"
+                  >
+                    {copiedKitField === 'tags' ? (
+                      <>
+                        <Check className="h-3.5 w-3.5 text-emerald-400" />
+                        <span>تم النسخ</span>
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="h-3.5 w-3.5" />
+                        <span>نسخ الهاشتاقات</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+                <div className="flex flex-wrap gap-1.5 mt-1">
+                  {['#Shorts', '#Reels', '#TikTok', '#Viral', '#اكسبلور', '#ترند', '#فيديو_اليوم', '#fyp', '#explore'].map((tag) => (
+                    <span key={tag} className="rounded-lg bg-hair/40 px-2 py-0.5 text-xs font-mono text-champagne">
+                      {tag}
+                    </span>
+                  ))}
+                </div>
+              </div>
+
+              {/* 4. Best Posting Times */}
+              <div className="rounded-2xl border border-gold/20 bg-gold/5 p-4">
+                <div className="flex items-center gap-2 mb-1 text-gold">
+                  <Clock className="h-4 w-4" />
+                  <span className="text-xs font-semibold uppercase tracking-wider">
+                    أفضل أوقات النشر للحصول على أعلى وصول:
+                  </span>
+                </div>
+                <p className="text-xs text-mist leading-relaxed mt-1">
+                  • <strong>الفترة المسائية (الذروة):</strong> بين 06:00 م و 09:30 م بالتوقيت المحلي.
+                  <br />
+                  • <strong>فترة الظهيرة:</strong> بين 01:00 م و 03:30 م.
+                </p>
+              </div>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="mt-6 pt-4 border-t border-hair-soft flex flex-wrap items-center justify-between gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  const allBundle = `${exportKitClip.title}\n\n${exportKitClip.description || exportKitClip.title}\n\n💬 شاركنا رأيك بالتعليقات!\n🔥 تابعنا لمزيد من المقاطع يومياً\n\n#Shorts #Reels #TikTok #Viral #اكسبلور #ترند #fyp`
+                  navigator.clipboard.writeText(allBundle)
+                  setCopiedKitField('all')
+                  setTimeout(() => setCopiedKitField(null), 2500)
+                }}
+                className="btn-lux btn-gold !py-2.5 !px-5 text-xs font-semibold inline-flex items-center gap-2"
+              >
+                {copiedKitField === 'all' ? (
+                  <>
+                    <Check className="h-4 w-4 text-black" />
+                    <span>تم نسخ الحزمة كاملة!</span>
+                  </>
+                ) : (
+                  <>
+                    <Copy className="h-4 w-4 text-black" />
+                    <span>نسخ الحزمة كاملة (Title + Desc + Tags)</span>
+                  </>
+                )}
+              </button>
+
+              <div className="flex items-center gap-2">
+                {exportKitClip.videoUrl || exportKitClip.exportUrl ? (
+                  <a
+                    href={exportKitClip.exportUrl || exportKitClip.videoUrl || '#'}
+                    download={`${exportKitClip.title || 'viral-clip'}.mp4`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="btn-lux btn-outline !py-2.5 !px-4 text-xs inline-flex items-center gap-2"
+                  >
+                    <Download className="h-4 w-4 text-champagne" />
+                    <span>تحميل الفيديو MP4</span>
+                  </a>
+                ) : null}
+                <button
+                  type="button"
+                  onClick={() => setExportKitClip(null)}
+                  className="btn-lux btn-outline !py-2.5 !px-4 text-xs"
+                >
+                  إغلاق
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}

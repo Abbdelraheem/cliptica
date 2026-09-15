@@ -13,6 +13,7 @@ import { cleanUrlString, normaliseVideoUrl } from '@/lib/validation'
 
 const FRAMINGS = [
   { id: 'smart', name: 'Smart framing', desc: 'Crops to the speaker when there is one — center otherwise.', icon: ScanFace },
+  { id: 'split', name: 'Podcast Split (تقسيم شخصين)', desc: 'Stacks host on top and guest on bottom in 9:16 vertical.', icon: Frame },
   { id: 'face', name: 'Face track', desc: 'Fills the frame and follows whoever is talking.', icon: ScanFace },
   { id: 'blur', name: 'Blurred backdrop', desc: 'Original framing with soft-blur bars.', icon: Frame },
   { id: 'letter', name: 'Letterbox', desc: 'Original framing on clean black.', icon: RectangleHorizontal },
@@ -32,6 +33,47 @@ const LANGS = [
 ] as const
 
 const CAPTION_PRESETS = [
+  // === ARABIC NATIVE CATEGORY ===
+  {
+    id: 'arabic_luxury',
+    category: 'Arabic Luxury',
+    name: 'عربي ملكي ذهبي',
+    desc: 'خط عربي عريض فخم مع توهج ذهبي وكلمات مفتاحية بارزة باللون الملكي.',
+    badge: 'الأكثر طلباً',
+    sample: 'سر النجاح المالي',
+    sampleStyle: {
+      color: '#FFD700',
+      textShadow: '0 3px 6px rgba(0,0,0,1), 0 0 4px #000',
+      fontWeight: 900,
+    },
+  },
+  {
+    id: 'arabic_viral',
+    category: 'Arabic Luxury',
+    name: 'عربي تيك توك فايرال',
+    desc: 'كلمات سريعة قافزة مع تلوين أصفر وأبيض لجذب الانتباه في أول 3 ثواني.',
+    badge: 'فايرال',
+    sample: 'اسمع هذي المفاجأة!',
+    sampleStyle: {
+      color: '#FFFFFF',
+      textShadow: '0 2px 4px rgba(0,0,0,0.9), 0 0 2px #000',
+      fontWeight: 900,
+    },
+  },
+  {
+    id: 'arabic_clean',
+    category: 'Arabic Luxury',
+    name: 'عربي كلاسيك نقي',
+    desc: 'نصوص واضحة ومريحة ومظللة في الأسفل ملائمة للبودكاست والمقابلات.',
+    badge: 'بودكاست',
+    sample: 'ما لم يخبرك به أحد',
+    sampleStyle: {
+      color: '#FFFFFF',
+      fontWeight: 700,
+      textShadow: '0 2px 4px rgba(0,0,0,0.8)',
+    },
+  },
+
   // === KINETIC CATEGORY ===
   {
     id: 'hormozi',

@@ -24,13 +24,13 @@ export const PLANS: Record<PlanKey, PlanDef> = {
   free: {
     name: 'Free',
     price: 0,
-    credits: 30,
+    credits: 15,
     maxVideoLength: 20, // minutes
     maxDailyVideos: 3,
     watermark: true,
     maxResolution: '720p',
     features: [
-      '30 credits to start',
+      '15 credits to start',
       'Karaoke captions (Arabic + English)',
       '720p exports with watermark',
       'Up to 3 videos/day',

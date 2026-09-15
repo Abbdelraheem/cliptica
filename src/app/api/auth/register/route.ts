@@ -30,13 +30,15 @@ export async function POST(request: Request) {
     const referralCode = (ref || cookieMatch?.[1] || '').trim().toLowerCase()
 
     let affiliateId: string | null = null
+    let affiliateOwnerUserId: string | null = null
     if (referralCode) {
       const affiliate = await prisma.affiliate.findUnique({
         where: { code: referralCode },
-        select: { id: true, isActive: true },
+        select: { id: true, isActive: true, userId: true },
       })
       if (affiliate?.isActive) {
         affiliateId = affiliate.id
+        affiliateOwnerUserId = affiliate.userId
       }
     }
 
@@ -68,7 +70,7 @@ export async function POST(request: Request) {
         email,
         passwordHash,
         name,
-        credits: 40,
+        credits: 15,
         role: 'FREE',
         referredByAffiliateId: affiliateId,
         referredAt: affiliateId ? new Date() : null,
@@ -83,6 +85,23 @@ export async function POST(request: Request) {
           type: 'SIGNUP',
         },
       }).catch((err) => console.error('[referral] signup conversion error:', err))
+
+      // Reward the referring user with +5 bonus credits
+      if (affiliateOwnerUserId) {
+        await prisma.user.update({
+          where: { id: affiliateOwnerUserId },
+          data: { credits: { increment: 5 } },
+        }).catch((err) => console.error('[referral] credit reward error:', err))
+
+        await prisma.creditTransaction.create({
+          data: {
+            userId: affiliateOwnerUserId,
+            amount: 5,
+            type: 'bonus',
+            description: `Referral bonus for inviting ${user.name || user.email}`,
+          },
+        }).catch((err) => console.error('[referral] tx log error:', err))
+      }
     }
 
     // Bind this device to the new account.
@@ -112,7 +131,7 @@ export async function POST(request: Request) {
     await prisma.creditTransaction.create({
       data: {
         userId: user.id,
-        amount: 40,
+        amount: 15,
         type: 'bonus',
         description: 'Starting credits for new account',
       },
