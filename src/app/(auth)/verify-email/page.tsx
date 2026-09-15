@@ -3,17 +3,19 @@
 import { Suspense, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
-import { CheckCircle2, Loader2, MailWarning } from 'lucide-react'
+import { CheckCircle2, Loader2, MailCheck, MailWarning } from 'lucide-react'
 import { Wordmark } from '@/components/logo'
 
 function VerifyEmailInner() {
   const searchParams = useSearchParams()
   const token = searchParams.get('token') ?? ''
+  const emailParam = searchParams.get('email') ?? ''
+  const isRegistered = searchParams.get('registered') === 'true'
 
-  const [state, setState] = useState<'verifying' | 'success' | 'failed' | 'resend'>(
-    token ? 'verifying' : 'resend'
+  const [state, setState] = useState<'verifying' | 'success' | 'failed' | 'resend' | 'registered'>(
+    token ? 'verifying' : isRegistered ? 'registered' : 'resend'
   )
-  const [email, setEmail] = useState('')
+  const [email, setEmail] = useState(emailParam)
   const [resent, setResent] = useState(false)
   const [resendError, setResendError] = useState('')
   const [loading, setLoading] = useState(false)
@@ -94,7 +96,18 @@ function VerifyEmailInner() {
         </>
       )}
 
-      {(state === 'failed' || state === 'resend') && (
+      {state === 'registered' && (
+        <>
+          <p className="text-xs uppercase tracking-[0.3em] text-champagne">Check your inbox</p>
+          <h1 className="display-md mt-3">Confirm your email</h1>
+          <p className="mt-4 flex items-start gap-2 rounded-lg border border-hair bg-surface px-4 py-2.5 text-xs leading-relaxed text-mist-2">
+            <MailCheck className="mt-0.5 h-4 w-4 shrink-0 text-gold" />
+            We sent a verification link to <strong className="text-pearl">{email || 'your email'}</strong>. Click the link in the message to activate your 15 free credits.
+          </p>
+        </>
+      )}
+
+      {(state === 'failed' || state === 'resend' || state === 'registered') && (
         <form onSubmit={handleResend} className="mt-8 space-y-4">
           <div>
             <label htmlFor="email" className="mb-2 block text-sm font-light text-mist">Email</label>

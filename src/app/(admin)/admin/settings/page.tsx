@@ -24,9 +24,9 @@ const DEFAULTS: SettingsState = {
   whisper_model: 'whisper-large-v3-turbo',
   groq_api_key: '',
   openai_api_key: '',
-  free_starting_credits: 40,
-  clipper_monthly_credits: 300,
-  studio_monthly_credits: 1200,
+  free_starting_credits: 15,
+  clipper_monthly_credits: 150,
+  studio_monthly_credits: 400,
   youtube_cookies: '',
 }
 

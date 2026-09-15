@@ -12,7 +12,7 @@ const schema = z.object({
 
 const DEFAULT_PLAN_CREDITS = {
   FREE: 0,
-  CLIPPER: 100,
+  CLIPPER: 150,
   STUDIO: 400,
 }
 

@@ -2,6 +2,7 @@ import type { NextAuthOptions } from 'next-auth'
 import { getServerSession } from 'next-auth'
 import CredentialsProvider from 'next-auth/providers/credentials'
 import GoogleProvider from 'next-auth/providers/google'
+import { cookies } from 'next/headers'
 import { prisma } from '@/lib/prisma'
 import { compare } from 'bcryptjs'
 import { z } from 'zod'
@@ -50,24 +51,72 @@ export const authOptions: NextAuthOptions = {
       })
 
       if (!existing) {
+        let affiliateId: string | null = null
+        let affiliateOwnerUserId: string | null = null
+        try {
+          const cookieStore = await cookies()
+          const refCookie = cookieStore.get('cliptica_ref')?.value?.trim().toLowerCase()
+          if (refCookie) {
+            const affiliate = await prisma.affiliate.findUnique({
+              where: { code: refCookie },
+              select: { id: true, isActive: true, userId: true },
+            })
+            if (affiliate?.isActive) {
+              affiliateId = affiliate.id
+              affiliateOwnerUserId = affiliate.userId
+            }
+          }
+        } catch {
+          // ignore when cookies unavailable
+        }
+
         const created = await prisma.user.create({
           data: {
             email: user.email.toLowerCase(),
             name: user.name ?? null,
             avatar: user.image ?? null,
             emailVerified: new Date(),
-            credits: 40,
+            credits: 15,
             role: 'FREE',
+            referredByAffiliateId: affiliateId,
+            referredAt: affiliateId ? new Date() : null,
           },
         })
         await prisma.creditTransaction.create({
           data: {
             userId: created.id,
-            amount: 40,
+            amount: 15,
             type: 'bonus',
             description: 'Starting credits for new account',
           },
         })
+
+        if (affiliateId) {
+          await prisma.referralConversion.create({
+            data: {
+              affiliateId,
+              userId: created.id,
+              type: 'SIGNUP',
+            },
+          }).catch((err) => console.error('[referral] signup conversion error:', err))
+
+          if (affiliateOwnerUserId) {
+            await prisma.user.update({
+              where: { id: affiliateOwnerUserId },
+              data: { credits: { increment: 5 } },
+            }).catch((err) => console.error('[referral] credit reward error:', err))
+
+            await prisma.creditTransaction.create({
+              data: {
+                userId: affiliateOwnerUserId,
+                amount: 5,
+                type: 'bonus',
+                description: `Referral bonus for inviting ${created.name || created.email}`,
+              },
+            }).catch((err) => console.error('[referral] tx log error:', err))
+          }
+        }
+
         return true
       }
 

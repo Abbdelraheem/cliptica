@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { signIn } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import { Loader2, Check, ShieldAlert } from 'lucide-react'
 import { Wordmark } from '@/components/logo'
@@ -47,14 +46,8 @@ export default function RegisterPage() {
         setLoading(false)
         return
       }
-      const login = await signIn('credentials', { email, password, deviceId, redirect: false })
       setLoading(false)
-      if (login?.error) {
-        router.push('/login')
-        return
-      }
-      router.push('/dashboard')
-      router.refresh()
+      router.push(`/verify-email?email=${encodeURIComponent(email)}&registered=true`)
     } catch {
       setError('Network error. Try again.')
       setLoading(false)
@@ -73,7 +66,7 @@ export default function RegisterPage() {
             A week of clips from <span className="italic-accent gold-text">one paste.</span>
           </h2>
           <ul className="mt-8 space-y-3.5">
-            {['40 free credits — no card required', 'Karaoke captions unlocked', 'Campaign ledger from day one'].map(
+            {['15 free credits — no card required', 'Karaoke captions unlocked', 'Campaign ledger from day one'].map(
               (item) => (
                 <li key={item} className="flex items-center gap-3 text-sm font-light text-mist">
                   <span className="flex h-5 w-5 items-center justify-center rounded-full border border-hair text-champagne">
@@ -140,7 +133,7 @@ export default function RegisterPage() {
             )}
 
             <button type="submit" disabled={loading} className="btn-lux btn-gold w-full disabled:opacity-60">
-              {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Start free — 40 credits'}
+              {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Start free — 15 credits'}
             </button>
           </form>
 

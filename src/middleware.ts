@@ -71,6 +71,7 @@ export async function middleware(request: NextRequest) {
     '/api/campaigns',
     '/api/payouts',
     '/api/admin',
+    '/api/user',
   ]
   const isProtected = protectedPaths.some((path) => pathname.startsWith(path))
 
@@ -79,6 +80,9 @@ export async function middleware(request: NextRequest) {
   const isAuthPath = authPaths.some((path) => pathname.startsWith(path))
 
   if (isProtected && !loggedIn) {
+    if (pathname.startsWith('/api/')) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
     const loginUrl = new URL('/login', request.url)
     loginUrl.searchParams.set('callbackUrl', pathname)
     return NextResponse.redirect(loginUrl)
@@ -105,6 +109,7 @@ export const config = {
     '/api/campaigns/:path*',
     '/api/payouts/:path*',
     '/api/admin/:path*',
+    '/api/user/:path*',
     '/api/auth/callback/:path*',
     '/login',
     '/register',

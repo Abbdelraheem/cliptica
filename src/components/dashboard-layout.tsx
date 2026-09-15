@@ -72,10 +72,10 @@ export function DashboardLayout({ children }: { children: ReactNode }) {
   const currentRole = (liveRole ?? (session?.user as { role?: string })?.role ?? 'FREE').toUpperCase()
   const maxCredits =
     currentRole === 'STUDIO' || currentRole === 'ADMIN'
-      ? 1200
+      ? 400
       : currentRole === 'CLIPPER'
-      ? 300
-      : 40
+      ? 150
+      : 15
   const creditPercent = Math.min(100, Math.max(0, Math.round((displayCredits / maxCredits) * 100)))
 
   // One-account-per-device enforcement — runs on every dashboard entry.

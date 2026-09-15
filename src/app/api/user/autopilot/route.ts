@@ -39,7 +39,7 @@ export async function POST(request: Request) {
     const captionStyle = body.captionStyle || 'hormozi'
     const framing = body.framing || 'smart'
     const aspectRatio = body.aspectRatio || '9:16'
-    const channelTitle = body.channelTitle || rawUrl.split('/').pop() || 'YouTube Channel'
+    const channelTitle = body.channelTitle || rawUrl.replace(/\/+$/, '').split('/').pop() || 'YouTube Channel'
 
     const channel = await prisma.autoPilotChannel.create({
       data: {
