@@ -407,7 +407,21 @@ async function transcribeLocal(file, dir) {
     '-c', `
 import sys, json
 from faster_whisper import WhisperModel
-m = WhisperModel(${JSON.stringify(CFG.whisperModel)}, device="cpu", compute_type="int8")
+raw_model = ${JSON.stringify(CFG.whisperModel || 'turbo')}
+aliases = {
+    'whisper-large-v3-turbo': 'turbo',
+    'whisper-large-v3': 'large-v3',
+    'whisper-large-v2': 'large-v2',
+    'whisper-medium': 'medium',
+    'whisper-small': 'small',
+    'whisper-base': 'base',
+    'whisper-tiny': 'tiny'
+}
+model_name = aliases.get(raw_model, raw_model.replace('whisper-', ''))
+try:
+    m = WhisperModel(model_name, device="cpu", compute_type="int8")
+except Exception:
+    m = WhisperModel("turbo", device="cpu", compute_type="int8")
 segs, info = m.transcribe(sys.argv[1], word_timestamps=True)
 out, words = [], []
 for s in segs:
@@ -497,9 +511,14 @@ function generateCandidateMoments(transcript, duration, from = 0, minDur = 15, m
 
   if (!segs.length) {
     const fallback = []
-    const win = Math.min(60, Math.max(minDur, 45))
-    for (let s = Math.max(0, from); s + win <= duration && fallback.length < 50; s += win / 2) {
-      fallback.push({ start: Math.round(s), end: Math.round(s + win), text: '' })
+    const win = Math.min(duration, Math.min(60, Math.max(minDur, 30)))
+    if (duration > 0 && win > 0) {
+      for (let s = Math.max(0, from); s + win <= duration && fallback.length < 50; s += Math.max(5, win / 2)) {
+        fallback.push({ start: Math.round(s), end: Math.round(s + win), text: '' })
+      }
+    }
+    if (fallback.length === 0 && duration > 0) {
+      fallback.push({ start: 0, end: Math.round(duration), text: '' })
     }
     return fallback
   }
@@ -558,17 +577,26 @@ function generateCandidateMoments(transcript, duration, from = 0, minDur = 15, m
   // Fallback if semantic grouping produced too few candidates
   if (candidates.length < 3) {
     for (const win of [30, 45, 60]) {
-      for (let s = Math.max(0, from); s + win < duration && candidates.length < 40; s += win / 2) {
+      const actualWin = Math.min(duration, win)
+      if (actualWin < minDur && duration >= minDur) continue
+      for (let s = Math.max(0, from); s + actualWin <= duration && candidates.length < 40; s += Math.max(5, actualWin / 2)) {
         const text = segs
-          .filter((x) => x.start >= s - 1 && x.end <= s + win + 1)
+          .filter((x) => x.start >= s - 1 && x.end <= s + actualWin + 1)
           .map((x) => x.text)
           .join(' ')
           .trim()
-        if (text.split(/\s+/).length > 15) {
-          candidates.push({ start: Math.round(s), end: Math.round(s + win), text })
-        }
+        candidates.push({ start: Math.round(s), end: Math.round(s + actualWin), text })
       }
     }
+  }
+
+  if (candidates.length === 0 && duration > 0) {
+    const defaultEnd = Math.round(Math.min(duration, maxDur))
+    candidates.push({
+      start: 0,
+      end: defaultEnd,
+      text: segs.map((s) => s.text).join(' ').trim() || 'Highlight moment',
+    })
   }
 
   return candidates
