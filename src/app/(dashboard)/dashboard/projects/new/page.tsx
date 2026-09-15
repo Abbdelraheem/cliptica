@@ -6,7 +6,8 @@ import { useRouter } from 'next/navigation'
 import {
   Link2, Upload, Loader2, Sparkles, ScanFace, Frame,
   RectangleHorizontal, Shuffle, CloudUpload, CheckCircle2,
-  Megaphone, ExternalLink, FileVideo, HardDrive,
+  Megaphone, ExternalLink, FileVideo, HardDrive, Check,
+  ChevronDown, ChevronUp,
 } from 'lucide-react'
 import { fetchWithTimeout } from '@/lib/utils'
 import { cleanUrlString, normaliseVideoUrl } from '@/lib/validation'
@@ -332,9 +333,14 @@ export default function NewProjectPage() {
     guidelines: string[]
     requiredHashtags: string[]
     recommendedInstructions: string
-    assets: Array<{ type: string; url: string; label: string }>
+    campaignHook?: string
+    recommendedCaptionStyle?: string
+    primaryAsset?: { type: string; url: string; label: string; isRecommended?: boolean } | null
+    aiRationale?: string
+    assets: Array<{ type: string; url: string; label: string; isRecommended?: boolean }>
   } | null>(null)
   const [selectedAsset, setSelectedAsset] = useState<string | null>(null)
+  const [showAssetCustomizer, setShowAssetCustomizer] = useState(false)
 
   async function handleAnalyzeCampaign() {
     const clean = campaignUrl.trim()
@@ -352,13 +358,17 @@ export default function NewProjectPage() {
         throw new Error(data?.error ?? 'Failed to inspect campaign')
       }
       setCampaignData(data.campaign)
-      if (!title) setTitle(data.campaign.title)
+      setTitle(data.campaign.title || 'Campaign Clip')
       if (data.campaign.recommendedInstructions) {
         setInstructions(data.campaign.recommendedInstructions)
       }
-      if (data.campaign.assets?.length) {
-        setSelectedAsset(data.campaign.assets[0].url)
-        setUrl(data.campaign.assets[0].url)
+      if (data.campaign.recommendedCaptionStyle) {
+        setCaptionStyle(data.campaign.recommendedCaptionStyle)
+      }
+      const chosen = data.campaign.primaryAsset?.url || data.campaign.assets?.[0]?.url || ''
+      if (chosen) {
+        setSelectedAsset(chosen)
+        setUrl(chosen)
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not analyze campaign URL')
@@ -602,6 +612,7 @@ export default function NewProjectPage() {
 
             {campaignData && (
               <div className="rounded-2xl border border-champagne/40 bg-black/40 p-5 space-y-4 shadow-[0_0_25px_rgba(212,175,55,0.08)]">
+                {/* Header */}
                 <div className="flex flex-wrap items-center justify-between gap-2 border-b border-hair/50 pb-3">
                   <div className="flex items-center gap-2">
                     <span className="rounded-full bg-champagne/20 px-2.5 py-0.5 font-mono text-[11px] font-semibold text-champagne border border-champagne/30">
@@ -616,41 +627,61 @@ export default function NewProjectPage() {
                   )}
                 </div>
 
-                {/* Campaign Guidelines */}
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-wider text-mist-2 mb-2">Campaign Guidelines &amp; Criteria</p>
-                  <ul className="space-y-1.5 text-xs text-mist">
-                    {campaignData.guidelines.map((g, idx) => (
-                      <li key={idx} className="flex items-start gap-2">
-                        <span className="text-gold mt-0.5">✦</span>
-                        <span>{g}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-
-                {/* Extracted Media Assets (Drive / YouTube / Video) */}
-                <div>
-                  <div className="flex items-center justify-between mb-2">
-                    <p className="text-xs font-semibold uppercase tracking-wider text-mist-2">
-                      Detected Assets &amp; Footage ({campaignData.assets.length})
-                    </p>
-                    <span className="text-[11px] text-champagne">Select one to clip</span>
+                {/* AI Selected Primary Footage Card */}
+                <div className="rounded-xl border border-gold/40 bg-gradient-to-r from-gold/[0.12] via-gold/[0.05] to-transparent p-4">
+                  <div className="flex items-center justify-between gap-2 mb-2">
+                    <span className="inline-flex items-center gap-1.5 rounded-full bg-gold/20 px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wider text-champagne border border-gold/30">
+                      <Sparkles className="h-3 w-3" />
+                      AI Auto-Selected Best Footage
+                    </span>
+                    {campaignData.assets.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => setShowAssetCustomizer(!showAssetCustomizer)}
+                        className="text-[11px] text-mist hover:text-champagne flex items-center gap-1 underline underline-offset-4"
+                      >
+                        {showAssetCustomizer ? 'Hide alternatives' : `Switch footage (${campaignData.assets.length} detected)`}
+                        {showAssetCustomizer ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+                      </button>
+                    )}
                   </div>
 
-                  {campaignData.assets.length === 0 ? (
-                    <div className="rounded-xl border border-hair/50 bg-black/20 p-3 text-xs text-mist-2">
-                      No direct Drive or video links detected on the page. Paste your source video link manually:
-                      <input
-                        type="url"
-                        value={url}
-                        onChange={(e) => setUrl(e.target.value)}
-                        placeholder="https://drive.google.com/... or https://youtube.com/..."
-                        className="input-lux mt-2"
-                      />
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="min-w-0 flex-1">
+                      <p className="text-xs font-semibold text-pearl truncate">
+                        {campaignData.primaryAsset?.label || 'Primary Campaign Footage'}
+                      </p>
+                      <p className="text-[11px] text-mist truncate mt-0.5 font-mono">
+                        {url || selectedAsset}
+                      </p>
+                      {campaignData.aiRationale && (
+                        <p className="text-[11px] text-champagne/90 mt-1.5 flex items-center gap-1.5">
+                          <Check className="h-3 w-3 text-gold shrink-0" />
+                          <span>{campaignData.aiRationale}</span>
+                        </p>
+                      )}
                     </div>
-                  ) : (
-                    <div className="grid gap-2">
+                    {url && (
+                      <a
+                        href={url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="p-2 rounded-lg bg-black/40 border border-hair text-mist hover:text-pearl shrink-0"
+                        title="Preview footage"
+                      >
+                        <ExternalLink className="h-4 w-4" />
+                      </a>
+                    )}
+                  </div>
+                </div>
+
+                {/* Alternative Assets Accordion */}
+                {showAssetCustomizer && campaignData.assets.length > 0 && (
+                  <div className="space-y-2 pt-1 border-t border-hair/40">
+                    <p className="text-xs font-semibold text-mist-2 uppercase tracking-wider">
+                      All Detected Campaign Assets:
+                    </p>
+                    <div className="grid gap-2 max-h-56 overflow-y-auto pr-1">
                       {campaignData.assets.map((asset, idx) => {
                         const isChosen = (selectedAsset || url) === asset.url
                         return (
@@ -660,47 +691,48 @@ export default function NewProjectPage() {
                               setSelectedAsset(asset.url)
                               setUrl(asset.url)
                             }}
-                            className={`flex items-center justify-between gap-3 rounded-xl border p-3 cursor-pointer transition-all ${
+                            className={`flex items-center justify-between gap-3 rounded-xl border p-2.5 cursor-pointer transition-all ${
                               isChosen
-                                ? 'border-champagne bg-champagne/15 shadow-[0_0_15px_rgba(212,175,55,0.15)]'
+                                ? 'border-champagne bg-champagne/15 shadow-[0_0_12px_rgba(212,175,55,0.15)]'
                                 : 'border-hair/60 bg-black/30 hover:border-hair hover:bg-black/50'
                             }`}
                           >
-                            <div className="flex items-center gap-3 min-w-0">
+                            <div className="flex items-center gap-2.5 min-w-0">
                               {asset.type === 'drive' ? (
-                                <HardDrive className={`h-5 w-5 shrink-0 ${isChosen ? 'text-gold' : 'text-mist'}`} />
+                                <HardDrive className={`h-4 w-4 shrink-0 ${isChosen ? 'text-gold' : 'text-mist'}`} />
                               ) : asset.type === 'youtube' ? (
-                                <Link2 className={`h-5 w-5 shrink-0 ${isChosen ? 'text-gold' : 'text-mist'}`} />
+                                <Link2 className={`h-4 w-4 shrink-0 ${isChosen ? 'text-gold' : 'text-mist'}`} />
                               ) : (
-                                <FileVideo className={`h-5 w-5 shrink-0 ${isChosen ? 'text-gold' : 'text-mist'}`} />
+                                <FileVideo className={`h-4 w-4 shrink-0 ${isChosen ? 'text-gold' : 'text-mist'}`} />
                               )}
                               <div className="min-w-0">
                                 <p className={`text-xs font-semibold truncate ${isChosen ? 'text-pearl' : 'text-mist'}`}>
                                   {asset.label}
                                 </p>
-                                <p className="text-[11px] text-mist-2 truncate">{asset.url}</p>
+                                <p className="text-[10px] text-mist-2 truncate">{asset.url}</p>
                               </div>
                             </div>
-                            <div className="flex items-center gap-2 shrink-0">
-                              <a
-                                href={asset.url}
-                                target="_blank"
-                                rel="noreferrer"
-                                onClick={(e) => e.stopPropagation()}
-                                className="p-1 text-mist-2 hover:text-pearl"
-                                title="Open asset in new tab"
-                              >
-                                <ExternalLink className="h-3.5 w-3.5" />
-                              </a>
-                              <span className={`text-xs font-medium px-2 py-0.5 rounded ${isChosen ? 'bg-gold text-black font-semibold' : 'bg-white/5 text-mist'}`}>
-                                {isChosen ? 'Selected ✓' : 'Select'}
-                              </span>
-                            </div>
+                            <span className={`text-[10px] font-medium px-2 py-0.5 rounded ${isChosen ? 'bg-gold text-black font-semibold' : 'bg-white/5 text-mist'}`}>
+                              {isChosen ? 'Active ✓' : 'Use'}
+                            </span>
                           </div>
                         )
                       })}
                     </div>
-                  )}
+                  </div>
+                )}
+
+                {/* Campaign Guidelines & Strategy */}
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wider text-mist-2 mb-2">Campaign Strategy &amp; Criteria</p>
+                  <ul className="space-y-1 text-xs text-mist">
+                    {campaignData.guidelines.map((g, idx) => (
+                      <li key={idx} className="flex items-start gap-2">
+                        <span className="text-gold mt-0.5">✦</span>
+                        <span>{g}</span>
+                      </li>
+                    ))}
+                  </ul>
                 </div>
 
                 {/* Campaign Tags */}
@@ -713,6 +745,13 @@ export default function NewProjectPage() {
                     ))}
                   </div>
                 )}
+
+                <div className="rounded-xl border border-hair/50 bg-black/20 p-3 flex items-center gap-2.5 text-xs text-mist">
+                  <CheckCircle2 className="h-4 w-4 text-emerald-400 shrink-0" />
+                  <span>
+                    Campaign requirements, viral hook instructions, and optimal caption style have been automatically applied to this project.
+                  </span>
+                </div>
               </div>
             )}
 
@@ -922,7 +961,7 @@ export default function NewProjectPage() {
           ) : (
             <>
               <Sparkles className="h-4 w-4" />
-              Find the moments worth posting
+              {tab === 'campaign' && campaignData ? 'Generate Integrated Campaign Clips' : 'Find the moments worth posting'}
             </>
           )}
         </button>

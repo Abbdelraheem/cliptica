@@ -207,6 +207,28 @@ function ytdlpArgs(extra) {
 
 async function download(url, dir) {
   await assertPublicHttpUrl(url)
+
+  // Fast direct fetch for direct CDN / video files (ContentRewards, S3, direct MP4s)
+  const isDirectVideo =
+    /\.(mp4|mov|webm|mkv)(\?.*)?$/i.test(url) ||
+    url.includes('/downloaded-videos/') ||
+    url.includes('cdn.contentrewards.com')
+
+  if (isDirectVideo) {
+    const ext = (url.match(/\.(mp4|mov|webm|mkv)/i)?.[1] || 'mp4').toLowerCase()
+    const target = path.join(dir, `source.${ext}`)
+    const t0 = Date.now()
+    try {
+      console.log(`[worker:download] Direct media URL detected, fetching directly via curl: ${url}`)
+      await sh('curl', ['-f', '-L', '-s', '-S', '--max-time', '600', '-o', target, url])
+      const dur = Date.now() - t0
+      console.log(`[worker:download] direct curl download complete in ${dur}ms: ${target}`)
+      return target
+    } catch (curlErr) {
+      console.warn(`[worker:download] curl direct fetch failed, falling back to yt-dlp:`, curlErr?.message || curlErr)
+    }
+  }
+
   const out = path.join(dir, 'source.%(ext)s')
 
   const attempt = (proxy) =>
@@ -229,7 +251,7 @@ async function download(url, dir) {
         '--max-filesize',
         '2.5G',
         '--match-filter',
-        'duration <= 7200',
+        'duration <=? 7200',
         '-o',
         out,
         url,
@@ -242,9 +264,10 @@ async function download(url, dir) {
   const t0 = Date.now()
   try {
     await attempt(null)
+    const sourceFile = await findFile(dir, /^source\./)
     const dur = Date.now() - t0
     console.log(`[worker:download] proxy=direct duration_ms=${dur} outcome=success`)
-    return await findFile(dir, /^source\./)
+    return sourceFile
   } catch (e) {
     directErr = e
     const dur = Date.now() - t0
@@ -265,10 +288,11 @@ async function download(url, dir) {
     const redacted = redactProxy(proxy)
     try {
       await attempt(proxy)
+      const sourceFile = await findFile(dir, /^source\./)
       const dur = Date.now() - pStart
       recordProxyResult(proxy, true)
       console.log(`[worker:download] proxy=${redacted} duration_ms=${dur} outcome=success`)
-      return await findFile(dir, /^source\./)
+      return sourceFile
     } catch (e) {
       lastErr = e
       const dur = Date.now() - pStart
