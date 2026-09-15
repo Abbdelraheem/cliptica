@@ -982,3 +982,13 @@ Executed `scripts/test-render-styles.mjs` rendering 1080x1920 video with burned-
   - `tests/credit-reservation-settlement.test.ts`: Created new test suite verifying 1:1 reservation/settlement parity and duration limits across all plans.
 - **Verification**:
   - Vitest: `tests/credits.test.mjs` and `tests/credit-reservation-settlement.test.ts` passed 13/13 tests cleanly.
+
+### 2. Fix: AutoPilot Duration Guardrails & Daily Limit Circuit Breaker
+- **Root Cause**:
+  - `worker/worker.mjs` in `checkAutoPilotChannels` enqueued new uploads without checking video duration or per-user daily limits. If a channel uploaded long livestreams or multiple videos in one day, it could drain the creator's credits or overwhelm worker resources.
+- **Changes**:
+  - `worker/worker.mjs`: Added user `role` selection to determine plan limits.
+  - Added daily project limit circuit breaker checking `todaysCount` against `AUTOPILOT_MAX_DAILY_PROJECTS` (default 10).
+  - Added pre-download URL duration probe using `probeUrlDuration` and `exceedsPlanMinutes`. If oversized, logs the event, advances `lastVideoId` to avoid redundant sweeps, and skips without burning credits.
+- **Verification**:
+  - `node --check worker/worker.mjs` validated cleanly.

@@ -1335,11 +1335,43 @@ async function checkAutoPilotChannels() {
 
         const owner = await prisma.user.findUnique({
           where: { id: ch.userId },
-          select: { credits: true },
+          select: { credits: true, role: true },
         })
 
         if (!owner || owner.credits < 1) {
           console.log(`[autopilot] user ${ch.userId} has insufficient credits (${owner?.credits ?? 0})`)
+          continue
+        }
+
+        // Daily AutoPilot project circuit breaker
+        const maxDaily = parseInt(process.env.AUTOPILOT_MAX_DAILY_PROJECTS || '10', 10)
+        const startOfDay = new Date()
+        startOfDay.setHours(0, 0, 0, 0)
+        const todaysCount = await prisma.project.count({
+          where: {
+            userId: ch.userId,
+            createdAt: { gte: startOfDay },
+            title: { startsWith: 'AutoPilot:' },
+          },
+        })
+
+        if (todaysCount >= maxDaily) {
+          console.log(`[autopilot] user ${ch.userId} reached daily limit (${todaysCount}/${maxDaily}) — skipping`)
+          continue
+        }
+
+        // Fast duration probe to avoid downloading out-of-plan long videos
+        const videoUrl = `https://www.youtube.com/watch?v=${videoId}`
+        const durSec = await probeUrlDuration(videoUrl)
+        if (durSec && exceedsPlanMinutes(durSec / 60, owner.role)) {
+          const maxMin = planMaxMinutes(owner.role)
+          console.log(
+            `[autopilot] video ${videoId} is ~${Math.round(durSec / 60)} min, exceeding ${maxMin} min plan limit for ${owner.role || 'FREE'} — skipping`
+          )
+          await prisma.autoPilotChannel.update({
+            where: { id: ch.id },
+            data: { lastVideoId: videoId },
+          })
           continue
         }
 
