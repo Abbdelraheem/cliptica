@@ -129,6 +129,21 @@ export default function BillingPage() {
       initializePaddle({
         token,
         environment: env,
+        eventCallback: (event) => {
+          if (event.name) {
+            console.log('[Paddle Event]', event.name, event.data)
+          }
+          if (
+            event.name === 'checkout.error' ||
+            event.name === 'checkout.failed' ||
+            event.name === 'checkout.payment.error'
+          ) {
+            console.error('[Paddle Checkout Error]', event)
+          }
+          if (event.name === 'checkout.completed') {
+            window.location.href = '/dashboard/billing?success=paddle'
+          }
+        },
       })
         .then((p) => {
           if (p) setPaddle(p)
