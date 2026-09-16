@@ -55,9 +55,9 @@ const STAGE_COPY: Record<string, string> = {
 
 const CAPTION_PRESET_OPTIONS = [
   // === ARABIC NATIVE ===
-  { id: 'arabic_luxury', category: 'Arabic Luxury', name: 'عربي ملكي ذهبي (Arabic Luxury)' },
-  { id: 'arabic_viral', category: 'Arabic Luxury', name: 'عربي تيك توك فايرال (Arabic Viral)' },
-  { id: 'arabic_clean', category: 'Arabic Luxury', name: 'عربي كلاسيك نقي (Arabic Clean)' },
+  { id: 'arabic_luxury', category: 'Arabic Luxury', name: 'Arabic Luxury (Royal Gold)' },
+  { id: 'arabic_viral', category: 'Arabic Luxury', name: 'Arabic Viral (TikTok Kinetic)' },
+  { id: 'arabic_clean', category: 'Arabic Luxury', name: 'Arabic Clean (Classic Subtitle)' },
   // === KINETIC ===
   { id: 'hormozi', category: 'Kinetic', name: 'Hormozi Pop (Yellow High-Impact)' },
   { id: 'bold_impact', category: 'Kinetic', name: 'Bold Impact (Punchy Gold Uppercase)' },
@@ -533,10 +533,10 @@ export default function ProjectDetail({ projectId }: { projectId: string }) {
                       onClick={() => setExportKitClip(c)}
                       disabled={c.status === 'GENERATING'}
                       className="btn-lux btn-outline !py-1.5 !px-2.5 !text-xs !font-normal flex items-center gap-1.5 text-gold border-gold/30 hover:!border-gold hover:bg-gold/10"
-                      title="حزمة النشر الفايرال المتكاملة (عناوين، وصف، هاشتاقات، وأفضل الأوقات)"
+                      title="Viral Social Kit (Hooks, Description, Hashtags & Best Times)"
                     >
                       <Sparkles className="h-3.5 w-3.5 text-gold" />
-                      <span>حزمة الفايرال</span>
+                      <span>Viral Kit</span>
                     </button>
 
                     {(c.exportUrl || c.videoUrl) && (
@@ -992,13 +992,13 @@ export default function ProjectDetail({ projectId }: { projectId: string }) {
               <div>
                 <span className="text-xs uppercase tracking-[0.2em] font-semibold text-gold">Viral Social Kit</span>
                 <h3 className="font-display text-xl font-bold text-pearl mt-0.5">
-                  حزمة النشر الفايرال المتكاملة
+                  Viral Social Export Kit
                 </h3>
               </div>
             </div>
 
             <p className="mt-2 text-xs sm:text-sm text-mist font-light leading-relaxed">
-              كل ما تحتاجه لنشر هذا المقطع على TikTok وInstagram Reels وYouTube Shorts لتحقيق أعلى انتشار وتفاعل.
+              Everything you need to publish this clip to TikTok, Instagram Reels, and YouTube Shorts for maximum reach and engagement.
             </p>
 
             <div className="mt-6 space-y-4">
@@ -1006,7 +1006,7 @@ export default function ProjectDetail({ projectId }: { projectId: string }) {
               <div className="rounded-2xl border border-hair/60 bg-black/40 p-4">
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-xs font-semibold uppercase tracking-wider text-champagne">
-                    1. عنوان جاذب ومثير (Hook Title)
+                    1. High-Impact Hook Title
                   </span>
                   <button
                     type="button"
@@ -1020,12 +1020,12 @@ export default function ProjectDetail({ projectId }: { projectId: string }) {
                     {copiedKitField === 'title' ? (
                       <>
                         <Check className="h-3.5 w-3.5 text-emerald-400" />
-                        <span>تم النسخ</span>
+                        <span>Copied</span>
                       </>
                     ) : (
                       <>
                         <Copy className="h-3.5 w-3.5" />
-                        <span>نسخ العنوان</span>
+                        <span>Copy Title</span>
                       </>
                     )}
                   </button>
@@ -1037,12 +1037,12 @@ export default function ProjectDetail({ projectId }: { projectId: string }) {
               <div className="rounded-2xl border border-hair/60 bg-black/40 p-4">
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-xs font-semibold uppercase tracking-wider text-champagne">
-                    2. وصف الفيديو التفاعلي (Description & CTA)
+                    2. High-Retention Description & CTA
                   </span>
                   <button
                     type="button"
                     onClick={() => {
-                      const desc = `${exportKitClip.description || exportKitClip.title}\n\n💬 شاركنا رأيك بالتعليقات، هل توافق هذا الرأي؟\n🔥 تابع الحساب لمزيد من المقاطع القوية يومياً!`
+                      const desc = `${exportKitClip.description || exportKitClip.title}\n\n💬 Drop your thoughts in the comments — do you agree?\n🔥 Follow for more high-impact clips daily!`
                       navigator.clipboard.writeText(desc)
                       setCopiedKitField('desc')
                       setTimeout(() => setCopiedKitField(null), 2000)
@@ -1052,19 +1052,19 @@ export default function ProjectDetail({ projectId }: { projectId: string }) {
                     {copiedKitField === 'desc' ? (
                       <>
                         <Check className="h-3.5 w-3.5 text-emerald-400" />
-                        <span>تم النسخ</span>
+                        <span>Copied</span>
                       </>
                     ) : (
                       <>
                         <Copy className="h-3.5 w-3.5" />
-                        <span>نسخ الوصف</span>
+                        <span>Copy Description</span>
                       </>
                     )}
                   </button>
                 </div>
                 <p className="text-xs text-mist font-light whitespace-pre-line leading-relaxed">
                   {exportKitClip.description || exportKitClip.title}
-                  {'\n\n💬 شاركنا رأيك بالتعليقات، هل توافق هذا الرأي؟\n🔥 تابع الحساب لمزيد من المقاطع القوية يومياً!'}
+                  {'\n\n💬 Drop your thoughts in the comments — do you agree?\n🔥 Follow for more high-impact clips daily!'}
                 </p>
               </div>
 
@@ -1072,12 +1072,12 @@ export default function ProjectDetail({ projectId }: { projectId: string }) {
               <div className="rounded-2xl border border-hair/60 bg-black/40 p-4">
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-xs font-semibold uppercase tracking-wider text-champagne">
-                    3. الهاشتاقات المتصدرة (Trending Tags)
+                    3. Trending Hashtags
                   </span>
                   <button
                     type="button"
                     onClick={() => {
-                      const tags = '#Shorts #Reels #TikTok #Viral #اكسبلور #ترند #فيديو_اليوم #fyp #explore'
+                      const tags = '#Shorts #Reels #TikTok #Viral #Trending #VideoOfTheDay #fyp #explore'
                       navigator.clipboard.writeText(tags)
                       setCopiedKitField('tags')
                       setTimeout(() => setCopiedKitField(null), 2000)
@@ -1087,18 +1087,18 @@ export default function ProjectDetail({ projectId }: { projectId: string }) {
                     {copiedKitField === 'tags' ? (
                       <>
                         <Check className="h-3.5 w-3.5 text-emerald-400" />
-                        <span>تم النسخ</span>
+                        <span>Copied</span>
                       </>
                     ) : (
                       <>
                         <Copy className="h-3.5 w-3.5" />
-                        <span>نسخ الهاشتاقات</span>
+                        <span>Copy Hashtags</span>
                       </>
                     )}
                   </button>
                 </div>
                 <div className="flex flex-wrap gap-1.5 mt-1">
-                  {['#Shorts', '#Reels', '#TikTok', '#Viral', '#اكسبلور', '#ترند', '#فيديو_اليوم', '#fyp', '#explore'].map((tag) => (
+                  {['#Shorts', '#Reels', '#TikTok', '#Viral', '#Trending', '#VideoOfTheDay', '#fyp', '#explore'].map((tag) => (
                     <span key={tag} className="rounded-lg bg-hair/40 px-2 py-0.5 text-xs font-mono text-champagne">
                       {tag}
                     </span>
@@ -1111,13 +1111,13 @@ export default function ProjectDetail({ projectId }: { projectId: string }) {
                 <div className="flex items-center gap-2 mb-1 text-gold">
                   <Clock className="h-4 w-4" />
                   <span className="text-xs font-semibold uppercase tracking-wider">
-                    أفضل أوقات النشر للحصول على أعلى وصول:
+                    Optimal Posting Windows for Maximum Reach:
                   </span>
                 </div>
                 <p className="text-xs text-mist leading-relaxed mt-1">
-                  • <strong>الفترة المسائية (الذروة):</strong> بين 06:00 م و 09:30 م بالتوقيت المحلي.
+                  • <strong>Evening Peak:</strong> Between 06:00 PM and 09:30 PM (Local Audience Time).
                   <br />
-                  • <strong>فترة الظهيرة:</strong> بين 01:00 م و 03:30 م.
+                  • <strong>Afternoon Window:</strong> Between 01:00 PM and 03:30 PM.
                 </p>
               </div>
             </div>
@@ -1127,7 +1127,7 @@ export default function ProjectDetail({ projectId }: { projectId: string }) {
               <button
                 type="button"
                 onClick={() => {
-                  const allBundle = `${exportKitClip.title}\n\n${exportKitClip.description || exportKitClip.title}\n\n💬 شاركنا رأيك بالتعليقات!\n🔥 تابعنا لمزيد من المقاطع يومياً\n\n#Shorts #Reels #TikTok #Viral #اكسبلور #ترند #fyp`
+                  const allBundle = `${exportKitClip.title}\n\n${exportKitClip.description || exportKitClip.title}\n\n💬 Drop your thoughts below!\n🔥 Follow for more clips daily\n\n#Shorts #Reels #TikTok #Viral #explore #fyp`
                   navigator.clipboard.writeText(allBundle)
                   setCopiedKitField('all')
                   setTimeout(() => setCopiedKitField(null), 2500)
@@ -1137,12 +1137,12 @@ export default function ProjectDetail({ projectId }: { projectId: string }) {
                 {copiedKitField === 'all' ? (
                   <>
                     <Check className="h-4 w-4 text-black" />
-                    <span>تم نسخ الحزمة كاملة!</span>
+                    <span>Bundle Copied!</span>
                   </>
                 ) : (
                   <>
                     <Copy className="h-4 w-4 text-black" />
-                    <span>نسخ الحزمة كاملة (Title + Desc + Tags)</span>
+                    <span>Copy Complete Bundle (Title + Desc + Tags)</span>
                   </>
                 )}
               </button>
@@ -1157,7 +1157,7 @@ export default function ProjectDetail({ projectId }: { projectId: string }) {
                     className="btn-lux btn-outline !py-2.5 !px-4 text-xs inline-flex items-center gap-2"
                   >
                     <Download className="h-4 w-4 text-champagne" />
-                    <span>تحميل الفيديو MP4</span>
+                    <span>Download MP4</span>
                   </a>
                 ) : null}
                 <button
@@ -1165,7 +1165,7 @@ export default function ProjectDetail({ projectId }: { projectId: string }) {
                   onClick={() => setExportKitClip(null)}
                   className="btn-lux btn-outline !py-2.5 !px-4 text-xs"
                 >
-                  إغلاق
+                  Close
                 </button>
               </div>
             </div>

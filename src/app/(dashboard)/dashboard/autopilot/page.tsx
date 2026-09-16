@@ -21,17 +21,17 @@ type AutoPilotChannel = {
 }
 
 const CAPTION_OPTIONS = [
-  { id: 'arabic_luxury', name: 'عربي ملكي ذهبي (Arabic Luxury)' },
-  { id: 'arabic_viral', name: 'عربي تيك توك فايرال (Arabic Viral)' },
+  { id: 'arabic_luxury', name: 'Arabic Luxury (Royal Gold)' },
+  { id: 'arabic_viral', name: 'Arabic Viral (TikTok Kinetic)' },
   { id: 'hormozi', name: 'Hormozi Pop (Yellow Punch)' },
   { id: 'bold_impact', name: 'Bold Impact (Punchy Gold)' },
   { id: 'clean_minimal', name: 'Clean Minimal (Soft Subtitle)' },
 ]
 
 const FRAMING_OPTIONS = [
-  { id: 'smart', name: 'Smart Face Tracking (ذكي)' },
-  { id: 'split', name: 'Podcast Split Screen (تقسيم شخصين)' },
-  { id: 'blur', name: 'Blurred Backdrop (خلفية مموهة)' },
+  { id: 'smart', name: 'Smart Face Tracking' },
+  { id: 'split', name: 'Podcast Split Screen' },
+  { id: 'blur', name: 'Blurred Backdrop' },
 ]
 
 export default function AutoPilotPage() {
@@ -89,7 +89,7 @@ export default function AutoPilotPage() {
         throw new Error(data.error || 'Failed to add channel')
       }
 
-      setSuccess('تمت إضافة القناة بنجاح! الطيار الآلي يراقب الآن أي فيديو جديد.')
+      setSuccess('Channel added successfully! Auto-Pilot is now monitoring for new uploads.')
       setChannelUrl('')
       setChannelTitle('')
       fetchChannels()
@@ -101,7 +101,7 @@ export default function AutoPilotPage() {
   }
 
   const handleDelete = async (id: string) => {
-    if (!confirm('هل أنت متأكد من حذف هذه القناة من الطيار الآلي؟')) return
+    if (!confirm('Are you sure you want to remove this channel from Auto-Pilot?')) return
     try {
       const res = await fetch(`/api/user/autopilot?id=${id}`, {
         method: 'DELETE',
@@ -142,9 +142,9 @@ export default function AutoPilotPage() {
             <Radio className="h-4 w-4 animate-pulse text-gold" />
             <span>Autonomous Ingestion Engine</span>
           </div>
-          <h1 className="display-md mt-2">نظام الطيار الآلي للقنوات (Auto-Pilot)</h1>
+          <h1 className="display-md mt-2">Auto-Pilot Channel Ingestion</h1>
           <p className="mt-1 text-sm font-light text-mist max-w-2xl leading-relaxed">
-            اربط قنوات YouTube المفضلة أو قناتك الخاصة. عندما يتم نشر أي فيديو جديد على القناة، يقوم سيرفر المعالجة الذاتي بسحبه فوراً وإنتاج 3-6 مقاطع ريلز وشورتس جاهزة للنشر تلقائياً!
+            Connect your favorite YouTube channels or your own. Whenever a new video drops, our automated processing pipeline ingests it, transcribes, and renders 3–6 viral clips ready to post!
           </p>
         </div>
       </div>
@@ -156,7 +156,7 @@ export default function AutoPilotPage() {
             <Youtube className="h-5 w-5" />
           </div>
           <h2 className="font-display text-lg font-bold text-pearl">
-            إضافة قناة جديدة للمراقبة الآلية
+            Add Channel for Automated Monitoring
           </h2>
         </div>
 
@@ -164,7 +164,7 @@ export default function AutoPilotPage() {
           <div className="grid gap-4 md:grid-cols-2">
             <div>
               <label className="mb-1.5 block text-xs font-medium text-mist">
-                رابط القناة أو المعرف (YouTube Channel URL / @handle)
+                YouTube Channel URL or @handle
               </label>
               <input
                 type="text"
@@ -177,13 +177,13 @@ export default function AutoPilotPage() {
             </div>
             <div>
               <label className="mb-1.5 block text-xs font-medium text-mist">
-                اسم تعريفي للقناة (اختياري)
+                Channel Display Name (Optional)
               </label>
               <input
                 type="text"
                 value={channelTitle}
                 onChange={(e) => setChannelTitle(e.target.value)}
-                placeholder="مثال: بودكاست فنجان"
+                placeholder="e.g. My Favorite Podcast"
                 className="input-lux !py-2.5 !text-xs"
               />
             </div>
@@ -192,7 +192,7 @@ export default function AutoPilotPage() {
           <div className="grid gap-4 md:grid-cols-2">
             <div>
               <label className="mb-1.5 block text-xs font-medium text-mist">
-                نمط الترجمة التلقائي (Auto Caption Style)
+                Default Caption Preset
               </label>
               <select
                 value={captionStyle}
@@ -208,7 +208,7 @@ export default function AutoPilotPage() {
             </div>
             <div>
               <label className="mb-1.5 block text-xs font-medium text-mist">
-                طريقة الاقتصاص والتأطير (Framing Mode)
+                Framing Mode
               </label>
               <select
                 value={framing}
@@ -247,12 +247,12 @@ export default function AutoPilotPage() {
               {adding ? (
                 <>
                   <Loader2 className="h-4 w-4 animate-spin text-black" />
-                  <span>جاري الإضافة...</span>
+                  <span>Adding Channel…</span>
                 </>
               ) : (
                 <>
                   <Plus className="h-4 w-4 text-black" />
-                  <span>تفعيل الطيار الآلي للقناة</span>
+                  <span>Enable Auto-Pilot</span>
                 </>
               )}
             </button>
@@ -263,7 +263,7 @@ export default function AutoPilotPage() {
       {/* Active Watchlist */}
       <div className="mt-12">
         <h2 className="font-display text-xl font-bold text-pearl">
-          القنوات قيد المراقبة الآلية ({channels.length})
+          Monitored Channels ({channels.length})
         </h2>
 
         {loading ? (
@@ -274,7 +274,7 @@ export default function AutoPilotPage() {
           <div className="mt-6 rounded-3xl border border-dashed border-hair/50 bg-black/20 p-12 text-center">
             <Radio className="mx-auto h-8 w-8 text-mist opacity-50" />
             <p className="mt-3 text-sm font-light text-mist">
-              لم تقم بإضافة أي قناة بعد. أضف رابط قناة يوتيوب أعلاه ليبدأ الذكاء الاصطناعي برصدها آلياً.
+              No channels added yet. Enter a YouTube channel URL above to start autonomous ingestion.
             </p>
           </div>
         ) : (
@@ -296,15 +296,15 @@ export default function AutoPilotPage() {
                   <div>
                     <div className="flex items-center gap-2">
                       <h3 className="font-display text-sm font-semibold text-pearl">
-                        {ch.channelTitle || 'قناة يوتيوب'}
+                        {ch.channelTitle || 'YouTube Channel'}
                       </h3>
                       {ch.isActive ? (
                         <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-bold text-emerald-400 border border-emerald-500/20">
-                          مراقبة نشطة
+                          Active
                         </span>
                       ) : (
                         <span className="rounded-full bg-amber-500/10 px-2 py-0.5 text-[10px] font-bold text-amber-400 border border-amber-500/20">
-                          متوقف مؤقتاً
+                          Paused
                         </span>
                       )}
                     </div>
@@ -322,15 +322,15 @@ export default function AutoPilotPage() {
 
                 <div className="flex flex-wrap items-center gap-4 text-xs text-mist">
                   <div className="text-right">
-                    <p className="text-[10px] uppercase tracking-wider text-mist-2">الترجمة والتأطير</p>
+                    <p className="text-[10px] uppercase tracking-wider text-mist-2">Style & Framing</p>
                     <p className="font-medium text-champagne mt-0.5">
                       {ch.captionStyle} · {ch.framing}
                     </p>
                   </div>
                   <div className="text-right">
-                    <p className="text-[10px] uppercase tracking-wider text-mist-2">آخر فحص تلقائي</p>
+                    <p className="text-[10px] uppercase tracking-wider text-mist-2">Last Checked</p>
                     <p className="font-medium text-pearl mt-0.5">
-                      {ch.lastCheckedAt ? new Date(ch.lastCheckedAt).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' }) : 'قيد الانتظار'}
+                      {ch.lastCheckedAt ? new Date(ch.lastCheckedAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : 'Pending'}
                     </p>
                   </div>
                   <div className="flex items-center gap-2">
@@ -342,17 +342,17 @@ export default function AutoPilotPage() {
                           ? 'border-hair/40 bg-black/40 text-mist hover:border-amber-400/40 hover:text-amber-400'
                           : 'border-gold/30 bg-gold/10 text-champagne hover:bg-gold/20'
                       }`}
-                      title={ch.isActive ? 'إيقاف المراقبة مؤقتاً' : 'استئناف المراقبة'}
+                      title={ch.isActive ? 'Pause monitoring' : 'Resume monitoring'}
                     >
                       {ch.isActive ? (
                         <>
                           <Pause className="h-3.5 w-3.5" />
-                          <span>إيقاف</span>
+                          <span>Pause</span>
                         </>
                       ) : (
                         <>
                           <Play className="h-3.5 w-3.5" />
-                          <span>استئناف</span>
+                          <span>Resume</span>
                         </>
                       )}
                     </button>
@@ -360,7 +360,7 @@ export default function AutoPilotPage() {
                       type="button"
                       onClick={() => handleDelete(ch.id)}
                       className="rounded-xl border border-hair/40 bg-black/40 p-2 text-mist hover:border-red-400/40 hover:text-red-400"
-                      title="حذف من الطيار الآلي"
+                      title="Remove from Auto-Pilot"
                     >
                       <Trash2 className="h-4 w-4" />
                     </button>

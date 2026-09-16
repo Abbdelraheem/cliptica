@@ -189,7 +189,7 @@ export default function BillingPage() {
       const data = await res.json().catch(() => ({}))
 
       if (!res.ok || !data.priceId) {
-        setError(data.error || 'تعذر جلب تفاصيل الباقة. يرجى المحاولة مرة أخرى.')
+        setError(data.error || 'Unable to load plan checkout. Please try again.')
         setLoading(null)
         return
       }
@@ -209,13 +209,13 @@ export default function BillingPage() {
         setLoading(null)
         return
       } else {
-        setError('تعذر تحميل نافذة الدفع في المتصفح. تأكد من إيقاف أي مانع إعلانات (AdBlocker) والمحاولة مجدداً.')
+        setError('Unable to open checkout overlay. Please disable ad-blockers and try again.')
         setLoading(null)
         return
       }
     } catch (err: unknown) {
       console.error('Upgrade error:', err)
-      setError('حدث خطأ غير متوقع أثناء بدء الدفع. يرجى المحاولة لاحقاً.')
+      setError('An unexpected error occurred while starting checkout. Please try again.')
       setLoading(null)
     }
   }
@@ -248,7 +248,7 @@ export default function BillingPage() {
       const data = await res.json().catch(() => ({}))
 
       if (!res.ok || !data.priceId) {
-        setError(data.error || 'تعذر جلب تفاصيل حزمة الرصيد. يرجى المحاولة مرة أخرى.')
+        setError(data.error || 'Unable to load credit pack checkout. Please try again.')
         setLoading(null)
         return
       }
@@ -268,13 +268,13 @@ export default function BillingPage() {
         setLoading(null)
         return
       } else {
-        setError('تعذر تحميل نافذة الدفع في المتصفح. تأكد من إيقاف أي مانع إعلانات (AdBlocker) والمحاولة مجدداً.')
+        setError('Unable to open checkout overlay. Please disable ad-blockers and try again.')
         setLoading(null)
         return
       }
     } catch (err: unknown) {
       console.error('Buy pack error:', err)
-      setError('حدث خطأ غير متوقع أثناء بدء شراء الرصيد. يرجى المحاولة لاحقاً.')
+      setError('An unexpected error occurred while purchasing credits. Please try again.')
       setLoading(null)
     }
   }
@@ -289,8 +289,8 @@ export default function BillingPage() {
           <ShieldCheck className="h-5 w-5 shrink-0" />
           <p className="text-sm">
             {isSuccessPack
-              ? `تمت عملية الدفع بنجاح! تم إضافة +${addedCredits ?? ''} كريديت إلى حسابك فوراً.`
-              : 'تم تفعيل اشتراكك بنجاح! مرحباً بك في باقتك الجديدة.'}
+              ? `Payment successful! +${addedCredits ?? ''} credits have been added to your account.`
+              : 'Your subscription has been activated successfully! Welcome to your new plan.'}
           </p>
         </div>
       )}
@@ -298,7 +298,7 @@ export default function BillingPage() {
       {/* Credits balance */}
       <div className="glass-card mt-8 flex flex-wrap items-center justify-between gap-6 !p-8">
         <div>
-          <p className="text-sm font-light text-mist">Credits remaining / الرصيد المتاح</p>
+          <p className="text-sm font-light text-mist">Credits Remaining</p>
           <p className="stat-value mt-1">{displayCredits}</p>
           <div className="mt-3 h-1.5 w-56 overflow-hidden rounded-full bg-pearl/10">
             <div
@@ -309,7 +309,7 @@ export default function BillingPage() {
         </div>
         <div className="text-right">
           <p className="max-w-xs text-sm font-light leading-relaxed text-mist">
-            1 كريديت لكل عملية معالجة فيديو كاملة تنتج 3-6 مقاطع فايرال. رصيدك لا ينتهي ويبقى متاحاً في حسابك دائماً.
+            1 credit per full video processed into 3–6 viral clips. Credits never expire on active accounts.
           </p>
           {(userRole === 'CLIPPER' || userRole === 'STUDIO') && (
             <Link
@@ -336,23 +336,23 @@ export default function BillingPage() {
                 <span className="rounded-full bg-gold/20 px-2 py-0.5 text-[10px] font-bold text-gold">+5 Credits / Friend</span>
               </div>
               <h3 className="font-display text-xl font-bold text-pearl mt-0.5">
-                ادعُ أصدقاءك وصنّاع المحتوى واكسب رصيداً مجانياً
+                Invite Creators & Earn Free Credits
               </h3>
             </div>
           </div>
           {referral && (
             <div className="flex items-center gap-4">
               <div className="rounded-xl border border-hair/50 bg-black/40 px-4 py-2 text-center">
-                <p className="text-[10px] uppercase tracking-wider text-mist">الأصدقاء المنضمون</p>
+                <p className="text-[10px] uppercase tracking-wider text-mist">Creators Joined</p>
                 <p className="font-display text-lg font-bold text-pearl flex items-center justify-center gap-1 mt-0.5">
                   <Users className="h-3.5 w-3.5 text-champagne" />
                   {referral.signupsCount}
                 </p>
               </div>
               <div className="rounded-xl border border-gold/40 bg-gold/10 px-4 py-2 text-center">
-                <p className="text-[10px] uppercase tracking-wider text-gold">أرباحك المكتسبة</p>
+                <p className="text-[10px] uppercase tracking-wider text-gold">Credits Earned</p>
                 <p className="font-display text-lg font-bold text-gold mt-0.5">
-                  +{referral.earnedCredits} كريديت
+                  +{referral.earnedCredits} Credits
                 </p>
               </div>
             </div>
@@ -360,7 +360,7 @@ export default function BillingPage() {
         </div>
 
         <p className="mt-3 max-w-2xl text-xs sm:text-sm font-light text-mist leading-relaxed">
-          شارك رابط دعوتك الحصري: أي صانع محتوى يسجل من خلالك، يحصل هو على <strong>15 كريديت مجاناً</strong> لتجربة المنصة، وتحصل أنت تلقائياً على <strong>+5 كريديت فوراً</strong> في حسابك تضاف بدون أي حدود.
+          Share your exclusive referral link. Any creator who signs up gets <strong>15 free credits</strong>, and you automatically earn <strong>+5 credits</strong> added instantly to your balance.
         </p>
 
         <div className="mt-5 flex flex-col sm:flex-row items-stretch sm:items-center gap-3 max-w-2xl">
@@ -385,12 +385,12 @@ export default function BillingPage() {
             {copiedRef ? (
               <>
                 <CheckCircle2 className="h-4 w-4 text-black" />
-                تم النسخ!
+                Copied!
               </>
             ) : (
               <>
                 <Copy className="h-4 w-4 text-black" />
-                نسخ رابط الدعوة
+                Copy Referral Link
               </>
             )}
           </button>
@@ -481,7 +481,7 @@ export default function BillingPage() {
             </div>
             <h2 className="font-display text-2xl font-semibold mt-1">Pay-As-You-Go Credit Packs</h2>
             <p className="mt-1 text-sm font-light text-mist">
-              لا ترغب باشتراك شهري متجدد؟ اشحن رصيدك لمرة واحدة ويبقى صالحاً في حسابك دائماً.
+              Prefer not to subscribe? Top up credits anytime — they never expire on active accounts.
             </p>
           </div>
         </div>

@@ -14,7 +14,7 @@ import { cleanUrlString, normaliseVideoUrl } from '@/lib/validation'
 
 const FRAMINGS = [
   { id: 'smart', name: 'Smart framing', desc: 'Crops to the speaker when there is one — center otherwise.', icon: ScanFace },
-  { id: 'split', name: 'Podcast Split (تقسيم شخصين)', desc: 'Stacks host on top and guest on bottom in 9:16 vertical.', icon: Frame },
+  { id: 'split', name: 'Podcast Split Screen', desc: 'Stacks host on top and guest on bottom in 9:16 vertical.', icon: Frame },
   { id: 'face', name: 'Face track', desc: 'Fills the frame and follows whoever is talking.', icon: ScanFace },
   { id: 'blur', name: 'Blurred backdrop', desc: 'Original framing with soft-blur bars.', icon: Frame },
   { id: 'letter', name: 'Letterbox', desc: 'Original framing on clean black.', icon: RectangleHorizontal },
@@ -38,9 +38,9 @@ const CAPTION_PRESETS = [
   {
     id: 'arabic_luxury',
     category: 'Arabic Luxury',
-    name: 'عربي ملكي ذهبي',
-    desc: 'خط عربي عريض فخم مع توهج ذهبي وكلمات مفتاحية بارزة باللون الملكي.',
-    badge: 'الأكثر طلباً',
+    name: 'Arabic Luxury (Royal Gold)',
+    desc: 'Bold luxury typography with royal gold glow and high-impact keyword highlights.',
+    badge: 'Popular',
     sample: 'سر النجاح المالي',
     sampleStyle: {
       color: '#FFD700',
@@ -51,9 +51,9 @@ const CAPTION_PRESETS = [
   {
     id: 'arabic_viral',
     category: 'Arabic Luxury',
-    name: 'عربي تيك توك فايرال',
-    desc: 'كلمات سريعة قافزة مع تلوين أصفر وأبيض لجذب الانتباه في أول 3 ثواني.',
-    badge: 'فايرال',
+    name: 'Arabic Viral (TikTok Kinetic)',
+    desc: 'Fast-paced kinetic pop with yellow & white cadence designed for 3-second hook retention.',
+    badge: 'Viral',
     sample: 'اسمع هذي المفاجأة!',
     sampleStyle: {
       color: '#FFFFFF',
@@ -64,9 +64,9 @@ const CAPTION_PRESETS = [
   {
     id: 'arabic_clean',
     category: 'Arabic Luxury',
-    name: 'عربي كلاسيك نقي',
-    desc: 'نصوص واضحة ومريحة ومظللة في الأسفل ملائمة للبودكاست والمقابلات.',
-    badge: 'بودكاست',
+    name: 'Arabic Clean (Classic Subtitle)',
+    desc: 'Crisp, high-legibility shadowed subtitles tailored for podcasts and interviews.',
+    badge: 'Podcast',
     sample: 'ما لم يخبرك به أحد',
     sampleStyle: {
       color: '#FFFFFF',
@@ -949,9 +949,9 @@ export default function NewProjectPage() {
 
         {/* Cost note */}
         <div className="flex items-center justify-between rounded-xl border border-hair/50 bg-onyx-2/60 px-5 py-4">
-          <span className="text-sm font-light text-mist">التكلفة / Cost</span>
+          <span className="text-sm font-light text-mist">Processing Cost</span>
           <span className="font-display text-base sm:text-lg italic text-gold">
-            1 كريديت لكل فيديو نهائي (1 credit per final video)
+            1 credit per final video
           </span>
         </div>
 
