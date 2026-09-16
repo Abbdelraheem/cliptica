@@ -36,13 +36,13 @@ export function buildOrganizationSchema() {
     },
     contactPoint: {
       '@type': 'ContactPoint',
-      email: 'support@cliptica.com',
+      email: 'support@clipzila.com',
       contactType: 'customer support',
       availableLanguage: ['English', 'Arabic'],
     },
     sameAs: [
-      'https://twitter.com/cliptica',
-      'https://github.com/Abbdelraheem/cliptica',
+      'https://twitter.com/clipzila',
+      'https://github.com/Abbdelraheem/clipzila',
     ],
   }
 }

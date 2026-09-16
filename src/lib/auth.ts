@@ -55,7 +55,7 @@ export const authOptions: NextAuthOptions = {
         let affiliateOwnerUserId: string | null = null
         try {
           const cookieStore = await cookies()
-          const refCookie = cookieStore.get('cliptica_ref')?.value?.trim().toLowerCase()
+          const refCookie = (cookieStore.get('clipzila_ref')?.value || cookieStore.get('cliptica_ref')?.value)?.trim().toLowerCase()
           if (refCookie) {
             const affiliate = await prisma.affiliate.findUnique({
               where: { code: refCookie },

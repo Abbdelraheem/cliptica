@@ -47,13 +47,15 @@ export async function GET(
     destination.searchParams.set('ref', cleanCode)
 
     const response = NextResponse.redirect(destination)
-    response.cookies.set('cliptica_ref', cleanCode, {
+    const cookieOptions = {
       path: '/',
       maxAge: 30 * 24 * 60 * 60, // 30 days
       httpOnly: false, // accessible to client scripts if needed
-      sameSite: 'lax',
+      sameSite: 'lax' as const,
       secure: process.env.NODE_ENV === 'production',
-    })
+    }
+    response.cookies.set('clipzila_ref', cleanCode, cookieOptions)
+    response.cookies.set('cliptica_ref', cleanCode, cookieOptions)
 
     return response
   } catch (error) {

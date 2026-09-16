@@ -60,7 +60,7 @@ export async function POST(request: Request) {
     if (user.email) {
       sendEmail({
         to: user.email,
-        subject: 'Your Cliptica password was changed',
+        subject: 'Your Clipzila password was changed',
         html: passwordChangedEmailHtml(),
       }).catch((e) => console.error('[change-password] failed to send email notification:', e))
     }

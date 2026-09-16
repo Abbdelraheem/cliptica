@@ -39,7 +39,7 @@ export default function ForgotPasswordPage() {
       <div className="amb" aria-hidden="true" />
 
       <div className="relative z-[2] w-full max-w-md">
-        <Link href="/" className="mb-10 flex justify-center" aria-label="Cliptica home">
+        <Link href="/" className="mb-10 flex justify-center" aria-label="Clipzila home">
           <Wordmark size={30} />
         </Link>
 

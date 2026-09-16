@@ -39,25 +39,25 @@ describe('Multilingual SEO & Message Parity', () => {
   })
 
   it('generates correct unprefixed canonical for English and prefixed for other locales', () => {
-    expect(getLocaleUrl('en')).toBe('https://cliptica.com')
-    expect(getLocaleUrl('en', 'pricing')).toBe('https://cliptica.com/pricing')
-    expect(getLocaleUrl('en', 'compare')).toBe('https://cliptica.com/compare')
+    expect(getLocaleUrl('en')).toBe('https://clipzila.com')
+    expect(getLocaleUrl('en', 'pricing')).toBe('https://clipzila.com/pricing')
+    expect(getLocaleUrl('en', 'compare')).toBe('https://clipzila.com/compare')
 
-    expect(getLocaleUrl('ar')).toBe('https://cliptica.com/ar')
-    expect(getLocaleUrl('ar', 'pricing')).toBe('https://cliptica.com/ar/pricing')
-    expect(getLocaleUrl('de', 'compare')).toBe('https://cliptica.com/de/compare')
-    expect(getLocaleUrl('fr', 'pricing')).toBe('https://cliptica.com/fr/pricing')
-    expect(getLocaleUrl('es', 'compare')).toBe('https://cliptica.com/es/compare')
+    expect(getLocaleUrl('ar')).toBe('https://clipzila.com/ar')
+    expect(getLocaleUrl('ar', 'pricing')).toBe('https://clipzila.com/ar/pricing')
+    expect(getLocaleUrl('de', 'compare')).toBe('https://clipzila.com/de/compare')
+    expect(getLocaleUrl('fr', 'pricing')).toBe('https://clipzila.com/fr/pricing')
+    expect(getLocaleUrl('es', 'compare')).toBe('https://clipzila.com/es/compare')
   })
 
   it('builds complete reciprocal hreflang alternates with x-default', () => {
     const alternates = buildHreflangAlternates('compare')
-    expect(alternates['en']).toBe('https://cliptica.com/compare')
-    expect(alternates['ar']).toBe('https://cliptica.com/ar/compare')
-    expect(alternates['de']).toBe('https://cliptica.com/de/compare')
-    expect(alternates['fr']).toBe('https://cliptica.com/fr/compare')
-    expect(alternates['es']).toBe('https://cliptica.com/es/compare')
-    expect(alternates['x-default']).toBe('https://cliptica.com/compare')
+    expect(alternates['en']).toBe('https://clipzila.com/compare')
+    expect(alternates['ar']).toBe('https://clipzila.com/ar/compare')
+    expect(alternates['de']).toBe('https://clipzila.com/de/compare')
+    expect(alternates['fr']).toBe('https://clipzila.com/fr/compare')
+    expect(alternates['es']).toBe('https://clipzila.com/es/compare')
+    expect(alternates['x-default']).toBe('https://clipzila.com/compare')
   })
 
   it('accurately identifies AI search and search engine crawlers', () => {

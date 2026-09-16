@@ -29,7 +29,7 @@ export async function generateMetadata({
   return buildPageMetadata({
     locale: locale as Locale,
     path: 'pricing',
-    title: `${m.pricingSection.h1} | Cliptica`,
+    title: `${m.pricingSection.h1} | Clipzila`,
     description: m.pricingSection.subtitle,
   })
 }

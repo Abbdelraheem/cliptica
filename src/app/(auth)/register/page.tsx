@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
+import { signIn } from 'next-auth/react'
 import { Loader2, Check, ShieldAlert } from 'lucide-react'
 import { Wordmark } from '@/components/logo'
 import { getDeviceId } from '@/lib/fingerprint'
@@ -38,7 +39,7 @@ export default function RegisterPage() {
         const data = await res.json().catch(() => null)
         setError(
           data?.error === 'DEVICE_LIMIT'
-            ? (data?.message ?? 'This device already has a Cliptica account. One account per device.')
+            ? (data?.message ?? 'This device already has a Clipzila account. One account per device.')
             : (data?.error === 'Email already registered'
                 ? 'This email is already registered.'
                 : (data?.error ?? 'Something went wrong. Try again.'))
@@ -81,7 +82,7 @@ export default function RegisterPage() {
 
         {/* Form card */}
         <div className="rounded-3xl border border-hair bg-gradient-to-b from-pearl/[0.05] to-pearl/[0.01] p-9 backdrop-blur-xl">
-          <Link href="/" className="mb-8 flex justify-center md:hidden" aria-label="Cliptica home">
+          <Link href="/" className="mb-8 flex justify-center md:hidden" aria-label="Clipzila home">
             <Wordmark size={26} />
           </Link>
 
@@ -136,6 +137,22 @@ export default function RegisterPage() {
               {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Start free — 15 credits'}
             </button>
           </form>
+
+          <div className="my-6 flex items-center gap-4">
+            <span className="h-px flex-1 bg-hair/40" />
+            <span className="text-xs uppercase tracking-widest text-mist-2">or</span>
+            <span className="h-px flex-1 bg-hair/40" />
+          </div>
+
+          <div className="grid grid-cols-1 gap-3">
+            <button
+              type="button"
+              onClick={() => signIn('google', { callbackUrl: '/dashboard' })}
+              className="btn-lux btn-outline !py-3 !text-sm"
+            >
+              Continue with Google
+            </button>
+          </div>
 
           <p className="mt-6 text-center text-sm font-light text-mist">
             Already have an account?{' '}

@@ -54,7 +54,7 @@ export async function POST(request: Request) {
     try {
       await sendEmail({
         to: user.email,
-        subject: 'Reset your Cliptica password',
+        subject: 'Reset your Clipzila password',
         html: passwordResetEmailHtml(link),
       })
     } catch (err) {

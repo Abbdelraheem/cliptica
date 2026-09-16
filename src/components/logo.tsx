@@ -1,4 +1,4 @@
-export function ClipticaMark({ size = 28 }: { size?: number }) {
+export function ClipzilaMark({ size = 28 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 32 32" fill="none" aria-hidden="true">
       <rect x="1" y="1" width="30" height="30" rx="9" fill="url(#clp-g)" />
@@ -14,14 +14,15 @@ export function ClipticaMark({ size = 28 }: { size?: number }) {
   )
 }
 
-export const NologyMark = ClipticaMark
+export const ClipticaMark = ClipzilaMark
+export const NologyMark = ClipzilaMark
 
 export function Wordmark({ size = 26 }: { size?: number }) {
   return (
     <span className="flex items-center gap-2.5">
-      <ClipticaMark size={size} />
+      <ClipzilaMark size={size} />
       <span className="font-display text-lg font-extrabold tracking-[0.08em] text-white">
-        CLIPTICA
+        CLIPZILA
       </span>
     </span>
   )

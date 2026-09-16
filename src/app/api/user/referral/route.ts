@@ -20,7 +20,7 @@ export async function GET() {
       affiliate = await prisma.affiliate.create({
         data: {
           userId,
-          name: session.user.name || 'Cliptica Creator',
+          name: session.user.name || 'Clipzila Creator',
           code: defaultCode,
         },
       })
@@ -28,7 +28,7 @@ export async function GET() {
       affiliate = await prisma.affiliate.create({
         data: {
           userId,
-          name: session.user.name || 'Cliptica Creator',
+          name: session.user.name || 'Clipzila Creator',
           code: `c-${Math.random().toString(36).substring(2, 8)}`,
         },
       })
@@ -42,7 +42,7 @@ export async function GET() {
     },
   })
 
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://cliptica.com'
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://clipzila.com'
   const referralUrl = `${appUrl}/register?ref=${affiliate.code}`
 
   return NextResponse.json({

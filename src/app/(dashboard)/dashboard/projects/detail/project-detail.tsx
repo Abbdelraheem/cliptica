@@ -115,7 +115,7 @@ export default function ProjectDetail({ projectId }: { projectId: string }) {
 
   useEffect(() => {
     if (projectId && typeof window !== 'undefined') {
-      const saved = localStorage.getItem(`cliptica_final_clip_${projectId}`)
+      const saved = localStorage.getItem(`clipzila_final_clip_${projectId}`) || localStorage.getItem(`cliptica_final_clip_${projectId}`)
       if (saved) setSelectedFinalClipId(saved)
     }
   }, [projectId])
@@ -123,7 +123,7 @@ export default function ProjectDetail({ projectId }: { projectId: string }) {
   const handleSelectFinalClip = (clipId: string) => {
     setSelectedFinalClipId(clipId)
     if (projectId && typeof window !== 'undefined') {
-      localStorage.setItem(`cliptica_final_clip_${projectId}`, clipId)
+      localStorage.setItem(`clipzila_final_clip_${projectId}`, clipId)
     }
   }
 
@@ -138,7 +138,7 @@ export default function ProjectDetail({ projectId }: { projectId: string }) {
     setPublishingClip(c)
     setPublishTitle(c.title || 'Viral Clip')
     const hook = c.description || c.title || ''
-    setPublishDesc(`${hook}\n\n#Shorts #Reels #Viral #Cliptica`)
+    setPublishDesc(`${hook}\n\n#Shorts #Reels #Viral #Clipzila`)
     setPublishPrivacy('public')
     setPublishError(null)
     setPublishSuccess(null)
@@ -753,15 +753,28 @@ export default function ProjectDetail({ projectId }: { projectId: string }) {
                   )}
 
                   {(c.exportUrl || c.videoUrl) && (
-                    <a
-                      href={c.exportUrl ?? c.videoUrl ?? '#'}
-                      download
-                      target="_blank"
-                      rel="noreferrer"
-                      className="btn-lux btn-primary w-full !py-2 !text-xs !font-medium"
-                    >
-                      <Download className="h-3.5 w-3.5" /> Download 9:16 MP4
-                    </a>
+                    <div className="space-y-2">
+                      <a
+                        href={c.exportUrl ?? c.videoUrl ?? '#'}
+                        download
+                        target="_blank"
+                        rel="noreferrer"
+                        className="btn-lux btn-primary w-full !py-2 !text-xs !font-medium"
+                      >
+                        <Download className="h-3.5 w-3.5" /> Download 9:16 MP4
+                      </a>
+                      <button
+                        type="button"
+                        onClick={() => openPublishModal(c)}
+                        className="btn-lux btn-outline w-full !py-2 !text-xs !font-medium flex items-center justify-center gap-1.5"
+                      >
+                        <Send className="h-3.5 w-3.5 text-gold" />
+                        <span>Direct Publish</span>
+                        <span className="rounded-full bg-gold/15 text-champagne text-[10px] font-bold px-2 py-0.5 border border-gold/30">
+                          Coming Soon
+                        </span>
+                      </button>
+                    </div>
                   )}
                 </div>
               </div>
@@ -780,8 +793,13 @@ export default function ProjectDetail({ projectId }: { projectId: string }) {
                   <Send className="h-4 w-4" />
                 </span>
                 <div>
-                  <h3 className="font-display text-lg font-semibold text-pearl">Publish to Social Media</h3>
-                  <p className="text-xs text-mist-2">Post directly to your connected creator channels</p>
+                  <h3 className="flex items-center gap-2 font-display text-lg font-semibold text-pearl">
+                    Publish to Social Media
+                    <span className="rounded-full border border-gold/40 bg-gold/10 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-champagne">
+                      Coming Soon
+                    </span>
+                  </h3>
+                  <p className="text-xs text-mist-2">Automated posting to TikTok, YouTube Shorts, and Reels is in final testing.</p>
                 </div>
               </div>
               <button

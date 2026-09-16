@@ -121,7 +121,7 @@ export default function AdminReferralsPage() {
   })
 
   function copyLink(affCode: string, id: string) {
-    const origin = typeof window !== 'undefined' ? window.location.origin : 'https://cliptica.com'
+    const origin = typeof window !== 'undefined' ? window.location.origin : 'https://clipzila.com'
     const fullUrl = `${origin}/r/${affCode}`
     navigator.clipboard.writeText(fullUrl)
     setCopiedId(id)
@@ -406,7 +406,7 @@ export default function AdminReferralsPage() {
                   Link Slug (URL Code)
                 </label>
                 <div className="flex items-center rounded-xl border border-hair/60 bg-black/30 px-3">
-                  <span className="font-mono text-xs text-mist-2">cliptica.com/r/</span>
+                  <span className="font-mono text-xs text-mist-2">clipzila.com/r/</span>
                   <input
                     required
                     value={code}

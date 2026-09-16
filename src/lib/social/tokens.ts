@@ -273,9 +273,9 @@ export async function publishClipToSocial(
 
   // 4. Assemble publish parameters
   const publishParams: PublishParams = {
-    title: customParams?.title || clip.title || 'Cliptica Clip',
+    title: customParams?.title || clip.title || 'Clipzila Clip',
     description: customParams?.description || clip.description || clip.title || '',
-    tags: customParams?.tags || ['#Shorts', '#Reels', '#Viral', '#Cliptica'],
+    tags: customParams?.tags || ['#Shorts', '#Reels', '#Viral', '#Clipzila'],
     privacy: customParams?.privacy || 'public',
     videoUrl: finalVideoUrl,
     aspectRatio: clip.aspectRatio,

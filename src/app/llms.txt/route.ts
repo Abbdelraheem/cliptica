@@ -3,7 +3,6 @@ import {
   PRODUCT_NAME,
   SITE_URL,
   ONE_LINER,
-  CATEGORY_TERMS,
   COMPETITORS,
   FOUNDER_NAME,
 } from '@/lib/seo/constants'

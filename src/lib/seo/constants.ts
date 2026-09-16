@@ -1,17 +1,17 @@
 /**
- * Cliptica SEO & Generative Engine Optimization (GEO) Constants
+ * Clipzila SEO & Generative Engine Optimization (GEO) Constants
  * Frozen entity definitions and multilingual locale configurations.
  */
 
-export const PRODUCT_NAME = 'Cliptica'
-export const SITE_URL = process.env.NEXTAUTH_URL || 'https://cliptica.com'
+export const PRODUCT_NAME = 'Clipzila'
+export const SITE_URL = process.env.NEXTAUTH_URL || 'https://clipzila.com'
 
 /**
  * Frozen ONE_LINER — used verbatim across metadata, schema, llms.txt,
  * social profiles, and knowledge graphs to anchor entity disambiguation.
  */
 export const ONE_LINER =
-  'Cliptica is an AI-powered video clipping platform that turns long YouTube videos and podcasts into viral short-form clips with automated Arabic and English karaoke captions, speaker face tracking, and viral moment scoring.'
+  'Clipzila is an AI-powered video clipping platform that turns long YouTube videos and podcasts into viral short-form clips with automated Arabic and English karaoke captions, speaker face tracking, and viral moment scoring.'
 
 export const CATEGORY_TERMS = [
   'AI video clipping',

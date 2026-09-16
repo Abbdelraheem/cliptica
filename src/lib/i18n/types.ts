@@ -45,14 +45,14 @@ export interface MessageCatalog {
     tldrAnswer: string
     tableTitle: string
     colFeature: string
-    colCliptica: string
+    colClipzila: string
     colOpus: string
     colKlap: string
     colSubmagic: string
-    rowPricing: { feature: string; cliptica: string; opus: string; klap: string; submagic: string }
-    rowArabic: { feature: string; cliptica: string; opus: string; klap: string; submagic: string }
-    rowSplit: { feature: string; cliptica: string; opus: string; klap: string; submagic: string }
-    rowWhop: { feature: string; cliptica: string; opus: string; klap: string; submagic: string }
+    rowPricing: { feature: string; clipzila: string; opus: string; klap: string; submagic: string }
+    rowArabic: { feature: string; clipzila: string; opus: string; klap: string; submagic: string }
+    rowSplit: { feature: string; clipzila: string; opus: string; klap: string; submagic: string }
+    rowWhop: { feature: string; clipzila: string; opus: string; klap: string; submagic: string }
     bestForHeading: string
     bestForText: string
     notBestForHeading: string

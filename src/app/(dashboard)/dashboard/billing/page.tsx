@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import Link from 'next/link'
 import { useSession } from 'next-auth/react'
 import { useSearchParams } from 'next/navigation'
 import { Check, Zap, ShieldCheck, Gift, Copy, CheckCircle2, Users } from 'lucide-react'
@@ -173,12 +174,13 @@ export default function BillingPage() {
             1 كريديت لكل عملية معالجة فيديو كاملة تنتج 3-6 مقاطع فايرال. رصيدك لا ينتهي ويبقى متاحاً في حسابك دائماً.
           </p>
           {(userRole === 'CLIPPER' || userRole === 'STUDIO') && (
-            <a
+            <Link
               href="/api/billing/portal"
+              prefetch={false}
               className="btn-lux btn-outline mt-3 !py-1.5 !px-3 !text-xs inline-flex"
             >
               Stripe Customer Portal
-            </a>
+            </Link>
           )}
         </div>
       </div>
@@ -303,9 +305,13 @@ export default function BillingPage() {
                   plan.role === 'FREE' ? (
                     <button disabled className="btn-lux btn-outline w-full opacity-50">Current plan</button>
                   ) : (
-                    <a href="/api/billing/portal" className="btn-lux btn-outline w-full text-center block">
+                    <Link
+                      href="/api/billing/portal"
+                      prefetch={false}
+                      className="btn-lux btn-outline w-full text-center block"
+                    >
                       Manage subscription
-                    </a>
+                    </Link>
                   )
                 ) : (
                   <div className="space-y-2.5">
@@ -386,7 +392,7 @@ export default function BillingPage() {
 
       <p className="mt-10 text-center text-sm font-light text-mist">
         Need invoice history or a custom tier?{' '}
-        <a href="mailto:support@cliptica.com" className="text-gold underline underline-offset-4">
+        <a href="mailto:support@clipzila.com" className="text-gold underline underline-offset-4">
           Contact support
         </a>
       </p>

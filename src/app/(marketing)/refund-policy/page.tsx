@@ -4,7 +4,7 @@ import { MarketingLayout } from '@/components/marketing-layout'
 
 export const metadata: Metadata = {
   title: 'Refund Policy',
-  description: 'Refund Policy, cancellation terms, and credit rules for Cliptica subscriptions.',
+  description: 'Refund Policy, cancellation terms, and credit rules for Clipzila subscriptions.',
 }
 
 export default function RefundPolicyPage() {
@@ -19,7 +19,7 @@ export default function RefundPolicyPage() {
           <section className="space-y-3">
             <h2 className="text-xl font-semibold text-pearl">1. Subscription Refunds (14-Day Window)</h2>
             <p>
-              We want you to be completely satisfied with Cliptica. We offer a full refund on your initial subscription purchase within{' '}
+              We want you to be completely satisfied with Clipzila. We offer a full refund on your initial subscription purchase within{' '}
               <strong className="text-pearl">14 days</strong> of the billing transaction, provided that you have consumed fewer than{' '}
               <strong className="text-pearl">15 credits</strong> from your plan allowance.
             </p>
@@ -63,8 +63,8 @@ export default function RefundPolicyPage() {
             <h2 className="text-xl font-semibold text-pearl">5. How to Request a Refund</h2>
             <p>
               To request a refund, please send an email to{' '}
-              <a href="mailto:support@cliptica.com?subject=Refund%20Request" className="text-gold underline underline-offset-4">
-                support@cliptica.com
+              <a href="mailto:support@clipzila.com?subject=Refund%20Request" className="text-gold underline underline-offset-4">
+                support@clipzila.com
               </a>{' '}
               with the subject line &quot;Refund Request&quot; and include:
             </p>

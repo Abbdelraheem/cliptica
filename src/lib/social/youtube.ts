@@ -129,7 +129,7 @@ export async function publishToYouTube(
     snippet: {
       title: params.title.slice(0, 100),
       description: (params.description || params.title).slice(0, 5000),
-      tags: params.tags && params.tags.length > 0 ? params.tags : ['#Shorts', '#AI', '#Cliptica'],
+      tags: params.tags && params.tags.length > 0 ? params.tags : ['#Shorts', '#AI', '#Clipzila'],
       categoryId: '22', // People & Blogs
     },
     status: {

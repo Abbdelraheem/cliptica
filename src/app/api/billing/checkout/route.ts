@@ -61,7 +61,7 @@ export async function GET(request: Request) {
               currency: 'usd',
               unit_amount: pack.price,
               product_data: {
-                name: `Cliptica: ${pack.name}`,
+                name: `Clipzila: ${pack.name}`,
                 description: `${pack.credits} video operations balance (${pack.description})`,
               },
             },

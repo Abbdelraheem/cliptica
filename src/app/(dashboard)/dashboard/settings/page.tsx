@@ -640,11 +640,14 @@ export default function SettingsPage() {
       <section className="mt-8 rounded-3xl border border-hair bg-onyx/40 p-8 backdrop-blur-xl">
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="flex items-center gap-2 font-display text-2xl font-semibold">
+            <h2 className="flex items-center gap-2.5 font-display text-2xl font-semibold">
               <Share2 className="h-5 w-5 text-gold" /> Connected Accounts & Direct Publishing
+              <span className="rounded-full border border-gold/40 bg-gold/10 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-champagne">
+                Coming Soon
+              </span>
             </h2>
             <p className="mt-1 text-sm font-light text-mist">
-              Connect your TikTok, YouTube, and Instagram accounts to publish viral clips directly from your dashboard.
+              Direct automated publishing to TikTok, YouTube Shorts, and Instagram Reels is in final testing and coming soon to your dashboard.
             </p>
           </div>
         </div>
@@ -759,7 +762,7 @@ export default function SettingsPage() {
                         }`}
                       >
                         <ExternalLink className="h-3.5 w-3.5" />
-                        <span>{c.configured ? 'Connect' : 'Setup Required'}</span>
+                        <span>{c.configured ? 'Connect' : 'Coming Soon'}</span>
                       </a>
                     )}
                   </div>
@@ -777,7 +780,7 @@ export default function SettingsPage() {
           Deleting your account removes all projects, clips and ledger history. This cannot be undone.
         </p>
         <a
-          href={`mailto:support@cliptica.com?subject=${encodeURIComponent('Account deletion request')}&body=${encodeURIComponent(`Please delete my account (${session?.user?.email ?? ''}).`)}`}
+          href={`mailto:support@clipzila.com?subject=${encodeURIComponent('Account deletion request')}&body=${encodeURIComponent(`Please delete my account (${session?.user?.email ?? ''}).`)}`}
           className="btn-lux mt-6 inline-flex border border-red-400/40 !bg-transparent text-red-300 hover:!bg-red-400/10"
         >
           Request account deletion

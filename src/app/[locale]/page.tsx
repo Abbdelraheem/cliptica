@@ -6,11 +6,7 @@ import {
   ArrowRight,
   Zap,
   ShieldCheck,
-  Check,
-  HelpCircle,
-  Video,
   Languages,
-  Layers,
   Flame,
 } from 'lucide-react'
 import { MarketingLayout } from '@/components/marketing-layout'
@@ -123,7 +119,7 @@ export default async function LocalizedLandingPage({
             </div>
 
             <div className="grid gap-6 md:grid-cols-2">
-              {/* Box 1: What is Cliptica */}
+              {/* Box 1: What is Clipzila */}
               <div className="rounded-3xl border border-hair/80 bg-onyx-2/90 p-6 shadow-xl">
                 <div className="flex items-center gap-2 text-gold text-sm font-bold">
                   <Zap className="h-4 w-4" />

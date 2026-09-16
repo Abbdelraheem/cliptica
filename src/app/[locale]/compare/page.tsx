@@ -29,7 +29,7 @@ export async function generateMetadata({
   return buildPageMetadata({
     locale: locale as Locale,
     path: 'compare',
-    title: `${m.compare.h1} | Cliptica`,
+    title: `${m.compare.h1} | Clipzila`,
     description: m.compare.subtitle,
   })
 }
@@ -112,7 +112,7 @@ export default async function LocalizedComparePage({
                 <thead className="border-b border-hair/60 bg-black/20 text-xs uppercase tracking-wider text-mist">
                   <tr>
                     <th className="px-6 py-4">{c.colFeature}</th>
-                    <th className="px-6 py-4 text-gold font-bold bg-gold/5">{c.colCliptica}</th>
+                    <th className="px-6 py-4 text-gold font-bold bg-gold/5">{c.colClipzila}</th>
                     <th className="px-6 py-4">{c.colOpus}</th>
                     <th className="px-6 py-4">{c.colKlap}</th>
                     <th className="px-6 py-4">{c.colSubmagic}</th>
@@ -121,28 +121,28 @@ export default async function LocalizedComparePage({
                 <tbody className="divide-y divide-hair/40 text-pearl">
                   <tr className="hover:bg-white/[0.02]">
                     <td className="px-6 py-4 font-semibold">{c.rowPricing.feature}</td>
-                    <td className="px-6 py-4 font-bold text-champagne bg-gold/5">{c.rowPricing.cliptica}</td>
+                    <td className="px-6 py-4 font-bold text-champagne bg-gold/5">{c.rowPricing.clipzila}</td>
                     <td className="px-6 py-4 text-mist">{c.rowPricing.opus}</td>
                     <td className="px-6 py-4 text-mist">{c.rowPricing.klap}</td>
                     <td className="px-6 py-4 text-mist">{c.rowPricing.submagic}</td>
                   </tr>
                   <tr className="hover:bg-white/[0.02]">
                     <td className="px-6 py-4 font-semibold">{c.rowArabic.feature}</td>
-                    <td className="px-6 py-4 font-bold text-champagne bg-gold/5">{c.rowArabic.cliptica}</td>
+                    <td className="px-6 py-4 font-bold text-champagne bg-gold/5">{c.rowArabic.clipzila}</td>
                     <td className="px-6 py-4 text-mist">{c.rowArabic.opus}</td>
                     <td className="px-6 py-4 text-mist">{c.rowArabic.klap}</td>
                     <td className="px-6 py-4 text-mist">{c.rowArabic.submagic}</td>
                   </tr>
                   <tr className="hover:bg-white/[0.02]">
                     <td className="px-6 py-4 font-semibold">{c.rowSplit.feature}</td>
-                    <td className="px-6 py-4 font-bold text-champagne bg-gold/5">{c.rowSplit.cliptica}</td>
+                    <td className="px-6 py-4 font-bold text-champagne bg-gold/5">{c.rowSplit.clipzila}</td>
                     <td className="px-6 py-4 text-mist">{c.rowSplit.opus}</td>
                     <td className="px-6 py-4 text-mist">{c.rowSplit.klap}</td>
                     <td className="px-6 py-4 text-mist">{c.rowSplit.submagic}</td>
                   </tr>
                   <tr className="hover:bg-white/[0.02]">
                     <td className="px-6 py-4 font-semibold">{c.rowWhop.feature}</td>
-                    <td className="px-6 py-4 font-bold text-champagne bg-gold/5">{c.rowWhop.cliptica}</td>
+                    <td className="px-6 py-4 font-bold text-champagne bg-gold/5">{c.rowWhop.clipzila}</td>
                     <td className="px-6 py-4 text-mist">{c.rowWhop.opus}</td>
                     <td className="px-6 py-4 text-mist">{c.rowWhop.klap}</td>
                     <td className="px-6 py-4 text-mist">{c.rowWhop.submagic}</td>

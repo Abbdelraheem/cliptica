@@ -10,7 +10,7 @@ export function CookieConsent() {
 
   useEffect(() => {
     setMounted(true)
-    const consent = localStorage.getItem('cliptica_cookie_consent')
+    const consent = localStorage.getItem('clipzila_cookie_consent') || localStorage.getItem('cliptica_cookie_consent')
     if (!consent) {
       // Delay display slightly so it doesn't jarringly block initial render
       const timer = setTimeout(() => setVisible(true), 1200)
@@ -22,7 +22,7 @@ export function CookieConsent() {
 
   const handleConsent = (choice: 'all' | 'essential') => {
     try {
-      localStorage.setItem('cliptica_cookie_consent', choice)
+      localStorage.setItem('clipzila_cookie_consent', choice)
     } catch {}
     setVisible(false)
   }

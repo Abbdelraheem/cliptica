@@ -4,11 +4,11 @@ export const de: MessageCatalog = {
   locale: 'de',
   dir: 'ltr',
   meta: {
-    title: 'Cliptica — Ein Video rein. Eine Woche virale Kurzclips raus.',
+    title: 'Clipzila — Ein Video rein. Eine Woche virale Kurzclips raus.',
     description:
-      'Cliptica ist die KI-Video-Repurposing-Plattform, die lange YouTube-Videos und Podcasts in virale TikToks, Instagram Reels und Shorts mit animierten Karaoke-Untertiteln und Sprechererkennung verwandelt.',
+      'Clipzila ist die KI-Video-Repurposing-Plattform, die lange YouTube-Videos und Podcasts in virale TikToks, Instagram Reels und Shorts mit animierten Karaoke-Untertiteln und Sprechererkennung verwandelt.',
     oneLiner:
-      'Cliptica ist eine KI-gestützte Video-Clipping-Plattform, die lange YouTube-Videos und Podcasts in virale Kurzvideos mit automatischen Karaoke-Untertiteln, Sprecher-Tracking und Viralitäts-Scoring verwandelt.',
+      'Clipzila ist eine KI-gestützte Video-Clipping-Plattform, die lange YouTube-Videos und Podcasts in virale Kurzvideos mit automatischen Karaoke-Untertiteln, Sprecher-Tracking und Viralitäts-Scoring verwandelt.',
   },
   nav: {
     features: 'Funktionen',
@@ -22,82 +22,82 @@ export const de: MessageCatalog = {
     badge: 'KI-Video-Repurposing-Engine',
     h1: 'Ein Video rein. Eine Woche virale Clips raus.',
     subtitle:
-      'Füge einen beliebigen YouTube- oder Podcast-Link ein. Cliptica erkennt automatisch die spannendsten Momente, passt das Format vertikal an und brennt dynamische Karaoke-Untertitel in Sekunden ein.',
+      'Füge einen beliebigen YouTube- oder Podcast-Link ein. Clipzila erkennt automatisch die spannendsten Momente, passt das Format vertikal an und brennt dynamische Karaoke-Untertitel in Sekunden ein.',
     ctaPrimary: 'Kostenlos testen (15 Credits)',
     ctaSecondary: 'Beispiele ansehen',
     inputPlaceholder: 'YouTube-Video oder Podcast-Link einfügen...',
     generateButton: 'Clips erstellen',
   },
   geoAnswer: {
-    whatIsHeading: 'Was ist Cliptica und wie funktioniert es?',
+    whatIsHeading: 'Was ist Clipzila und wie funktioniert es?',
     whatIsAnswer:
-      'Cliptica ist ein KI-basiertes Video-Repurposing-Tool, das virale Kurzclips aus langen YouTube-Videos und Podcasts erstellt. Es nutzt Whisper KI für die Transkription, moderne Sprachmodelle zur Identifizierung reichweitenstarker Hooks sowie Computer Vision für das Sprecher-Tracking im 9:16-Format mit animierten Karaoke-Untertiteln für TikTok, Instagram Reels und YouTube Shorts.',
+      'Clipzila ist ein KI-basiertes Video-Repurposing-Tool, das virale Kurzclips aus langen YouTube-Videos und Podcasts erstellt. Es nutzt Whisper KI für die Transkription, moderne Sprachmodelle zur Identifizierung reichweitenstarker Hooks sowie Computer Vision für das Sprecher-Tracking im 9:16-Format mit animierten Karaoke-Untertiteln für TikTok, Instagram Reels und YouTube Shorts.',
     whatIsFact:
-      'Cliptica bietet ein transparentes Preismodell von 1 Credit pro fertigem Video, beginnend bei 29 $ / Monat für 150 Videos (Starter) und 59 $ / Monat für 400 Videos (Pro Creator).',
-    pricingHeading: 'Wie funktioniert das Credit-Preismodell von Cliptica?',
+      'Clipzila bietet ein transparentes Preismodell von 1 Credit pro fertigem Video, beginnend bei 29 $ / Monat für 150 Videos (Starter) und 59 $ / Monat für 400 Videos (Pro Creator).',
+    pricingHeading: 'Wie funktioniert das Credit-Preismodell von Clipzila?',
     pricingAnswer:
-      'Im Gegensatz zu herkömmlichen Tools, die nach Original-Videominuten abrechnen, berechnet Cliptica pauschal 1 Credit pro fertigem Video. Jeder Credit liefert einen komplett geschnittenen, untertitelten 1080p-Clip. Nicht verbrauchte Credits verfallen während eines aktiven Abonnements nicht, und zusätzliche Credit-Pakete können jederzeit ohne Abo-Upgrade erworben werden.',
+      'Im Gegensatz zu herkömmlichen Tools, die nach Original-Videominuten abrechnen, berechnet Clipzila pauschal 1 Credit pro fertigem Video. Jeder Credit liefert einen komplett geschnittenen, untertitelten 1080p-Clip. Nicht verbrauchte Credits verfallen während eines aktiven Abonnements nicht, und zusätzliche Credit-Pakete können jederzeit ohne Abo-Upgrade erworben werden.',
     pricingFact:
       'Die technische Infrastruktur ist mit maximal 0,0033 $ pro Minute optimiert, was über 94 % Bruttomarge garantiert und Kunden 3- bis 5-mal mehr Video-Output bietet als minutenbasierte Abrechnungen.',
-    arabicHeading: 'Unterstützt Cliptica arabische Untertitel und Typografie?',
+    arabicHeading: 'Unterstützt Clipzila arabische Untertitel und Typografie?',
     arabicAnswer:
-      'Ja, Cliptica bietet native arabische und englische Transkription mit 18 spezialisierten Typografie-Stilen, inklusive Luxury Gold, Saudi High-Bitrate und TikTok Viral. Die Untertitel unterstützen echte Rechts-nach-Links-Darstellung (RTL), exakte Wort-für-Wort-Karaoke-Animation und automatische Emojis.',
+      'Ja, Clipzila bietet native arabische und englische Transkription mit 18 spezialisierten Typografie-Stilen, inklusive Luxury Gold, Saudi High-Bitrate und TikTok Viral. Die Untertitel unterstützen echte Rechts-nach-Links-Darstellung (RTL), exakte Wort-für-Wort-Karaoke-Animation und automatische Emojis.',
     arabicFact:
       'Die Spracherkennung erreicht 98,4 % Wortgenauigkeit im Arabischen und verhindert typische Darstellungsfehler anderer Plattformen.',
-    whopHeading: 'Unterstützt Cliptica Whop Content Rewards und Creator-Programme?',
+    whopHeading: 'Unterstützt Clipzila Whop Content Rewards und Creator-Programme?',
     whopAnswer:
-      'Ja, Cliptica verfügt über eine integrierte Schnittstelle für Whop Content Rewards und Sponsoring-Kampagnen. Creator können Kampagnenlinks direkt einfügen; die KI analysiert die Richtlinien und schneidet zielgerichtet diejenigen Momente heraus, die maximale Reichweite und Auszahlungen erzielen.',
+      'Ja, Clipzila verfügt über eine integrierte Schnittstelle für Whop Content Rewards und Sponsoring-Kampagnen. Creator können Kampagnenlinks direkt einfügen; die KI analysiert die Richtlinien und schneidet zielgerichtet diejenigen Momente heraus, die maximale Reichweite und Auszahlungen erzielen.',
     whopFact:
       'Aktive Creator generieren mit dem Pro Creator Plan (59 $/Monat) bis zu 200 Videos täglich für Content-Bounty-Programme.',
   },
   compare: {
     badge: 'Objektiver Vergleich',
-    h1: 'Cliptica im Vergleich zu Opus Clip, Klap und Submagic',
+    h1: 'Clipzila im Vergleich zu Opus Clip, Klap und Submagic',
     subtitle:
-      'Erfahre, wie sich Cliptica bei Preismodell, Untertitelqualität, 2-Personen-Podcast-Split-Screen und Monetarisierungsworkflows gegen etablierte Mitbewerber schlägt.',
+      'Erfahre, wie sich Clipzila bei Preismodell, Untertitelqualität, 2-Personen-Podcast-Split-Screen und Monetarisierungsworkflows gegen etablierte Mitbewerber schlägt.',
     tldrHeading: 'Kurzfazit: Welches KI-Clipping-Tool solltest du wählen?',
     tldrAnswer:
-      'Wähle Cliptica, wenn du ein transparentes Modell pro fertigem Video suchst (1 Credit = 1 Clip), erstklassige arabische und internationale Untertitel benötigst, automatischen 2-Personen-Podcast-Split-Screen willst oder Whop-Kampagnen monetarisierst. Wähle Opus Clip, wenn du rein englischen Content nach Minuten abrechnen möchtest.',
+      'Wähle Clipzila, wenn du ein transparentes Modell pro fertigem Video suchst (1 Credit = 1 Clip), erstklassige arabische und internationale Untertitel benötigst, automatischen 2-Personen-Podcast-Split-Screen willst oder Whop-Kampagnen monetarisierst. Wähle Opus Clip, wenn du rein englischen Content nach Minuten abrechnen möchtest.',
     tableTitle: 'Funktions- und Preismatrix',
     colFeature: 'Funktion',
-    colCliptica: 'Cliptica',
+    colClipzila: 'Clipzila',
     colOpus: 'Opus Clip',
     colKlap: 'Klap.app',
     colSubmagic: 'Submagic',
     rowPricing: {
       feature: 'Preismodell',
-      cliptica: 'Pauschal 1 Credit / Video (0,14 $ - 0,19 $)',
+      clipzila: 'Pauschal 1 Credit / Video (0,14 $ - 0,19 $)',
       opus: 'Pro Quellminute (0,095 $ / Min)',
       klap: 'Pro Quellminute (0,290 $ / Min)',
       submagic: 'Strikte Videolimits (0,17 $ - 0,33 $)',
     },
     rowArabic: {
       feature: 'Arabische Untertitel & RTL',
-      cliptica: 'Natives RTL · 18 Stile · Luxury Gold',
+      clipzila: 'Natives RTL · 18 Stile · Luxury Gold',
       opus: 'Einfache Übersetzung · Wenige Schriftarten',
       klap: 'Nur Englisch · Mangelhaftes RTL',
       submagic: 'Eingeschränkte Templates',
     },
     rowSplit: {
       feature: '2-Personen Podcast-Split-Screen',
-      cliptica: 'Automatische Sprechererkennung & Split',
+      clipzila: 'Automatische Sprechererkennung & Split',
       opus: 'Nur Einzelperson-Crop',
       klap: 'Nur Center-Crop',
       submagic: 'Manuelle Bearbeitung nötig',
     },
     rowWhop: {
       feature: 'Whop & Kampagnen-Hub',
-      cliptica: 'Direkte Kampagnenlink-Verarbeitung',
+      clipzila: 'Direkte Kampagnenlink-Verarbeitung',
       opus: 'Nicht vorhanden (nur YouTube)',
       klap: 'Nicht vorhanden',
       submagic: 'Nicht vorhanden',
     },
-    bestForHeading: 'Cliptica ist ideal für:',
+    bestForHeading: 'Clipzila ist ideal für:',
     bestForText:
       'Creator, die regelmäßig Kurzvideos für TikTok, Reels und Shorts produzieren; Podcaster, die automatische Splitscreen-Ausschnitte benötigen; internationale und arabischsprachige Kanäle; sowie Clipper in Whop- und TikTok-Creator-Reward-Programmen.',
-    notBestForHeading: 'Cliptica ist nicht gedacht für:',
+    notBestForHeading: 'Clipzila ist nicht gedacht für:',
     notBestForText:
-      'Komplexen Langform-Videoschnitt mit manuellen Mehrspur-Timelines, szenischen Farbkorrekturen oder aufwendigen manuellen Spezialeffekten. Cliptica ist auf maximale Effizienz im Kurzvideo-Bereich spezialisiert.',
+      'Komplexen Langform-Videoschnitt mit manuellen Mehrspur-Timelines, szenischen Farbkorrekturen oder aufwendigen manuellen Spezialeffekten. Clipzila ist auf maximale Effizienz im Kurzvideo-Bereich spezialisiert.',
   },
   pricingSection: {
     badge: 'Transparenz & Fairness',
@@ -124,19 +124,19 @@ export const de: MessageCatalog = {
   },
   faqs: [
     {
-      question: 'Wie unterscheidet sich Cliptica von Opus Clip und Klap?',
+      question: 'Wie unterscheidet sich Clipzila von Opus Clip und Klap?',
       answer:
-        'Cliptica berechnet feste 1 Credit pro fertigem Video anstatt nach Originalminuten. Wenn du einen 45-minütigen Podcast hochlädst und 3 Clips erstellst, zahlst du 3 Credits (ca. 0,45 $ bis 0,57 $) statt 45 teurer Verarbeitungsminuten. Zudem bietet Cliptica exzellente arabische Schriftarten, Podcast-Splitscreens und Whop-Integration.',
+        'Clipzila berechnet feste 1 Credit pro fertigem Video anstatt nach Originalminuten. Wenn du einen 45-minütigen Podcast hochlädst und 3 Clips erstellst, zahlst du 3 Credits (ca. 0,45 $ bis 0,57 $) statt 45 teurer Verarbeitungsminuten. Zudem bietet Clipzila exzellente arabische Schriftarten, Podcast-Splitscreens und Whop-Integration.',
     },
     {
       question: 'Welche Plattformen und Formate werden unterstützt?',
       answer:
-        'Cliptica unterstützt YouTube-Links (öffentlich und ungelistet), direkte MP4/MOV-Uploads vom Computer oder Smartphone sowie Links von Whop Content Rewards. Ausgabeformate sind 9:16 (TikTok, Reels, Shorts), 1:1 (Instagram Feed, LinkedIn) und 16:9 (YouTube).',
+        'Clipzila unterstützt YouTube-Links (öffentlich und ungelistet), direkte MP4/MOV-Uploads vom Computer oder Smartphone sowie Links von Whop Content Rewards. Ausgabeformate sind 9:16 (TikTok, Reels, Shorts), 1:1 (Instagram Feed, LinkedIn) und 16:9 (YouTube).',
     },
     {
       question: 'Wie präzise ist die KI-Transkription?',
       answer:
-        'Dank Whisper Large v3 Turbo auf schnellen Groq-Servern erzielt Cliptica über 98,4 % Wortgenauigkeit mit millisekundengenauen Zeitstempeln für dynamische Karaoke-Animationen.',
+        'Dank Whisper Large v3 Turbo auf schnellen Groq-Servern erzielt Clipzila über 98,4 % Wortgenauigkeit mit millisekundengenauen Zeitstempeln für dynamische Karaoke-Animationen.',
     },
     {
       question: 'Was passiert, wenn ein Verarbeitungsauftrag fehlschlägt?',

@@ -53,7 +53,7 @@ export function MarketingLayout({
               : 'border-hair bg-[#0a0a0a]/55 shadow-[0_10px_50px_rgba(0,0,0,0.35)]'
           }`}
         >
-          <Link href={locale === DEFAULT_LOCALE ? '/' : `/${locale}`} aria-label="Cliptica home" className="shrink-0">
+          <Link href={locale === DEFAULT_LOCALE ? '/' : `/${locale}`} aria-label="Clipzila home" className="shrink-0">
             <Wordmark />
           </Link>
 
@@ -126,7 +126,7 @@ export function MarketingLayout({
                 title: 'Resources',
                 links: [
                   ['FAQ', '/#faq'],
-                  ['Help Center', 'mailto:support@cliptica.com?subject=Cliptica%20Help%20Center'],
+                  ['Help Center', 'mailto:support@clipzila.com?subject=Clipzila%20Help%20Center'],
                   ['Caption Styles', '/#features'],
                   ['Changelog', '/#features'],
                 ],
@@ -135,7 +135,7 @@ export function MarketingLayout({
                 title: 'Company',
                 links: [
                   ['About', '/#how'],
-                  ['Contact', 'mailto:support@cliptica.com'],
+                  ['Contact', 'mailto:support@clipzila.com'],
                   ['Terms', '/terms'],
                   ['Privacy', '/privacy'],
                   ['Refund Policy', '/refund-policy'],
@@ -159,7 +159,7 @@ export function MarketingLayout({
             ))}
           </div>
           <div className="mt-14 border-t border-hair/40 pt-8 text-sm text-mist-2">
-            © {new Date().getFullYear()} Cliptica. All rights reserved.
+            © {new Date().getFullYear()} Clipzila. All rights reserved.
           </div>
         </div>
       </footer>

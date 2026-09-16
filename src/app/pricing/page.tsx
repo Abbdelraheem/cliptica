@@ -1,6 +1,6 @@
 import { Metadata } from 'next'
 import Link from 'next/link'
-import { Check, ArrowRight, Sparkles, Zap, ShieldCheck } from 'lucide-react'
+import { Check, Sparkles, ShieldCheck } from 'lucide-react'
 import { MarketingLayout } from '@/components/marketing-layout'
 import { buildPageMetadata } from '@/lib/seo/metadata'
 import {
@@ -15,11 +15,11 @@ import { SITE_URL } from '@/lib/seo/constants'
 export const metadata: Metadata = buildPageMetadata({
   locale: 'en',
   path: 'pricing',
-  title: 'Pricing Plans & Credit Packs — 1 Credit = 1 Final Video | Cliptica',
+  title: 'Pricing Plans & Credit Packs — 1 Credit = 1 Final Video | Clipzila',
   description:
     'Transparent per-video pricing. Start with 15 free credits. Starter plan at $29/mo for 150 videos, Pro Creator at $59/mo for 400 videos. No source minute meters.',
   keywords: [
-    'Cliptica pricing',
+    'Clipzila pricing',
     'AI video clipping cost',
     'cheap video clipper',
     'Opus Clip pricing comparison',

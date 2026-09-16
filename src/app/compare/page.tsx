@@ -1,6 +1,6 @@
 import { Metadata } from 'next'
 import Link from 'next/link'
-import { Check, X, ArrowRight, Sparkles, Shield, Zap, HelpCircle } from 'lucide-react'
+import { Check, X, ArrowRight, Sparkles, Zap } from 'lucide-react'
 import { MarketingLayout } from '@/components/marketing-layout'
 import { buildPageMetadata } from '@/lib/seo/metadata'
 import {
@@ -15,12 +15,12 @@ import { SITE_URL } from '@/lib/seo/constants'
 export const metadata: Metadata = buildPageMetadata({
   locale: 'en',
   path: 'compare',
-  title: 'Cliptica vs. Opus Clip, Klap & Submagic — Best AI Video Clipper (2026)',
+  title: 'Clipzila vs. Opus Clip, Klap & Submagic — Best AI Video Clipper (2026)',
   description:
-    'Detailed head-to-head comparison of Cliptica vs Opus Clip, Klap, Submagic, and Vizard. Compare pricing per video vs per minute, Arabic subtitles, podcast split-screen, and Whop rewards.',
+    'Detailed head-to-head comparison of Clipzila vs Opus Clip, Klap, Submagic, and Vizard. Compare pricing per video vs per minute, Arabic subtitles, podcast split-screen, and Whop rewards.',
   keywords: [
     'Opus Clip alternative',
-    'Cliptica vs Opus Clip',
+    'Clipzila vs Opus Clip',
     'Klap alternative',
     'Submagic alternative',
     'best AI video clipper 2026',
@@ -86,7 +86,7 @@ export default function ComparePage() {
             {c.tldrAnswer}
           </p>
           <p className="mt-2 text-sm text-champagne font-medium">
-            Fact: Cliptica starts at $29/mo for 150 complete 1080p videos ($0.19/clip), whereas Opus Clip bills $0.095 per source minute regardless of how many clips you keep.
+            Fact: Clipzila starts at $29/mo for 150 complete 1080p videos ($0.19/clip), whereas Opus Clip bills $0.095 per source minute regardless of how many clips you keep.
           </p>
         </div>
 
@@ -100,7 +100,7 @@ export default function ComparePage() {
               <thead className="border-b border-hair/60 bg-black/20 text-xs uppercase tracking-wider text-mist">
                 <tr>
                   <th className="px-6 py-4">{c.colFeature}</th>
-                  <th className="px-6 py-4 text-gold font-bold bg-gold/5">{c.colCliptica}</th>
+                  <th className="px-6 py-4 text-gold font-bold bg-gold/5">{c.colClipzila}</th>
                   <th className="px-6 py-4">{c.colOpus}</th>
                   <th className="px-6 py-4">{c.colKlap}</th>
                   <th className="px-6 py-4">{c.colSubmagic}</th>
@@ -109,28 +109,28 @@ export default function ComparePage() {
               <tbody className="divide-y divide-hair/40 text-pearl">
                 <tr className="hover:bg-white/[0.02]">
                   <td className="px-6 py-4 font-semibold">{c.rowPricing.feature}</td>
-                  <td className="px-6 py-4 font-bold text-champagne bg-gold/5">{c.rowPricing.cliptica}</td>
+                  <td className="px-6 py-4 font-bold text-champagne bg-gold/5">{c.rowPricing.clipzila}</td>
                   <td className="px-6 py-4 text-mist">{c.rowPricing.opus}</td>
                   <td className="px-6 py-4 text-mist">{c.rowPricing.klap}</td>
                   <td className="px-6 py-4 text-mist">{c.rowPricing.submagic}</td>
                 </tr>
                 <tr className="hover:bg-white/[0.02]">
                   <td className="px-6 py-4 font-semibold">{c.rowArabic.feature}</td>
-                  <td className="px-6 py-4 font-bold text-champagne bg-gold/5">{c.rowArabic.cliptica}</td>
+                  <td className="px-6 py-4 font-bold text-champagne bg-gold/5">{c.rowArabic.clipzila}</td>
                   <td className="px-6 py-4 text-mist">{c.rowArabic.opus}</td>
                   <td className="px-6 py-4 text-mist">{c.rowArabic.klap}</td>
                   <td className="px-6 py-4 text-mist">{c.rowArabic.submagic}</td>
                 </tr>
                 <tr className="hover:bg-white/[0.02]">
                   <td className="px-6 py-4 font-semibold">{c.rowSplit.feature}</td>
-                  <td className="px-6 py-4 font-bold text-champagne bg-gold/5">{c.rowSplit.cliptica}</td>
+                  <td className="px-6 py-4 font-bold text-champagne bg-gold/5">{c.rowSplit.clipzila}</td>
                   <td className="px-6 py-4 text-mist">{c.rowSplit.opus}</td>
                   <td className="px-6 py-4 text-mist">{c.rowSplit.klap}</td>
                   <td className="px-6 py-4 text-mist">{c.rowSplit.submagic}</td>
                 </tr>
                 <tr className="hover:bg-white/[0.02]">
                   <td className="px-6 py-4 font-semibold">{c.rowWhop.feature}</td>
-                  <td className="px-6 py-4 font-bold text-champagne bg-gold/5">{c.rowWhop.cliptica}</td>
+                  <td className="px-6 py-4 font-bold text-champagne bg-gold/5">{c.rowWhop.clipzila}</td>
                   <td className="px-6 py-4 text-mist">{c.rowWhop.opus}</td>
                   <td className="px-6 py-4 text-mist">{c.rowWhop.klap}</td>
                   <td className="px-6 py-4 text-mist">{c.rowWhop.submagic}</td>

@@ -26,7 +26,7 @@ export async function POST(request: Request) {
 
     // Check for referral attribution via body param or cookie
     const cookieHeader = request.headers.get('cookie') || ''
-    const cookieMatch = /cliptica_ref=([a-zA-Z0-9_-]+)/.exec(cookieHeader)
+    const cookieMatch = /(?:clipzila_ref|cliptica_ref)=([a-zA-Z0-9_-]+)/.exec(cookieHeader)
     const referralCode = (ref || cookieMatch?.[1] || '').trim().toLowerCase()
 
     let affiliateId: string | null = null
@@ -55,7 +55,7 @@ export async function POST(request: Request) {
         return NextResponse.json(
           {
             error: 'DEVICE_LIMIT',
-            message: 'This device already has a Cliptica account. One account per device.',
+            message: 'This device already has a Clipzila account. One account per device.',
           },
           { status: 403 }
         )
@@ -121,7 +121,7 @@ export async function POST(request: Request) {
       const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'
       await sendEmail({
         to: user.email,
-        subject: 'Confirm your Cliptica email',
+        subject: 'Confirm your Clipzila email',
         html: verificationEmailHtml(`${appUrl}/verify-email?token=${token}`),
       })
     } catch (err) {

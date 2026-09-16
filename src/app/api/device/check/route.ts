@@ -32,7 +32,7 @@ export async function POST(request: Request) {
         return NextResponse.json(
           {
             status: 'device_conflict',
-            message: 'This device already has another Cliptica account. One account per device.',
+            message: 'This device already has another Clipzila account. One account per device.',
           },
           { status: 403 }
         )
@@ -52,7 +52,7 @@ export async function POST(request: Request) {
       return NextResponse.json(
         {
           status: 'device_conflict',
-          message: 'This device already has another Cliptica account. One account per device.',
+          message: 'This device already has another Clipzila account. One account per device.',
         },
         { status: 403 }
       )
