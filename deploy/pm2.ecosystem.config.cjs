@@ -23,6 +23,7 @@ module.exports = {
       cwd: '/opt/nology',
       script: 'node_modules/next/dist/bin/next',
       args: 'start -p 3000',
+      node_args: '--env-file=/opt/nology/.env.production',
       // Graceful shutdown: allow 30s for in-flight requests to complete
       kill_timeout: 30000,
       // Wait for connections to drain before killing
