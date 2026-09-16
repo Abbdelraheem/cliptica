@@ -16,10 +16,13 @@ export async function POST(request: Request) {
 
     let priceId: string | undefined
 
-    if (plan === 'clipper' || plan === 'studio') {
-      priceId = PADDLE_PLAN_PRICES[plan as 'clipper' | 'studio']
-    } else if (packId && packId in PADDLE_PACK_PRICES) {
-      priceId = PADDLE_PACK_PRICES[packId as keyof typeof PADDLE_PACK_PRICES]
+    if (plan === 'clipper') {
+      priceId = process.env.PADDLE_PRICE_CLIPPER_MONTHLY || PADDLE_PLAN_PRICES.clipper
+    } else if (plan === 'studio') {
+      priceId = process.env.PADDLE_PRICE_STUDIO_MONTHLY || PADDLE_PLAN_PRICES.studio
+    } else if (packId) {
+      const envKey = `PADDLE_PRICE_${packId.toUpperCase()}`
+      priceId = process.env[envKey] || (packId in PADDLE_PACK_PRICES ? PADDLE_PACK_PRICES[packId as keyof typeof PADDLE_PACK_PRICES] : undefined)
     }
 
     if (!priceId) {

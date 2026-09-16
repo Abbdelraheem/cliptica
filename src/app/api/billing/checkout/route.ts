@@ -4,10 +4,11 @@ import { stripe, PLANS, CREDIT_PACKS } from '@/lib/stripe'
 import { NextResponse } from 'next/server'
 
 export async function GET(request: Request) {
+  const baseUrl = process.env.NEXTAUTH_URL || process.env.NEXT_PUBLIC_APP_URL || 'https://clipzila.com'
   try {
     const session = await auth()
     if (!session?.user?.id) {
-      return NextResponse.redirect(new URL('/login?callbackUrl=/dashboard/billing', request.url))
+      return NextResponse.redirect(new URL('/login?callbackUrl=/dashboard/billing', baseUrl))
     }
 
     const { searchParams } = new URL(request.url)
@@ -18,7 +19,7 @@ export async function GET(request: Request) {
     const isPlan = Boolean(planKey && PLANS[planKey])
 
     if (!isPack && !isPlan) {
-      return NextResponse.redirect(new URL('/dashboard/billing?error=invalid_selection', request.url))
+      return NextResponse.redirect(new URL('/dashboard/billing?error=invalid_selection', baseUrl))
     }
 
     // Get or create Stripe customer
@@ -28,7 +29,7 @@ export async function GET(request: Request) {
     })
 
     if (!user) {
-      return NextResponse.redirect(new URL('/dashboard/billing?error=user_not_found', request.url))
+      return NextResponse.redirect(new URL('/dashboard/billing?error=user_not_found', baseUrl))
     }
 
     let customerId = user.stripeCustomerId
@@ -45,8 +46,6 @@ export async function GET(request: Request) {
         data: { stripeCustomerId: customerId },
       })
     }
-
-    const baseUrl = process.env.NEXTAUTH_URL || process.env.NEXT_PUBLIC_APP_URL || new URL(request.url).origin
 
     // 1. One-time credit pack purchase
     if (isPack) {
@@ -83,7 +82,7 @@ export async function GET(request: Request) {
     // 2. Recurring subscription plan
     const plan = PLANS[planKey]
     if (!plan.priceId) {
-      return NextResponse.redirect(new URL('/dashboard/billing?error=plan_not_configured', request.url))
+      return NextResponse.redirect(new URL('/dashboard/billing?error=plan_not_configured', baseUrl))
     }
 
     const checkoutSession = await stripe.checkout.sessions.create({
@@ -113,6 +112,6 @@ export async function GET(request: Request) {
     return NextResponse.redirect(checkoutSession.url!, 303)
   } catch (error) {
     console.error('Checkout error:', error)
-    return NextResponse.redirect(new URL('/dashboard/billing?error=checkout_failed', request.url))
+    return NextResponse.redirect(new URL('/dashboard/billing?error=checkout_failed', baseUrl))
   }
 }

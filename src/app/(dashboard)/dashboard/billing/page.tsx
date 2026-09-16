@@ -166,33 +166,56 @@ export default function BillingPage() {
     setError('')
     setLoading(planKey)
     try {
-      if (paddle) {
-        const res = await fetch('/api/billing/paddle-checkout', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ plan: planKey }),
-        })
-        if (res.ok) {
-          const data = await res.json()
-          if (data.priceId) {
-            paddle.Checkout.open({
-              items: [{ priceId: data.priceId, quantity: 1 }],
-              customer: data.email ? { email: data.email } : undefined,
-              customData: { userId: data.userId },
-              settings: {
-                variant: 'one-page',
-                theme: 'dark',
-                successUrl: `${window.location.origin}/dashboard/billing?success=plan`,
-              },
-            })
-            setLoading(null)
-            return
-          }
+      let p = paddle
+      if (!p && process.env.NEXT_PUBLIC_PADDLE_CLIENT_TOKEN) {
+        try {
+          p =
+            (await initializePaddle({
+              token: process.env.NEXT_PUBLIC_PADDLE_CLIENT_TOKEN,
+              environment: (process.env.NEXT_PUBLIC_PADDLE_ENV || 'production') as 'sandbox' | 'production',
+            })) || null
+          if (p) setPaddle(p)
+        } catch (initErr) {
+          console.warn('[Paddle] Re-init error:', initErr)
         }
       }
-      window.location.href = `/api/billing/checkout?plan=${encodeURIComponent(planKey)}`
-    } catch {
-      setError('Could not start checkout. Please try again.')
+
+      const res = await fetch('/api/billing/paddle-checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ plan: planKey }),
+      })
+
+      const data = await res.json().catch(() => ({}))
+
+      if (!res.ok || !data.priceId) {
+        setError(data.error || 'تعذر جلب تفاصيل الباقة. يرجى المحاولة مرة أخرى.')
+        setLoading(null)
+        return
+      }
+
+      if (p) {
+        p.Checkout.open({
+          items: [{ priceId: data.priceId, quantity: 1 }],
+          customer: data.email ? { email: data.email } : undefined,
+          customData: { userId: data.userId },
+          settings: {
+            variant: 'one-page',
+            theme: 'dark',
+            displayMode: 'overlay',
+            successUrl: `${window.location.origin}/dashboard/billing?success=plan`,
+          },
+        })
+        setLoading(null)
+        return
+      } else {
+        setError('تعذر تحميل نافذة الدفع في المتصفح. تأكد من إيقاف أي مانع إعلانات (AdBlocker) والمحاولة مجدداً.')
+        setLoading(null)
+        return
+      }
+    } catch (err: unknown) {
+      console.error('Upgrade error:', err)
+      setError('حدث خطأ غير متوقع أثناء بدء الدفع. يرجى المحاولة لاحقاً.')
       setLoading(null)
     }
   }
@@ -202,33 +225,56 @@ export default function BillingPage() {
     setLoading(packId)
     try {
       const selected = CREDIT_PACKS.find((p) => p.id === packId)
-      if (paddle) {
-        const res = await fetch('/api/billing/paddle-checkout', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ packId }),
-        })
-        if (res.ok) {
-          const data = await res.json()
-          if (data.priceId) {
-            paddle.Checkout.open({
-              items: [{ priceId: data.priceId, quantity: 1 }],
-              customer: data.email ? { email: data.email } : undefined,
-              customData: { userId: data.userId },
-              settings: {
-                variant: 'one-page',
-                theme: 'dark',
-                successUrl: `${window.location.origin}/dashboard/billing?success=pack&credits=${selected?.credits ?? ''}`,
-              },
-            })
-            setLoading(null)
-            return
-          }
+      let p = paddle
+      if (!p && process.env.NEXT_PUBLIC_PADDLE_CLIENT_TOKEN) {
+        try {
+          p =
+            (await initializePaddle({
+              token: process.env.NEXT_PUBLIC_PADDLE_CLIENT_TOKEN,
+              environment: (process.env.NEXT_PUBLIC_PADDLE_ENV || 'production') as 'sandbox' | 'production',
+            })) || null
+          if (p) setPaddle(p)
+        } catch (initErr) {
+          console.warn('[Paddle] Re-init error:', initErr)
         }
       }
-      window.location.href = `/api/billing/checkout?pack=${encodeURIComponent(packId)}`
-    } catch {
-      setError('Could not start credit pack purchase. Please try again.')
+
+      const res = await fetch('/api/billing/paddle-checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ packId }),
+      })
+
+      const data = await res.json().catch(() => ({}))
+
+      if (!res.ok || !data.priceId) {
+        setError(data.error || 'تعذر جلب تفاصيل حزمة الرصيد. يرجى المحاولة مرة أخرى.')
+        setLoading(null)
+        return
+      }
+
+      if (p) {
+        p.Checkout.open({
+          items: [{ priceId: data.priceId, quantity: 1 }],
+          customer: data.email ? { email: data.email } : undefined,
+          customData: { userId: data.userId },
+          settings: {
+            variant: 'one-page',
+            theme: 'dark',
+            displayMode: 'overlay',
+            successUrl: `${window.location.origin}/dashboard/billing?success=pack&credits=${selected?.credits ?? ''}`,
+          },
+        })
+        setLoading(null)
+        return
+      } else {
+        setError('تعذر تحميل نافذة الدفع في المتصفح. تأكد من إيقاف أي مانع إعلانات (AdBlocker) والمحاولة مجدداً.')
+        setLoading(null)
+        return
+      }
+    } catch (err: unknown) {
+      console.error('Buy pack error:', err)
+      setError('حدث خطأ غير متوقع أثناء بدء شراء الرصيد. يرجى المحاولة لاحقاً.')
       setLoading(null)
     }
   }

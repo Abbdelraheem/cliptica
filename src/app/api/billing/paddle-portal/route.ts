@@ -4,11 +4,12 @@ import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { getPaddleInstance } from '@/lib/paddle'
 
-export async function GET(request: Request) {
+export async function GET() {
+  const baseUrl = process.env.NEXTAUTH_URL || process.env.NEXT_PUBLIC_APP_URL || 'https://clipzila.com'
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user?.id) {
-      return NextResponse.redirect(new URL('/login', request.url))
+      return NextResponse.redirect(new URL('/login', baseUrl))
     }
 
     const user = await prisma.user.findUnique({
@@ -18,7 +19,7 @@ export async function GET(request: Request) {
 
     if (!user?.paddleCustomerId) {
       // If customer has no Paddle subscription yet, redirect to billing page
-      return NextResponse.redirect(new URL('/dashboard/billing?error=no_paddle_account', request.url))
+      return NextResponse.redirect(new URL('/dashboard/billing?error=no_paddle_account', baseUrl))
     }
 
     const paddle = getPaddleInstance()
@@ -33,6 +34,6 @@ export async function GET(request: Request) {
     return NextResponse.redirect(redirectUrl)
   } catch (error) {
     console.error('[paddle-portal] Error creating portal session:', error)
-    return NextResponse.redirect(new URL('/dashboard/billing?error=portal_error', request.url))
+    return NextResponse.redirect(new URL('/dashboard/billing?error=portal_error', baseUrl))
   }
 }
