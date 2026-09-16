@@ -27,6 +27,8 @@ export async function GET() {
         stripeCustomerId: true,
         stripeSubscriptionId: true,
         subscriptionStatus: true,
+        paddleCustomerId: true,
+        paddleSubscriptionId: true,
       },
     })
 

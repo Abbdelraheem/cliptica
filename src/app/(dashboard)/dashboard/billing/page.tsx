@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { useSession } from 'next-auth/react'
 import { useSearchParams } from 'next/navigation'
+import { initializePaddle, type Paddle } from '@paddle/paddle-js'
 import { Check, Zap, ShieldCheck, Gift, Copy, CheckCircle2, Users } from 'lucide-react'
 
 const PLANS = [
@@ -81,6 +82,8 @@ export default function BillingPage() {
   const [loading, setLoading] = useState<string | null>(null)
   const [error, setError] = useState('')
   const [liveCredits, setLiveCredits] = useState<number | null>(null)
+  const [paddle, setPaddle] = useState<Paddle | null>(null)
+  const [hasPaddleCustomer, setHasPaddleCustomer] = useState(false)
   const [referral, setReferral] = useState<{
     code: string
     referralUrl: string
@@ -94,8 +97,13 @@ export default function BillingPage() {
     fetch('/api/auth/me')
       .then((r) => (r.ok ? r.json() : null))
       .then((d) => {
-        if (!cancelled && typeof d?.user?.credits === 'number') {
-          setLiveCredits(d.user.credits)
+        if (!cancelled && d?.user) {
+          if (typeof d.user.credits === 'number') {
+            setLiveCredits(d.user.credits)
+          }
+          if (d.user.paddleCustomerId) {
+            setHasPaddleCustomer(true)
+          }
         }
       })
       .catch(() => {})
@@ -114,10 +122,28 @@ export default function BillingPage() {
     }
   }, [])
 
+  useEffect(() => {
+    const token = process.env.NEXT_PUBLIC_PADDLE_CLIENT_TOKEN
+    const env = (process.env.NEXT_PUBLIC_PADDLE_ENV || 'sandbox') as 'sandbox' | 'production'
+    if (token) {
+      initializePaddle({
+        token,
+        environment: env,
+      })
+        .then((p) => {
+          if (p) setPaddle(p)
+        })
+        .catch((err) => {
+          console.warn('[Paddle] Client initialization skipped or failed:', err)
+        })
+    }
+  }, [])
+
   const displayCredits = liveCredits ?? session?.user?.credits ?? 0
   const userRole = (session?.user?.role ?? 'FREE').toUpperCase()
 
   const searchParams = useSearchParams()
+  const isSuccess = Boolean(searchParams.get('success'))
   const isSuccessPack = searchParams.get('success') === 'pack'
   const addedCredits = searchParams.get('credits')
 
@@ -125,6 +151,30 @@ export default function BillingPage() {
     setError('')
     setLoading(planKey)
     try {
+      if (paddle) {
+        const res = await fetch('/api/billing/paddle-checkout', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ plan: planKey }),
+        })
+        if (res.ok) {
+          const data = await res.json()
+          if (data.priceId) {
+            paddle.Checkout.open({
+              items: [{ priceId: data.priceId, quantity: 1 }],
+              customer: data.email ? { email: data.email } : undefined,
+              customData: { userId: data.userId },
+              settings: {
+                variant: 'one-page',
+                theme: 'dark',
+                successUrl: `${window.location.origin}/dashboard/billing?success=plan`,
+              },
+            })
+            setLoading(null)
+            return
+          }
+        }
+      }
       window.location.href = `/api/billing/checkout?plan=${encodeURIComponent(planKey)}`
     } catch {
       setError('Could not start checkout. Please try again.')
@@ -136,6 +186,31 @@ export default function BillingPage() {
     setError('')
     setLoading(packId)
     try {
+      const selected = CREDIT_PACKS.find((p) => p.id === packId)
+      if (paddle) {
+        const res = await fetch('/api/billing/paddle-checkout', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ packId }),
+        })
+        if (res.ok) {
+          const data = await res.json()
+          if (data.priceId) {
+            paddle.Checkout.open({
+              items: [{ priceId: data.priceId, quantity: 1 }],
+              customer: data.email ? { email: data.email } : undefined,
+              customData: { userId: data.userId },
+              settings: {
+                variant: 'one-page',
+                theme: 'dark',
+                successUrl: `${window.location.origin}/dashboard/billing?success=pack&credits=${selected?.credits ?? ''}`,
+              },
+            })
+            setLoading(null)
+            return
+          }
+        }
+      }
       window.location.href = `/api/billing/checkout?pack=${encodeURIComponent(packId)}`
     } catch {
       setError('Could not start credit pack purchase. Please try again.')
@@ -148,11 +223,13 @@ export default function BillingPage() {
       <p className="text-xs uppercase tracking-[0.3em] text-champagne">Membership & Credits</p>
       <h1 className="display-md mt-2.5">Billing & Plans</h1>
 
-      {isSuccessPack && (
+      {isSuccess && (
         <div className="mt-6 flex items-center gap-3 rounded-xl border border-emerald-500/40 bg-emerald-500/10 p-4 text-emerald-300">
           <ShieldCheck className="h-5 w-5 shrink-0" />
           <p className="text-sm">
-            تمت عملية الدفع بنجاح! تم إضافة <strong>+{addedCredits ?? ''} كريديت</strong> إلى حسابك فوراً.
+            {isSuccessPack
+              ? `تمت عملية الدفع بنجاح! تم إضافة +${addedCredits ?? ''} كريديت إلى حسابك فوراً.`
+              : 'تم تفعيل اشتراكك بنجاح! مرحباً بك في باقتك الجديدة.'}
           </p>
         </div>
       )}
@@ -175,11 +252,11 @@ export default function BillingPage() {
           </p>
           {(userRole === 'CLIPPER' || userRole === 'STUDIO') && (
             <Link
-              href="/api/billing/portal"
+              href={hasPaddleCustomer ? '/api/billing/paddle-portal' : '/api/billing/portal'}
               prefetch={false}
               className="btn-lux btn-outline mt-3 !py-1.5 !px-3 !text-xs inline-flex"
             >
-              Stripe Customer Portal
+              {hasPaddleCustomer ? 'Paddle Customer Portal' : 'Customer Billing Portal'}
             </Link>
           )}
         </div>
@@ -306,7 +383,7 @@ export default function BillingPage() {
                     <button disabled className="btn-lux btn-outline w-full opacity-50">Current plan</button>
                   ) : (
                     <Link
-                      href="/api/billing/portal"
+                      href={hasPaddleCustomer ? '/api/billing/paddle-portal' : '/api/billing/portal'}
                       prefetch={false}
                       className="btn-lux btn-outline w-full text-center block"
                     >
@@ -323,7 +400,7 @@ export default function BillingPage() {
                       {loading === plan.key ? 'Redirecting…' : `Upgrade to ${plan.name}`}
                     </button>
                     <p className="text-center text-[11px] leading-tight text-mist-2">
-                      Secure payment via Stripe · Cancel anytime
+                      Secure checkout · Instant activation · Cancel anytime
                     </p>
                   </div>
                 )}
