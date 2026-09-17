@@ -3,8 +3,41 @@ import { NextResponse } from 'next/server'
 import crypto from 'crypto'
 import { prisma } from '@/lib/prisma'
 
+interface WhopItem {
+  id?: string
+  name?: string
+}
+
+interface WhopData {
+  id?: string
+  user_id?: string
+  email?: string
+  final_amount?: number
+  amount?: number
+  plan_id?: string
+  product_id?: string
+  title?: string
+  custom_fields?: Record<string, string>
+  metadata?: Record<string, string>
+  user?: { email?: string }
+  customer?: { email?: string }
+  product?: WhopItem
+  plan?: WhopItem
+  line_items?: Array<{ product?: WhopItem; plan?: WhopItem }>
+}
+
+interface WhopPayload {
+  action?: string
+  event?: string
+  type?: string
+  id?: string
+  email?: string
+  metadata?: Record<string, string>
+  data?: WhopData
+}
+
 function verifyWhopSignature(rawBody: string, signatureHeader: string | null, secret: string): boolean {
-  if (!secret) return true // Allow local dev / bypass if not configured
+  if (!secret) return true
   if (!signatureHeader) return false
 
   try {
@@ -53,7 +86,6 @@ export async function POST(request: Request) {
 
     const secret = process.env.WHOP_WEBHOOK_SECRET || ''
 
-    // In production, enforce signature verification if secret is configured
     if (secret && process.env.NODE_ENV === 'production') {
       const isValid = verifyWhopSignature(rawBody, signature, secret)
       if (!isValid) {
@@ -62,9 +94,9 @@ export async function POST(request: Request) {
       }
     }
 
-    let payload: any
+    let payload: WhopPayload
     try {
-      payload = JSON.parse(rawBody)
+      payload = JSON.parse(rawBody) as WhopPayload
     } catch {
       return NextResponse.json({ error: 'Malformed JSON payload' }, { status: 400 })
     }
@@ -72,18 +104,15 @@ export async function POST(request: Request) {
     const action = payload.action || payload.event || payload.type
     console.log(`[Whop Webhook] Received action: "${action}"`)
 
-    // Only process successful payments and valid membership activations
     const relevantActions = ['payment.succeeded', 'payment.created', 'membership.went_valid', 'checkout.completed']
     if (action && !relevantActions.some((a) => action.toLowerCase().includes(a))) {
       return NextResponse.json({ received: true, ignoredAction: action })
     }
 
-    const data = payload.data || payload
+    const data: WhopData = payload.data || (payload as unknown as WhopData)
 
-    // Unique Event ID for idempotency lock
     const eventId = String(data.id || payload.id || `whop_${Date.now()}`)
 
-    // Idempotency check: Don't grant credits twice for duplicate webhook deliveries
     const existing = await prisma.processedWebhookEvent.findUnique({
       where: { whopEventId: eventId },
     })
@@ -93,7 +122,6 @@ export async function POST(request: Request) {
       return NextResponse.json({ received: true, alreadyProcessed: true })
     }
 
-    // Identify user from metadata or email
     const metadataUserId =
       data.metadata?.userId ||
       data.custom_fields?.userId ||
@@ -125,7 +153,6 @@ export async function POST(request: Request) {
       return NextResponse.json({ received: true, warning: 'User not found' })
     }
 
-    // Determine purchased plan / credits
     const planOrProductName = String(
       data.product?.name ||
       data.plan?.name ||
@@ -190,7 +217,6 @@ export async function POST(request: Request) {
       description = `Whop Purchase (${planOrProductName || 'Credits'})`
     }
 
-    // Atomic transaction
     await prisma.$transaction(async (tx) => {
       await tx.processedWebhookEvent.create({
         data: { whopEventId: eventId },
@@ -222,8 +248,9 @@ export async function POST(request: Request) {
       creditsAdded: addedCredits,
       role: targetRole || user.role,
     })
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const errorMsg = error instanceof Error ? error.message : 'Webhook internal error'
     console.error('[Whop Webhook] Unhandled error:', error)
-    return NextResponse.json({ error: error.message || 'Webhook internal error' }, { status: 500 })
+    return NextResponse.json({ error: errorMsg }, { status: 500 })
   }
 }
