@@ -134,7 +134,7 @@ export default function RegisterPage() {
             )}
 
             <button type="submit" disabled={loading} className="btn-lux btn-gold w-full disabled:opacity-60">
-              {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Start free — 15 credits'}
+              {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Start free — 5 credits'}
             </button>
           </form>
 

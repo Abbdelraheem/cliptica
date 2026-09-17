@@ -76,7 +76,7 @@ export const authOptions: NextAuthOptions = {
             name: user.name ?? null,
             avatar: user.image ?? null,
             emailVerified: new Date(),
-            credits: 15,
+            credits: 5,
             role: 'FREE',
             referredByAffiliateId: affiliateId,
             referredAt: affiliateId ? new Date() : null,
@@ -85,7 +85,7 @@ export const authOptions: NextAuthOptions = {
         await prisma.creditTransaction.create({
           data: {
             userId: created.id,
-            amount: 15,
+            amount: 5,
             type: 'bonus',
             description: 'Starting credits for new account',
           },

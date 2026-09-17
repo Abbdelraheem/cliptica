@@ -70,7 +70,7 @@ export async function POST(request: Request) {
         email,
         passwordHash,
         name,
-        credits: 15,
+        credits: 5,
         role: 'FREE',
         referredByAffiliateId: affiliateId,
         referredAt: affiliateId ? new Date() : null,
@@ -131,7 +131,7 @@ export async function POST(request: Request) {
     await prisma.creditTransaction.create({
       data: {
         userId: user.id,
-        amount: 15,
+        amount: 5,
         type: 'bonus',
         description: 'Starting credits for new account',
       },

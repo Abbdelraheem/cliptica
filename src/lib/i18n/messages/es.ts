@@ -23,7 +23,7 @@ export const es: MessageCatalog = {
     h1: 'Un video largo. Una semana de clips virales.',
     subtitle:
       'Pega el enlace de cualquier video o podcast de YouTube. Clipzila detecta automáticamente los momentos de mayor retención, encuadra los rostros en vertical y añade subtítulos animados estilo karaoke en segundos.',
-    ctaPrimary: 'Prueba gratis (15 créditos de regalo)',
+    ctaPrimary: 'Prueba gratis (5 créditos de regalo)',
     ctaSecondary: 'Ver ejemplos reales',
     inputPlaceholder: 'Pega un enlace de YouTube o podcast...',
     generateButton: 'Generar clips ahora',
@@ -33,7 +33,7 @@ export const es: MessageCatalog = {
     whatIsAnswer:
       'Clipzila es una plataforma en la nube impulsada por inteligencia artificial que extrae clips cortos virales a partir de videos largos y podcasts de YouTube. Utiliza Whisper para la transcripción de audio, modelos de lenguaje avanzados para identificar ganchos de alta retención y visión computacional para encuadrar en formato vertical 9:16 con subtítulos estilo karaoke listos para publicar en TikTok, Instagram Reels y YouTube Shorts.',
     whatIsFact:
-      'Clipzila ofrece un modelo de precio fijo de 1 crédito por video terminado, comenzando en $29/mes por 150 videos (Starter) y $59/mes por 400 videos (Pro Creator).',
+      'Clipzila ofrece un modelo de precio fijo de 1 crédito por video terminado, comenzando en $15/mes por 50 videos (Basic), $29/mes por 120 videos (Starter) y $59/mes por 400 videos (Pro Creator).',
     pricingHeading: '¿Cómo funciona el sistema de créditos de Clipzila?',
     pricingAnswer:
       'A diferencia de otras herramientas que cobran por minuto de video original, Clipzila cobra 1 crédito por cada video finalizado y editado. Cada crédito incluye el clip completo en 1080p con subtítulos y encuadre. Los créditos no utilizados no caducan mientras mantengas una suscripción activa, y puedes comprar paquetes de créditos adicionales en cualquier momento.',
@@ -108,7 +108,7 @@ export const es: MessageCatalog = {
     freeName: 'Prueba gratuita',
     freePrice: '$0',
     freePeriod: 'para siempre',
-    freeCredits: '15 créditos gratis para probar',
+    freeCredits: '5 créditos gratis para probar',
     basicName: 'Basic',
     basicPrice: '$15',
     basicPeriod: '/ mes',
@@ -122,7 +122,7 @@ export const es: MessageCatalog = {
     proPeriod: '/ mes',
     proCredits: '400 créditos / mes ($0.14 / video)',
     packsTitle: 'Paquetes de créditos únicos (Sin suscripción mensual)',
-    pack50: '50 Créditos — $15 ($0.30 / crédito)',
+    pack50: '50 Créditos — 18 $ ($0.36 / crédito)',
     pack150: '150 Créditos — $35 ($0.23 / crédito · Más popular)',
     pack500: '500 Créditos — $89 ($0.17 / crédito · Mejor valor)',
   },

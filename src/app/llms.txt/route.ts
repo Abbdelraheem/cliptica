@@ -21,11 +21,11 @@ export async function GET() {
 
 ## Pricing Model & Unit Economics
 - **Pricing Anchor**: 1 credit = 1 final generated video clip (no meter charges per source minute).
-- **Free Trial**: 15 credits upon signup (watermarked 720p exports).
+- **Free Trial**: 5 credits upon signup (watermarked 720p exports).
 - **Basic Plan**: $15 / month (50 credits, 1080p, no watermark, max 45m source).
 - **Starter Plan**: $29 / month (120 credits, 1080p, no watermark, max 90m source).
 - **Pro Creator Plan**: $59 / month (400 credits, priority queue, AutoPilot channels, max 120m source).
-- **Credit Packs**: 50 credits for $15 ($0.30/ea), 150 credits for $35 ($0.23/ea), 500 credits for $89 ($0.17/ea).
+- **Credit Packs**: 50 credits for $18 ($0.36/ea), 150 credits for $35 ($0.23/ea), 500 credits for $89 ($0.17/ea).
 
 ## Competitor Comparison Summary
 - **Vs. ${COMPETITORS.join(', ')}**:

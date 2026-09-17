@@ -566,9 +566,9 @@ const PLANS = [
   {
     name: 'Free',
     price: 0,
-    credits: '15 credits to start',
+    credits: '5 credits to start',
     blurb: 'See the magic on your own footage.',
-    features: ['15 credits to start', 'All caption styles', '9:16 face-tracked exports', 'Watermarked 720p exports'],
+    features: ['5 credits to start', 'All caption styles', '9:16 face-tracked exports', 'Watermarked 720p exports'],
     cta: 'Start Free',
     featured: false,
   },

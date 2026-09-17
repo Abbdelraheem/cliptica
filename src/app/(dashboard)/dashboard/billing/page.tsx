@@ -14,7 +14,7 @@ const PLANS = [
     role: 'FREE',
     price: '$0',
     period: '/ forever',
-    credits: '15 credits to start',
+    credits: '5 credits to start',
     items: ['Arabic & English captions', '720p exports with mark', 'Up to 3 videos / day'],
   },
   {
@@ -67,8 +67,8 @@ const CREDIT_PACKS = [
   {
     id: 'pack_50',
     name: '50 Credits',
-    price: '$15',
-    rate: '$0.30 / credit',
+    price: '$18',
+    rate: '$0.36 / credit',
     desc: 'Perfect for quick testing and short video projects.',
     credits: 50,
   },

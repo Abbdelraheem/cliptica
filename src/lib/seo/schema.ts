@@ -85,7 +85,7 @@ export function buildSoftwareApplicationSchema() {
         name: 'Free Trial',
         price: '0.00',
         priceCurrency: 'USD',
-        description: '15 free video generation credits with watermarked 720p exports.',
+        description: '5 free video generation credits with watermarked 720p exports.',
       },
       {
         '@type': 'Offer',

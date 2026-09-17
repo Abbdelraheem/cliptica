@@ -188,7 +188,7 @@ export default function ComparePage() {
             href="/register"
             className="btn-lux btn-primary inline-flex items-center gap-2 !px-8 !py-3.5 !text-base"
           >
-            <span>Start Free with 15 Credits</span>
+            <span>Start Free with 5 Credits</span>
             <ArrowRight className="h-4 w-4" />
           </Link>
           <p className="mt-2 text-xs text-mist">No credit card required · Full editor access</p>

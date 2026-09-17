@@ -65,7 +65,7 @@ export default async function LocalizedPricingPage({
       ctaStarter: 'اختر باقة ستارتر',
       ctaPro: 'اختر باقة المحترف',
       featuresFree: [
-        '15 رصيد فيديو مجاني',
+        '5 رصيد فيديو مجاني',
         'جميع أنماط النصوص الـ 18',
         'تصدير 720p بعلامة مائية',
         'فيديوهات أصلية حتى 20 دقيقة',
@@ -98,7 +98,7 @@ export default async function LocalizedPricingPage({
       ctaStarter: 'Starter wählen',
       ctaPro: 'Pro Creator wählen',
       featuresFree: [
-        '15 kostenlose Video-Credits',
+        '5 kostenlose Video-Credits',
         'Alle 18 Untertitel-Vorlagen',
         '720p-Export mit Wasserzeichen',
         'Videos bis zu 20 Minuten',
@@ -131,7 +131,7 @@ export default async function LocalizedPricingPage({
       ctaStarter: 'Choisir Starter',
       ctaPro: 'Choisir Pro Creator',
       featuresFree: [
-        '15 crédits vidéo gratuits',
+        '5 crédits vidéo gratuits',
         'Tous les 18 styles de sous-titres',
         'Export 720p avec filigrane',
         'Vidéos sources max 20 minutes',
@@ -164,7 +164,7 @@ export default async function LocalizedPricingPage({
       ctaStarter: 'Elegir Starter',
       ctaPro: 'Elegir Pro Creator',
       featuresFree: [
-        '15 créditos de video gratis',
+        '5 créditos de video gratis',
         'Las 18 plantillas de subtítulos',
         'Exportación 720p con marca de agua',
         'Videos fuente de hasta 20 minutos',

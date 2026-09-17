@@ -74,8 +74,8 @@ export function DashboardLayout({ children }: { children: ReactNode }) {
     currentRole === 'STUDIO' || currentRole === 'ADMIN'
       ? 400
       : currentRole === 'CLIPPER'
-      ? 150
-      : 15
+      ? 120
+      : 5
   const creditPercent = Math.min(100, Math.max(0, Math.round((displayCredits / maxCredits) * 100)))
 
   // One-account-per-device enforcement — runs on every dashboard entry.

@@ -24,13 +24,13 @@ export const PLANS: Record<PlanKey, PlanDef> = {
   free: {
     name: 'Free',
     price: 0,
-    credits: 15,
+    credits: 5,
     maxVideoLength: 20, // minutes
     maxDailyVideos: 3,
     watermark: true,
     maxResolution: '720p',
     features: [
-      '15 credits to start',
+      '5 credits to start',
       'Karaoke captions (Arabic + English)',
       '720p exports with watermark',
       'Up to 3 videos/day',
@@ -103,8 +103,8 @@ export const CREDIT_PACKS: Record<string, CreditPackDef> = {
     id: 'pack_50',
     name: '50 Credits',
     credits: 50,
-    price: 1500, // $15.00
-    pricePerCredit: '$0.30',
+    price: 1800, // $18.00
+    pricePerCredit: '$0.36',
     description: 'Perfect for quick testing and short projects',
   },
   pack_150: {

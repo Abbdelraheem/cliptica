@@ -21,7 +21,7 @@ export default function RefundPolicyPage() {
             <p>
               We want you to be completely satisfied with Clipzila. We offer a full refund on your initial subscription purchase within{' '}
               <strong className="text-pearl">14 days</strong> of the billing transaction, provided that you have consumed fewer than{' '}
-              <strong className="text-pearl">15 credits</strong> from your plan allowance.
+              <strong className="text-pearl">5 credits</strong> from your plan allowance.
             </p>
             <p>
               If your request meets these criteria, we will process a 100% refund back to your original payment method via Stripe.
@@ -33,7 +33,7 @@ export default function RefundPolicyPage() {
             <p>Refunds cannot be issued under the following circumstances:</p>
             <ul className="list-disc pl-5 space-y-2">
               <li>More than 14 days have passed since the subscription transaction date.</li>
-              <li>You have already processed footage consuming 15 or more credits, as GPU and cloud transcription computational costs are irreversibly incurred upon rendering.</li>
+              <li>You have already processed footage consuming 5 or more credits, as GPU and cloud transcription computational costs are irreversibly incurred upon rendering.</li>
               <li>One-off credit top-ups that have been partially or fully utilized.</li>
               <li>Accounts that have been suspended or terminated due to violations of our Terms of Service (e.g., copyright infringement or scraping abuse).</li>
             </ul>

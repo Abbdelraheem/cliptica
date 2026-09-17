@@ -17,7 +17,7 @@ export const metadata: Metadata = buildPageMetadata({
   path: 'pricing',
   title: 'Pricing Plans & Credit Packs — 1 Credit = 1 Final Video | Clipzila',
   description:
-    'Transparent per-video pricing. Start with 15 free credits. Basic plan at $15/mo for 50 videos, Starter at $29/mo for 120 videos, Pro Creator at $59/mo for 400 videos. Never pay for raw source minutes.',
+    'Transparent per-video pricing. Start with 5 free credits. Basic plan at $15/mo for 50 videos, Starter at $29/mo for 120 videos, Pro Creator at $59/mo for 400 videos. Never pay for raw source minutes.',
   keywords: [
     'Clipzila pricing',
     'AI video clipping cost',
@@ -94,7 +94,7 @@ export default function PricingPage() {
               <ul className="mt-6 space-y-3 text-xs text-mist">
                 <li className="flex items-center gap-2 text-pearl">
                   <Check className="h-4 w-4 text-gold" />
-                  <span>15 free video credits</span>
+                  <span>5 free video credits</span>
                 </li>
                 <li className="flex items-center gap-2">
                   <Check className="h-4 w-4 text-gold" />
