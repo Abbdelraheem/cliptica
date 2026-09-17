@@ -36,42 +36,109 @@ interface WhopPayload {
   data?: WhopData
 }
 
-function verifyWhopSignature(rawBody: string, signatureHeader: string | null, secret: string): boolean {
+function verifyWhopSignature(
+  rawBody: string,
+  headersList: { get: (name: string) => string | null },
+  secret: string
+): boolean {
   if (!secret) return true
-  if (!signatureHeader) return false
 
-  try {
-    // 1. Try Svix / Whop format: t=TIMESTAMP,v1=SIGNATURE
-    if (signatureHeader.includes('v1=')) {
-      const parts = signatureHeader.split(',')
-      const timestampPart = parts.find((p) => p.startsWith('t='))?.slice(2)
-      const sigPart = parts.find((p) => p.startsWith('v1='))?.slice(3)
-      if (sigPart) {
-        const toSign = timestampPart ? `${timestampPart}.${rawBody}` : rawBody
-        const expected = crypto.createHmac('sha256', secret).update(toSign).digest('hex')
-        if (sigPart.length === expected.length && crypto.timingSafeEqual(Buffer.from(sigPart), Buffer.from(expected))) {
-          return true
-        }
-      }
+  const sigHeader =
+    headersList.get('webhook-signature') ||
+    headersList.get('whop-signature') ||
+    headersList.get('x-whop-signature') ||
+    headersList.get('svix-signature')
+
+  if (!sigHeader) return false
+
+  const msgId =
+    headersList.get('webhook-id') ||
+    headersList.get('whop-id') ||
+    headersList.get('svix-id') ||
+    headersList.get('x-webhook-id') ||
+    ''
+
+  const timestamp =
+    headersList.get('webhook-timestamp') ||
+    headersList.get('whop-timestamp') ||
+    headersList.get('svix-timestamp') ||
+    headersList.get('x-webhook-timestamp') ||
+    ''
+
+  // Extract all signatures from the header (e.g. "v1,abc v1,def" or "t=123,v1=abc")
+  const candidateSignatures: string[] = []
+  const tokens = sigHeader.split(/[,\s]+/)
+  for (const token of tokens) {
+    if (token.startsWith('v1=')) {
+      candidateSignatures.push(token.slice(3))
+    } else if (token.startsWith('v1,')) {
+      candidateSignatures.push(token.slice(3))
+    } else if (token.startsWith('t=')) {
+      // timestamp token, ignore
+    } else if (token.length > 10) {
+      candidateSignatures.push(token)
     }
-
-    // 2. Try raw HMAC-SHA256 hex
-    const expectedHex = crypto.createHmac('sha256', secret).update(rawBody).digest('hex')
-    if (signatureHeader.length === expectedHex.length && crypto.timingSafeEqual(Buffer.from(signatureHeader), Buffer.from(expectedHex))) {
-      return true
-    }
-
-    // 3. Try raw HMAC-SHA256 base64
-    const expectedBase64 = crypto.createHmac('sha256', secret).update(rawBody).digest('base64')
-    if (signatureHeader.length === expectedBase64.length && crypto.timingSafeEqual(Buffer.from(signatureHeader), Buffer.from(expectedBase64))) {
-      return true
-    }
-
-    return false
-  } catch (err) {
-    console.error('[Whop Webhook] Verification error:', err)
-    return false
   }
+
+  // Also extract timestamp from t= in sigHeader if not in headers
+  let effectiveTimestamp = timestamp
+  if (!effectiveTimestamp && sigHeader.includes('t=')) {
+    const tToken = tokens.find((t) => t.startsWith('t='))
+    if (tToken) effectiveTimestamp = tToken.slice(2)
+  }
+
+  // Prepare payload variants
+  const payloads: string[] = []
+  if (msgId && effectiveTimestamp) {
+    payloads.push(`${msgId}.${effectiveTimestamp}.${rawBody}`)
+  }
+  if (effectiveTimestamp) {
+    payloads.push(`${effectiveTimestamp}.${rawBody}`)
+  }
+  payloads.push(rawBody)
+
+  // Prepare secret key variants
+  const rawKey = secret.replace(/^(ws_|whsec_)/, '')
+  const keyVariants: Buffer[] = []
+  try {
+    keyVariants.push(Buffer.from(secret, 'utf8'))
+  } catch {}
+  try {
+    keyVariants.push(Buffer.from(rawKey, 'utf8'))
+  } catch {}
+  try {
+    if (/^[0-9a-fA-F]+$/.test(rawKey) && rawKey.length % 2 === 0) {
+      keyVariants.push(Buffer.from(rawKey, 'hex'))
+    }
+  } catch {}
+  try {
+    keyVariants.push(Buffer.from(rawKey, 'base64'))
+  } catch {}
+
+  // Check all combinations
+  for (const key of keyVariants) {
+    for (const payload of payloads) {
+      try {
+        const expectedB64 = crypto.createHmac('sha256', key).update(payload).digest('base64')
+        const expectedHex = crypto.createHmac('sha256', key).update(payload).digest('hex')
+
+        for (const sig of candidateSignatures) {
+          if (sig.length === expectedB64.length) {
+            if (crypto.timingSafeEqual(Buffer.from(sig), Buffer.from(expectedB64))) {
+              return true
+            }
+          }
+          if (sig.length === expectedHex.length) {
+            if (crypto.timingSafeEqual(Buffer.from(sig), Buffer.from(expectedHex))) {
+              return true
+            }
+          }
+        }
+      } catch {}
+    }
+  }
+
+  return false
 }
 
 export async function POST(request: Request) {
@@ -79,15 +146,10 @@ export async function POST(request: Request) {
     const rawBody = await request.text()
     const headersList = await headers()
 
-    const signature =
-      headersList.get('whop-signature') ||
-      headersList.get('webhook-signature') ||
-      headersList.get('x-whop-signature')
-
     const secret = process.env.WHOP_WEBHOOK_SECRET || ''
 
     if (secret && process.env.NODE_ENV === 'production') {
-      const isValid = verifyWhopSignature(rawBody, signature, secret)
+      const isValid = verifyWhopSignature(rawBody, headersList, secret)
       if (!isValid) {
         console.warn('[Whop Webhook] Signature mismatch or invalid signature header')
         return NextResponse.json({ error: 'Invalid webhook signature' }, { status: 400 })
