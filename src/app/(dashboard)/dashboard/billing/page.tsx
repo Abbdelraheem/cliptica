@@ -424,7 +424,7 @@ export default function BillingPage() {
         </div>
 
         <p className="mt-3 max-w-2xl text-xs sm:text-sm font-light text-mist leading-relaxed">
-          Share your exclusive referral link. Any creator who signs up gets <strong>15 free credits</strong>, and you automatically earn <strong>+5 credits</strong> added instantly to your balance.
+          Share your exclusive referral link. Any creator who signs up gets <strong>5 free credits</strong>, and you automatically earn <strong>+5 credits</strong> added instantly to your balance.
         </p>
 
         <div className="mt-5 flex flex-col sm:flex-row items-stretch sm:items-center gap-3 max-w-2xl">

@@ -231,7 +231,7 @@ function Hero() {
           <div className="mt-8 max-w-lg">
             <PasteBar />
             <p className="mt-3 flex items-center gap-2 text-xs text-mist-2">
-              <Check className="h-3.5 w-3.5 text-champagne" /> 40 free credits — no card required
+              <Check className="h-3.5 w-3.5 text-champagne" /> 5 free credits — no card required
               <span className="mx-1 opacity-40">·</span> ~4 min per hour of video
             </p>
           </div>
@@ -741,7 +741,7 @@ function FinalCta() {
           upload
         </h2>
         <p className="relative mx-auto mt-5 max-w-md text-mist">
-          Start free with 40 credits. Paste one link and watch the clips come back scored,
+          Start free with 5 credits. Paste one link and watch the clips come back scored,
           captioned, and ready to post.
         </p>
         <div className="relative mt-9 flex flex-wrap items-center justify-center gap-4">

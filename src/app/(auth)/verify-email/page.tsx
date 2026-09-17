@@ -102,7 +102,7 @@ function VerifyEmailInner() {
           <h1 className="display-md mt-3">Confirm your email</h1>
           <p className="mt-4 flex items-start gap-2 rounded-lg border border-hair bg-surface px-4 py-2.5 text-xs leading-relaxed text-mist-2">
             <MailCheck className="mt-0.5 h-4 w-4 shrink-0 text-gold" />
-            We sent a verification link to <strong className="text-pearl">{email || 'your email'}</strong>. Click the link in the message to activate your 15 free credits.
+            We sent a verification link to <strong className="text-pearl">{email || 'your email'}</strong>. Click the link in the message to activate your 5 free credits.
           </p>
         </>
       )}
