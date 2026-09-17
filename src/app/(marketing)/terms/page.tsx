@@ -59,10 +59,10 @@ export default function TermsPage() {
           <section className="space-y-3">
             <h2 className="text-xl font-semibold text-pearl">5. Credit System Rules</h2>
             <ul className="list-disc pl-5 space-y-2">
-              <li>Credits are deducted based on video duration processed (approximately 1 credit per minute of source footage).</li>
-              <li>Credits are non-refundable once consumed by a completed or partially processed job.</li>
-              <li>Unused monthly subscription credits roll over for 30 days while your subscription remains active and in good standing.</li>
-              <li>Initial free trial credits (40 credits) are non-transferable, possess no monetary value, and cannot be redeemed for cash.</li>
+              <li>Credits are deducted based on final video outputs generated (1 credit = 1 final generated video clip, never per raw source minute).</li>
+              <li>Credits are non-refundable once consumed by a completed or successfully rendered clip.</li>
+              <li>Failed video processing jobs automatically refund reserved credits back to your balance immediately.</li>
+              <li>Initial free trial credits (5 credits) are non-transferable, possess no monetary value, and cannot be redeemed for cash.</li>
             </ul>
           </section>
 
