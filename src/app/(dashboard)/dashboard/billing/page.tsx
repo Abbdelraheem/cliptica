@@ -178,7 +178,7 @@ export default function BillingPage() {
   const addedCredits = searchParams.get('credits')
 
   const WHOP_CHECKOUT_URLS: Record<string, string> = {
-    basic: 'https://whop.com/clipzila-com/credits-50/',
+    basic: 'https://whop.com/clipzila-com/basic-plans/',
     clipper: 'https://whop.com/clipzila-com/starter-plans/',
     starter: 'https://whop.com/clipzila-com/starter-plans/',
     studio: 'https://whop.com/clipzila-com/pro-creator-plan/',
