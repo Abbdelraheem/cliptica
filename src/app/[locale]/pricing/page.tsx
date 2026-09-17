@@ -61,6 +61,7 @@ export default async function LocalizedPricingPage({
       mostPopular: 'الأكثر شيوعاً',
       faqTitle: 'أسئلة شائعة حول الأسعار والفواتير',
       ctaFree: 'ابدأ مجاناً',
+      ctaBasic: 'اختر باقة بيسك',
       ctaStarter: 'اختر باقة ستارتر',
       ctaPro: 'اختر باقة المحترف',
       featuresFree: [
@@ -69,8 +70,14 @@ export default async function LocalizedPricingPage({
         'تصدير 720p بعلامة مائية',
         'فيديوهات أصلية حتى 20 دقيقة',
       ],
+      featuresBasic: [
+        '50 رصيد شهرياً (50 مقطع)',
+        'بدون علامة مائية · جودة 1080p',
+        'جميع أنماط النصوص الـ 18 الفاخرة',
+        'فيديوهات أصلية حتى 45 دقيقة',
+      ],
       featuresStarter: [
-        '150 رصيد شهرياً (150 مقطع)',
+        '120 رصيد شهرياً (120 مقطع)',
         'بدون علامة مائية · جودة 1080p فائقة',
         'خطوط عربية فاخرة وأنماط كينيتك',
         'فيديوهات أصلية حتى 90 دقيقة',
@@ -87,6 +94,7 @@ export default async function LocalizedPricingPage({
       mostPopular: 'Beliebteste Wahl',
       faqTitle: 'Häufige Fragen zu Preisen & Abrechnung',
       ctaFree: 'Kostenlos starten',
+      ctaBasic: 'Basic wählen',
       ctaStarter: 'Starter wählen',
       ctaPro: 'Pro Creator wählen',
       featuresFree: [
@@ -95,8 +103,14 @@ export default async function LocalizedPricingPage({
         '720p-Export mit Wasserzeichen',
         'Videos bis zu 20 Minuten',
       ],
+      featuresBasic: [
+        '50 Credits / Monat (50 Clips)',
+        'Kein Wasserzeichen · 1080p HD',
+        'Alle 18 Untertitel-Vorlagen',
+        'Videos bis zu 45 Minuten',
+      ],
       featuresStarter: [
-        '150 Credits / Monat (150 Clips)',
+        '120 Credits / Monat (120 Clips)',
         'Kein Wasserzeichen · 1080p HD',
         'Dynamische virale Untertitel',
         'Videos bis zu 90 Minuten',
@@ -113,6 +127,7 @@ export default async function LocalizedPricingPage({
       mostPopular: 'Le Plus Populaire',
       faqTitle: 'Questions fréquentes sur les tarifs',
       ctaFree: 'Commencer gratuitement',
+      ctaBasic: 'Choisir Basic',
       ctaStarter: 'Choisir Starter',
       ctaPro: 'Choisir Pro Creator',
       featuresFree: [
@@ -121,8 +136,14 @@ export default async function LocalizedPricingPage({
         'Export 720p avec filigrane',
         'Vidéos sources max 20 minutes',
       ],
+      featuresBasic: [
+        '50 crédits / mois (50 clips)',
+        'Sans filigrane · 1080p HD',
+        'Tous les 18 styles de sous-titres',
+        'Vidéos sources max 45 minutes',
+      ],
       featuresStarter: [
-        '150 crédits / mois (150 clips)',
+        '120 crédits / mois (120 clips)',
         'Sans filigrane · 1080p HD',
         'Sous-titres dynamiques viraux',
         'Vidéos sources max 90 minutes',
@@ -139,6 +160,7 @@ export default async function LocalizedPricingPage({
       mostPopular: 'Más Popular',
       faqTitle: 'Preguntas frecuentes sobre precios',
       ctaFree: 'Comenzar gratis',
+      ctaBasic: 'Elegir Basic',
       ctaStarter: 'Elegir Starter',
       ctaPro: 'Elegir Pro Creator',
       featuresFree: [
@@ -147,8 +169,14 @@ export default async function LocalizedPricingPage({
         'Exportación 720p con marca de agua',
         'Videos fuente de hasta 20 minutos',
       ],
+      featuresBasic: [
+        '50 créditos / mes (50 clips)',
+        'Sin marca de agua · 1080p HD',
+        'Las 18 plantillas de subtítulos',
+        'Videos fuente de hasta 45 minutos',
+      ],
       featuresStarter: [
-        '150 créditos / mes (150 clips)',
+        '120 créditos / mes (120 clips)',
         'Sin marca de agua · 1080p HD',
         'Subtítulos cinéticos virales',
         'Videos fuente de hasta 90 minutos',
@@ -207,9 +235,9 @@ export default async function LocalizedPricingPage({
           </div>
 
           {/* Subscription Tier Cards */}
-          <div className="mt-12 grid gap-6 md:grid-cols-3">
+          <div className="mt-12 grid gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
             {/* Free Tier */}
-            <div className="flex flex-col justify-between rounded-3xl border border-hair/60 bg-onyx-2 p-7">
+            <div className="flex flex-col justify-between rounded-3xl border border-hair/60 bg-onyx-2 p-6">
               <div>
                 <h3 className="font-display text-lg font-bold text-pearl">{p.freeName}</h3>
                 <div className="mt-4 flex items-baseline gap-1">
@@ -231,8 +259,31 @@ export default async function LocalizedPricingPage({
               </Link>
             </div>
 
+            {/* Basic Plan */}
+            <div className="flex flex-col justify-between rounded-3xl border border-hair/60 bg-onyx-2 p-6">
+              <div>
+                <h3 className="font-display text-lg font-bold text-pearl">{p.basicName}</h3>
+                <div className="mt-4 flex items-baseline gap-1">
+                  <span className="font-display text-4xl font-extrabold text-pearl">{p.basicPrice}</span>
+                  <span className="text-xs text-mist">{p.basicPeriod}</span>
+                </div>
+                <p className="mt-2 text-xs text-champagne font-medium">{p.basicCredits}</p>
+                <ul className="mt-6 space-y-3 text-xs text-mist">
+                  {l.featuresBasic.map((feat, idx) => (
+                    <li key={idx} className="flex items-center gap-2 text-pearl">
+                      <Check className="h-4 w-4 text-gold shrink-0" />
+                      <span>{feat}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+              <Link href="/register?plan=basic" className="btn-secondary mt-8 w-full text-center text-xs font-semibold py-2.5">
+                {l.ctaBasic}
+              </Link>
+            </div>
+
             {/* Starter Plan (Featured) */}
-            <div className="relative flex flex-col justify-between rounded-3xl border border-gold/50 bg-gradient-to-b from-gold/10 via-onyx-2 to-onyx-2 p-7 shadow-2xl">
+            <div className="relative flex flex-col justify-between rounded-3xl border border-gold/50 bg-gradient-to-b from-gold/10 via-onyx-2 to-onyx-2 p-6 shadow-2xl">
               <span className={`absolute -top-3 ${isRtl ? 'left-6' : 'right-6'} rounded-full bg-gold px-3 py-0.5 text-[10px] font-extrabold text-black uppercase tracking-wider`}>
                 {l.mostPopular}
               </span>
@@ -258,7 +309,7 @@ export default async function LocalizedPricingPage({
             </div>
 
             {/* Pro Creator Plan */}
-            <div className="flex flex-col justify-between rounded-3xl border border-hair/60 bg-onyx-2 p-7">
+            <div className="flex flex-col justify-between rounded-3xl border border-hair/60 bg-onyx-2 p-6">
               <div>
                 <h3 className="font-display text-lg font-bold text-pearl">{p.proName}</h3>
                 <div className="mt-4 flex items-baseline gap-1">

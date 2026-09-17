@@ -573,11 +573,20 @@ const PLANS = [
     featured: false,
   },
   {
+    name: 'Basic',
+    price: 15,
+    credits: '50 credits / month',
+    blurb: 'Essential toolkit for launching short-form channels.',
+    features: ['50 credits / month', 'Watermark-free 1080p', 'All 18 caption presets', 'Face-tracking & 9:16 crop'],
+    cta: 'Go Basic',
+    featured: false,
+  },
+  {
     name: 'Starter',
     price: 29,
-    credits: '150 credits / month',
-    blurb: 'For daily creators building an audience.',
-    features: ['150 credits / month', 'Everything in Free', 'Watermark-free 1080p', 'Opening hooks & Kinetic subtitles', 'Priority rendering queue'],
+    credits: '120 credits / month',
+    blurb: 'For daily creators building an active audience.',
+    features: ['120 credits / month', 'Everything in Basic', 'Opening hooks & Kinetic subtitles', 'Priority rendering queue', 'Campaign hub access'],
     cta: 'Go Starter',
     featured: true,
   },
@@ -586,7 +595,7 @@ const PLANS = [
     price: 59,
     credits: '400 credits / month',
     blurb: 'For power creators and media agencies at scale.',
-    features: ['400 credits / month', 'Everything in Starter', 'Multiple brand kits', 'Team seats included', 'API access'],
+    features: ['400 credits / month', 'Everything in Starter', 'Auto-Pilot channel watchlists', 'Podcast 2-person split screen', 'Whop Bounty ingestion'],
     cta: 'Go Pro Creator',
     featured: false,
   },
@@ -599,10 +608,10 @@ function Pricing() {
       <h2 className="display-md mt-4 max-w-xl rv">
         Cheaper than <span className="gold-text">one edit</span>
       </h2>
-      <p className="mt-4 max-w-lg text-mist rv">
-        1 credit = 1 final video. Credits refresh every monthly billing cycle.
+      <p className="mt-4 max-w-xl text-mist rv">
+        1 credit = 1 final video (never pay for unused raw footage minutes). Credits refresh every monthly billing cycle.
       </p>
-      <div className="mt-14 grid gap-6 lg:grid-cols-3">
+      <div className="mt-14 grid gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
         {PLANS.map((p, i) => (
           <div
             key={p.name}

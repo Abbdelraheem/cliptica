@@ -36,17 +36,33 @@ export const PLANS: Record<PlanKey, PlanDef> = {
       'Up to 3 videos/day',
     ],
   },
+  basic: {
+    name: 'Basic',
+    price: 1500, // $15 / mo (cents)
+    priceId: process.env.STRIPE_PRICE_BASIC_MONTHLY,
+    credits: 50,
+    maxVideoLength: 45,
+    maxDailyVideos: 25,
+    watermark: false,
+    maxResolution: '1080p',
+    features: [
+      '50 credits/month (1 credit = 1 final video)',
+      'No watermark · 1080p high bitrate',
+      'All 18 subtitle presets & Arabic Luxury',
+      'Single face-tracking & 9:16 crop',
+    ],
+  },
   clipper: {
     name: 'Starter',
     price: 2900, // $29 / mo (cents)
     priceId: process.env.STRIPE_PRICE_CLIPPER_MONTHLY || process.env.STRIPE_CLIPPER_PRICE_ID,
-    credits: 150,
+    credits: 120,
     maxVideoLength: 90,
     maxDailyVideos: 50,
     watermark: false,
     maxResolution: '1080p',
     features: [
-      '150 credits/month',
+      '120 credits/month (1 credit = 1 final video)',
       'No watermark · 1080p high bitrate',
       'Opening AI Hook cards & Title overlays',
       'Arabic Luxury & Viral kinetic subtitle styles',
@@ -63,7 +79,7 @@ export const PLANS: Record<PlanKey, PlanDef> = {
     watermark: false,
     maxResolution: '1080p',
     features: [
-      '400 credits/month',
+      '400 credits/month (1 credit = 1 final video)',
       'Ultra-fast priority rendering queue',
       'AI Auto-Pilot channel watchlists',
       'Brand style presets & custom font packs',
@@ -111,7 +127,7 @@ export const CREDIT_PACKS: Record<string, CreditPackDef> = {
 }
 
 export type CreditPackKey = keyof typeof CREDIT_PACKS
-export type PlanKey = 'free' | 'clipper' | 'studio'
+export type PlanKey = 'free' | 'basic' | 'clipper' | 'studio'
 export type Plan = PlanDef
 
 export function getPlanFromPriceId(priceId: string): PlanKey | null {

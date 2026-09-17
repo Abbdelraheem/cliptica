@@ -89,6 +89,19 @@ export function buildSoftwareApplicationSchema() {
       },
       {
         '@type': 'Offer',
+        name: 'Basic Plan',
+        price: '15.00',
+        priceCurrency: 'USD',
+        priceSpecification: {
+          '@type': 'UnitPriceSpecification',
+          price: '15.00',
+          priceCurrency: 'USD',
+          unitText: 'MONTH',
+        },
+        description: '50 credits per month, 1080p exports, no watermark, all 18 subtitle styles.',
+      },
+      {
+        '@type': 'Offer',
         name: 'Starter Plan',
         price: '29.00',
         priceCurrency: 'USD',
@@ -98,7 +111,7 @@ export function buildSoftwareApplicationSchema() {
           priceCurrency: 'USD',
           unitText: 'MONTH',
         },
-        description: '150 credits per month, 1080p exports, no watermark, Arabic Luxury subtitles.',
+        description: '120 credits per month, 1080p exports, no watermark, Arabic Luxury subtitles.',
       },
       {
         '@type': 'Offer',

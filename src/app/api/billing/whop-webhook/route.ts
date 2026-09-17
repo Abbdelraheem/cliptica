@@ -189,8 +189,16 @@ export async function POST(request: Request) {
       (amount >= 25 && amount < 55)
     ) {
       targetRole = 'CLIPPER'
-      addedCredits = 150
-      description = 'Whop Subscription: Starter Plan (150 Credits)'
+      addedCredits = 120
+      description = 'Whop Subscription: Starter Plan (120 Credits)'
+    } else if (
+      planOrProductName.includes('basic') ||
+      planIdOrSlug.includes('basic') ||
+      planOrProductName.includes('lite')
+    ) {
+      targetRole = 'CLIPPER'
+      addedCredits = 50
+      description = 'Whop Subscription: Basic Plan (50 Credits)'
     } else if (
       planOrProductName.includes('500') ||
       planIdOrSlug.includes('500') ||
@@ -208,12 +216,13 @@ export async function POST(request: Request) {
     } else if (
       planOrProductName.includes('50') ||
       planIdOrSlug.includes('50') ||
-      (amount >= 10 && amount < 20)
+      (amount >= 10 && amount < 25)
     ) {
+      targetRole = 'CLIPPER'
       addedCredits = 50
-      description = 'Whop Credit Pack: 50 Credits'
+      description = 'Whop Purchase: 50 Credits / Basic Plan'
     } else {
-      addedCredits = 150
+      addedCredits = 120
       description = `Whop Purchase (${planOrProductName || 'Credits'})`
     }
 

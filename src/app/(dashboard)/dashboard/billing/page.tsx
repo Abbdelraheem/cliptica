@@ -18,17 +18,31 @@ const PLANS = [
     items: ['Arabic & English captions', '720p exports with mark', 'Up to 3 videos / day'],
   },
   {
+    key: 'basic',
+    name: 'Basic',
+    role: 'CLIPPER',
+    price: '$15',
+    period: '/ mo',
+    credits: '50 credits / month',
+    items: [
+      '50 credits / mo (1 credit = 1 final video)',
+      'No watermark · 1080p high bitrate',
+      'All 18 subtitle styles & Arabic Luxury',
+      'Single face tracking & 9:16 vertical crop',
+    ],
+  },
+  {
     key: 'clipper',
     name: 'Starter',
     role: 'CLIPPER',
     price: '$29',
     period: '/ mo',
-    credits: '150 credits / month',
+    credits: '120 credits / month',
     featured: true,
     items: [
-      'No watermark · 1080p high bitrate',
+      '120 credits / mo (1 credit = 1 final video)',
       'Opening AI Hook cards & Title overlays',
-      'Arabic Luxury & Viral kinetic styles',
+      'Priority rendering queue',
       'Campaign hub + full editor access',
     ],
   },
@@ -41,9 +55,10 @@ const PLANS = [
     credits: '400 credits / month',
     items: [
       '400 credits / month',
-      'Priority rendering queue',
+      'VIP ultra-fast rendering queue',
       'Auto-Pilot channel watchlists',
-      'Brand presets & custom fonts',
+      '2-Person Podcast Split-Screen',
+      'Whop Bounty campaign ingestion',
     ],
   },
 ]
@@ -163,6 +178,7 @@ export default function BillingPage() {
   const addedCredits = searchParams.get('credits')
 
   const WHOP_CHECKOUT_URLS: Record<string, string> = {
+    basic: 'https://whop.com/clipzila-com/credits-50/',
     clipper: 'https://whop.com/clipzila-com/starter-plans/',
     starter: 'https://whop.com/clipzila-com/starter-plans/',
     studio: 'https://whop.com/clipzila-com/pro-creator-plan/',
@@ -451,6 +467,28 @@ export default function BillingPage() {
         </p>
       )}
 
+      {/* Killer Value Proposition Banner */}
+      <div className="mt-10 rounded-2xl border border-gold/40 bg-gradient-to-r from-gold/15 via-onyx-2 to-gold/10 p-5 shadow-lg backdrop-blur-md">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+          <div className="rounded-xl bg-gold/20 p-3 text-gold shrink-0">
+            <Zap className="h-6 w-6" />
+          </div>
+          <div className="flex-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="rounded-full bg-gold/25 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-champagne">
+                Fair Pricing Guarantee · ضمان التسعير العادل
+              </span>
+              <h3 className="font-display text-base font-bold text-pearl">
+                1 Credit = 1 Final 1080p Video (Never pay per raw source minute)
+              </h3>
+            </div>
+            <p className="mt-1.5 text-xs sm:text-sm text-mist leading-relaxed">
+              Unlike competitors who burn your credits on raw footage minutes you never use, Clipzila only charges for completed viral clips you actually export. <strong>120 Credits = 120 Ready-to-Post Videos.</strong>
+            </p>
+          </div>
+        </div>
+      </div>
+
       {/* Plans */}
       <div className="mt-12">
         <h2 className="font-display text-2xl font-semibold">Monthly Subscriptions</h2>
@@ -458,7 +496,7 @@ export default function BillingPage() {
           Choose a recurring plan for continuous content generation and best monthly value.
         </p>
 
-        <div className="mt-6 grid gap-6 md:grid-cols-3">
+        <div className="mt-6 grid gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
           {PLANS.map((plan) => {
             const isCurrent = userRole === plan.role || (userRole === 'ADMIN' && plan.role === 'STUDIO')
             return (

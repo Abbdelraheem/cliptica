@@ -129,10 +129,11 @@ async function handleCheckoutCompleted(tx: Tx, session: Stripe.Checkout.Session)
   // invoice via `invoice.payment_succeeded` — granting here would double the
   // first period, because checkout.session.completed AND the initial invoice
   // both fire on a non-trial signup.
+  const targetRole = planKey === 'studio' ? 'STUDIO' : (planKey === 'free' ? 'FREE' : 'CLIPPER')
   await tx.user.update({
     where: { id: userId },
     data: {
-      role: planKey.toUpperCase() as never,
+      role: targetRole,
       stripeCustomerId: session.customer as string,
       stripeSubscriptionId: session.subscription as string,
       stripePriceId: PLANS[planKey].priceId,
@@ -154,10 +155,18 @@ async function handleSubscriptionUpdated(tx: Tx, subscription: Stripe.Subscripti
   // handled by customer.subscription.deleted; these cover the rest.
   const unpaid = ['past_due', 'unpaid', 'incomplete', 'incomplete_expired'].includes(subscription.status)
 
+  const targetRole = unpaid
+    ? 'FREE'
+    : planKey === 'studio'
+      ? 'STUDIO'
+      : planKey === 'free'
+        ? 'FREE'
+        : 'CLIPPER'
+
   await tx.user.update({
     where: { id: userId },
     data: {
-      role: unpaid ? 'FREE' : (planKey.toUpperCase() as never),
+      role: targetRole,
       stripeSubscriptionId: subscription.id,
       stripePriceId: priceId,
       subscriptionStatus: subscription.status,
@@ -224,10 +233,12 @@ async function handleInvoicePaymentSucceeded(
 
   const plan = PLANS[planKey]
 
+  const targetRole = planKey === 'studio' ? 'STUDIO' : (planKey === 'free' ? 'FREE' : 'CLIPPER')
+
   await tx.user.update({
     where: { id: userId },
     data: {
-      role: planKey.toUpperCase() as never,
+      role: targetRole,
       credits: { increment: plan.credits },
       subscriptionStatus: 'active',
       stripeSubscriptionId: subscriptionId,

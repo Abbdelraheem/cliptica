@@ -17,7 +17,7 @@ export const metadata: Metadata = buildPageMetadata({
   path: 'pricing',
   title: 'Pricing Plans & Credit Packs — 1 Credit = 1 Final Video | Clipzila',
   description:
-    'Transparent per-video pricing. Start with 15 free credits. Starter plan at $29/mo for 150 videos, Pro Creator at $59/mo for 400 videos. No source minute meters.',
+    'Transparent per-video pricing. Start with 15 free credits. Basic plan at $15/mo for 50 videos, Starter at $29/mo for 120 videos, Pro Creator at $59/mo for 400 videos. Never pay for raw source minutes.',
   keywords: [
     'Clipzila pricing',
     'AI video clipping cost',
@@ -81,9 +81,9 @@ export default function PricingPage() {
         </div>
 
         {/* Subscription Tier Cards */}
-        <div className="mt-12 grid gap-6 md:grid-cols-3">
+        <div className="mt-12 grid gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
           {/* Free Tier */}
-          <div className="flex flex-col justify-between rounded-3xl border border-hair/60 bg-onyx-2 p-7">
+          <div className="flex flex-col justify-between rounded-3xl border border-hair/60 bg-onyx-2 p-6">
             <div>
               <h3 className="font-display text-lg font-bold text-pearl">{p.freeName}</h3>
               <div className="mt-4 flex items-baseline gap-1">
@@ -115,8 +115,41 @@ export default function PricingPage() {
             </Link>
           </div>
 
+          {/* Basic Plan */}
+          <div className="flex flex-col justify-between rounded-3xl border border-hair/60 bg-onyx-2 p-6">
+            <div>
+              <h3 className="font-display text-lg font-bold text-pearl">{p.basicName}</h3>
+              <div className="mt-4 flex items-baseline gap-1">
+                <span className="font-display text-4xl font-extrabold text-pearl">{p.basicPrice}</span>
+                <span className="text-xs text-mist">{p.basicPeriod}</span>
+              </div>
+              <p className="mt-2 text-xs text-champagne font-medium">{p.basicCredits}</p>
+              <ul className="mt-6 space-y-3 text-xs text-mist">
+                <li className="flex items-center gap-2 text-pearl font-medium">
+                  <Check className="h-4 w-4 text-gold" />
+                  <span>50 credits / month</span>
+                </li>
+                <li className="flex items-center gap-2 text-pearl">
+                  <Check className="h-4 w-4 text-gold" />
+                  <span>No watermark · 1080p HD</span>
+                </li>
+                <li className="flex items-center gap-2">
+                  <Check className="h-4 w-4 text-gold" />
+                  <span>All 18 subtitle presets</span>
+                </li>
+                <li className="flex items-center gap-2">
+                  <Check className="h-4 w-4 text-gold" />
+                  <span>Max 45 min source videos</span>
+                </li>
+              </ul>
+            </div>
+            <Link href="/register?plan=basic" className="btn-secondary mt-8 w-full text-center text-xs font-semibold py-2.5">
+              Choose Basic
+            </Link>
+          </div>
+
           {/* Starter Plan (Featured) */}
-          <div className="relative flex flex-col justify-between rounded-3xl border border-gold/50 bg-gradient-to-b from-gold/10 via-onyx-2 to-onyx-2 p-7 shadow-2xl">
+          <div className="relative flex flex-col justify-between rounded-3xl border border-gold/50 bg-gradient-to-b from-gold/10 via-onyx-2 to-onyx-2 p-6 shadow-2xl">
             <span className="absolute -top-3 right-6 rounded-full bg-gold px-3 py-0.5 text-[10px] font-extrabold text-black uppercase tracking-wider">
               Most Popular
             </span>
@@ -130,7 +163,7 @@ export default function PricingPage() {
               <ul className="mt-6 space-y-3 text-xs text-mist">
                 <li className="flex items-center gap-2 text-pearl font-medium">
                   <Check className="h-4 w-4 text-gold" />
-                  <span>150 credits / month</span>
+                  <span>120 credits / month</span>
                 </li>
                 <li className="flex items-center gap-2 text-pearl">
                   <Check className="h-4 w-4 text-gold" />
@@ -138,7 +171,7 @@ export default function PricingPage() {
                 </li>
                 <li className="flex items-center gap-2">
                   <Check className="h-4 w-4 text-gold" />
-                  <span>Arabic Luxury & Viral kinetic fonts</span>
+                  <span>Opening hooks & Title cards</span>
                 </li>
                 <li className="flex items-center gap-2">
                   <Check className="h-4 w-4 text-gold" />
@@ -152,7 +185,7 @@ export default function PricingPage() {
           </div>
 
           {/* Pro Creator Plan */}
-          <div className="flex flex-col justify-between rounded-3xl border border-hair/60 bg-onyx-2 p-7">
+          <div className="flex flex-col justify-between rounded-3xl border border-hair/60 bg-onyx-2 p-6">
             <div>
               <h3 className="font-display text-lg font-bold text-pearl">{p.proName}</h3>
               <div className="mt-4 flex items-baseline gap-1">
@@ -167,7 +200,7 @@ export default function PricingPage() {
                 </li>
                 <li className="flex items-center gap-2 text-pearl">
                   <Check className="h-4 w-4 text-gold" />
-                  <span>Priority render queue</span>
+                  <span>VIP Priority render queue</span>
                 </li>
                 <li className="flex items-center gap-2">
                   <Check className="h-4 w-4 text-gold" />
@@ -175,11 +208,7 @@ export default function PricingPage() {
                 </li>
                 <li className="flex items-center gap-2">
                   <Check className="h-4 w-4 text-gold" />
-                  <span>Whop Content Rewards bounty ingestion</span>
-                </li>
-                <li className="flex items-center gap-2">
-                  <Check className="h-4 w-4 text-gold" />
-                  <span>Max 120 min source videos</span>
+                  <span>Podcast 2-person split screen</span>
                 </li>
               </ul>
             </div>

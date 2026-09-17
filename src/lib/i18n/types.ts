@@ -67,6 +67,10 @@ export interface MessageCatalog {
     freePrice: string
     freePeriod: string
     freeCredits: string
+    basicName: string
+    basicPrice: string
+    basicPeriod: string
+    basicCredits: string
     starterName: string
     starterPrice: string
     starterPeriod: string

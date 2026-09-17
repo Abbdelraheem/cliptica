@@ -33,7 +33,7 @@ export const en: MessageCatalog = {
     whatIsAnswer:
       'Clipzila is an AI-powered video repurposing SaaS that extracts viral short clips from long-form YouTube videos and podcasts. It transcribes speech using Whisper AI, scores hooks and shareability with LLMs, crops vertical 9:16 layouts with computer vision speaker tracking, and burns animated karaoke subtitles ready for TikTok, Instagram Reels, and YouTube Shorts.',
     whatIsFact:
-      'Clipzila charges a flat 1 credit per completed video clip, with Starter starting at $29/mo for 150 credits and Pro Creator at $59/mo for 400 credits.',
+      'Clipzila charges a flat 1 credit per completed video clip, with Basic starting at $15/mo for 50 credits, Starter at $29/mo for 120 credits, and Pro Creator at $59/mo for 400 credits.',
     pricingHeading: 'How does Clipzila credit pricing work?',
     pricingAnswer:
       'Unlike legacy competitors that bill per audio minute regardless of output, Clipzila uses a predictable 1-credit per final video model. Every credit yields one fully rendered, captioned, and reframed 1080p short video clip. Unused credits never expire during an active billing cycle, and additional credit packs can be purchased anytime without subscription upgrades.',
@@ -109,11 +109,15 @@ export const en: MessageCatalog = {
     freePrice: '$0',
     freePeriod: 'forever',
     freeCredits: '15 credits to test the pipeline',
-    starterName: 'Starter (Clipper)',
+    basicName: 'Basic',
+    basicPrice: '$15',
+    basicPeriod: '/ month',
+    basicCredits: '50 credits / month ($0.30 / video)',
+    starterName: 'Starter',
     starterPrice: '$29',
     starterPeriod: '/ month',
-    starterCredits: '150 credits / month ($0.19 / video)',
-    proName: 'Pro Creator (Studio)',
+    starterCredits: '120 credits / month ($0.24 / video)',
+    proName: 'Pro Creator',
     proPrice: '$59',
     proPeriod: '/ month',
     proCredits: '400 credits / month ($0.14 / video)',
