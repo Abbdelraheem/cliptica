@@ -26,6 +26,7 @@ import { buildKaraokeAss, buildPhraseAss } from './caption-styles.mjs'
 const run = promisify(execFile)
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
+const BRAND_WATERMARK_PATH = path.resolve(__dirname, '../public/brand/watermark.png')
 const FACES_SCRIPT = path.join(__dirname, 'premium', 'faces.py')
 const PYTHON_BIN =
   process.env.PYTHON_BIN ||
@@ -771,7 +772,7 @@ async function faceTrack(src, moment, dir, idx) {
 
 /* ---------- render ---------- */
 
-async function renderClip(src, moment, dir, idx, transcript, mode = 'smart', captionStyle = 'hormozi', aspectRatio = '9:16') {
+async function renderClip(src, moment, dir, idx, transcript, mode = 'smart', captionStyle = 'hormozi', aspectRatio = '9:16', watermark = false) {
   let W = CFG.outW, H = CFG.outH
   if (aspectRatio === '1:1') {
     W = 1080
@@ -850,10 +851,16 @@ async function renderClip(src, moment, dir, idx, transcript, mode = 'smart', cap
   }
 
   const buildArgs = (usePrimary) => {
-    const baseChain = `${usePrimary ? vfCore : centerCrop},scale=${W}:${H},subtitles=${escAss}`
+    let vfChain = `${usePrimary ? vfCore : centerCrop},scale=${W}:${H},subtitles=${escAss}`
+    if (watermark && existsSync(BRAND_WATERMARK_PATH)) {
+      const escWm = BRAND_WATERMARK_PATH.replace(/\\/g, '/').replace(/:/g, '\\:')
+      const wmW = Math.round(W * 0.28)
+      const margin = Math.round(W * 0.04)
+      vfChain = `movie='${escWm}',scale=${wmW}:-1,format=rgba,colorchannelmixer=aa=0.85[wm];[in]${vfChain}[vbase];[vbase][wm]overlay=W-w-${margin}:${margin}`
+    }
     return [
       '-y', '-ss', String(moment.start), '-t', String(targetDur), '-i', src,
-      '-vf', baseChain,
+      '-vf', vfChain,
       '-af', 'loudnorm=I=-14:TP=-1.5:LRA=11',
       '-c:v', 'libx264', '-preset', 'superfast', '-crf', '22',
       '-c:a', 'aac', '-b:a', '192k', '-movflags', '+faststart',
@@ -906,7 +913,7 @@ async function probeSize(file) {
 }
 
 /** Render all clips with bounded parallelism. */
-async function renderAll(src, moments, dir, transcript, framing = 'smart', captionStyle = 'hormozi', aspectRatio = '9:16') {
+async function renderAll(src, moments, dir, transcript, framing = 'smart', captionStyle = 'hormozi', aspectRatio = '9:16', watermark = false) {
   const VARIETY = ['face', 'blur', 'center']
   const results = new Array(moments.length)
   let next = 0
@@ -915,8 +922,8 @@ async function renderAll(src, moments, dir, transcript, framing = 'smart', capti
       const i = next++
       if (i >= moments.length) return
       const mode = framing === 'variety' ? VARIETY[i % VARIETY.length] : framing
-      console.log(`[worker] rendering clip ${i + 1}/${moments.length} [${mode}, style=${captionStyle}, ratio=${aspectRatio}]`)
-      results[i] = await renderClip(src, moments[i], dir, i, transcript, mode, captionStyle, aspectRatio)
+      console.log(`[worker] rendering clip ${i + 1}/${moments.length} [${mode}, style=${captionStyle}, ratio=${aspectRatio}, watermark=${watermark}]`)
+      results[i] = await renderClip(src, moments[i], dir, i, transcript, mode, captionStyle, aspectRatio, watermark)
     }
   }
   await Promise.all(Array.from({ length: Math.min(CFG.renderParallel, moments.length) }, lane))
@@ -1031,6 +1038,8 @@ async function processClipAdjust(job) {
     await setP(60, 'Re-rendering adjusted clip & subtitle burn-in...')
 
     const aspectRatio = project.aspectRatio ?? '9:16'
+    const owner = await prisma.user.findUnique({ where: { id: project.userId }, select: { role: true } })
+    const applyWatermark = !owner?.role || owner.role === 'FREE' || owner.role === 'USER'
     const rendered = await renderClip(
       src,
       moment,
@@ -1039,7 +1048,8 @@ async function processClipAdjust(job) {
       transcript,
       project.framing ?? 'smart',
       captionStyle,
-      aspectRatio
+      aspectRatio,
+      applyWatermark
     )
 
     await setP(85, 'Uploading adjusted clip to Cloudflare R2...')
@@ -1137,9 +1147,10 @@ async function processJob(job) {
 
     const captionStyle = project.captionStyle ?? 'hormozi'
     const aspectRatio = project.aspectRatio ?? '9:16'
-    console.log(`[worker] rendering ${moments.length} clips (premium=${CFG.premium}, framing=${project.framing}, style=${captionStyle}, ratio=${aspectRatio})`)
+    const applyWatermark = !owner?.role || owner.role === 'FREE' || owner.role === 'USER'
+    console.log(`[worker] rendering ${moments.length} clips (premium=${CFG.premium}, framing=${project.framing}, style=${captionStyle}, ratio=${aspectRatio}, watermark=${applyWatermark})`)
     await setP(58, 'Reframing vertical layout & rendering karaoke captions...')
-    const files = await renderAll(src, moments, dir, transcript, project.framing ?? 'smart', captionStyle, aspectRatio)
+    const files = await renderAll(src, moments, dir, transcript, project.framing ?? 'smart', captionStyle, aspectRatio, applyWatermark)
 
     for (let i = 0; i < moments.length; i++) {
       const m = moments[i]
