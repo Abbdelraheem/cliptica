@@ -9,6 +9,7 @@ export const registerSchema = z.object({
   name: z.string().min(2).max(100).optional(),
   deviceId: z.string().min(8).max(256),
   ref: z.string().max(100).optional(),
+  website_hp: z.string().max(100).optional(),
 })
 
 export const emailOnlySchema = z.object({

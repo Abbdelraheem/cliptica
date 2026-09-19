@@ -197,15 +197,15 @@ export const authOptions: NextAuthOptions = {
         // precise message via /api/auth/verification-status.
         if (!user.emailVerified) return null
 
-        // One account per device — server-side enforcement.
-        if (deviceId) {
+        // One account per device — server-side enforcement (Admins fully bypassed).
+        if (deviceId && user.role !== 'ADMIN') {
           try {
-            await assertDeviceAvailable(deviceId, user.id)
+            await assertDeviceAvailable(deviceId, user.id, user.role)
           } catch {
             return null
           }
           try {
-            await bindDevice(deviceId, user.id)
+            await bindDevice(deviceId, user.id, null, user.role)
           } catch {
             /* binding is best-effort here; conflict above is the gate */
           }

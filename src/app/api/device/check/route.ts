@@ -25,9 +25,9 @@ export async function POST(request: Request) {
     // Mode 1 — login form: check the device against the account being opened.
     if (email) {
       const user = await prisma.user.findUnique({ where: { email } })
-      if (!user) return NextResponse.json({ status: 'ok', bound: false })
+      if (!user || user.role === 'ADMIN') return NextResponse.json({ status: 'ok', bound: false })
       try {
-        await assertDeviceAvailable(deviceId, user.id)
+        await assertDeviceAvailable(deviceId, user.id, user.role)
       } catch {
         return NextResponse.json(
           {
@@ -45,9 +45,12 @@ export async function POST(request: Request) {
     if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
+    if (session.user.role === 'ADMIN') {
+      return NextResponse.json({ status: 'ok', bound: false })
+    }
 
     try {
-      await assertDeviceAvailable(deviceId, session.user.id)
+      await assertDeviceAvailable(deviceId, session.user.id, session.user.role)
     } catch {
       return NextResponse.json(
         {

@@ -41,7 +41,10 @@ export function buildOrganizationSchema() {
       availableLanguage: ['English', 'Arabic'],
     },
     sameAs: [
-      'https://twitter.com/clipzila',
+      'https://x.com/Clipzilaofficial',
+      'https://instagram.com/Clipzilaofficial',
+      'https://youtube.com/@Clipzilaofficial',
+      'https://tiktok.com/@Clipzilaofficial',
       'https://github.com/Abbdelraheem/clipzila',
     ],
   }

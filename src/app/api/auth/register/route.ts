@@ -21,7 +21,10 @@ export async function POST(request: Request) {
       )
     }
 
-    const { email, password, name, deviceId, ref } = validated.data
+    const { email, password, name, deviceId, ref, website_hp } = validated.data
+    if (website_hp && website_hp.trim().length > 0) {
+      return NextResponse.json({ error: 'Registration request rejected' }, { status: 400 })
+    }
     const userAgent = request.headers.get('user-agent')
 
     // Check for referral attribution via body param or cookie

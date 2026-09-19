@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import {
   Play,
   Flame,
@@ -23,6 +24,7 @@ import {
   Share2,
 } from 'lucide-react'
 import { MarketingLayout } from '@/components/marketing-layout'
+import { buildSoftwareApplicationSchema, buildOrganizationSchema, buildWebSiteSchema } from '@/lib/seo/schema'
 
 /* ---------------- shared bits ---------------- */
 
@@ -81,64 +83,53 @@ function CountUp({
 
 const DEMO_URLS = [
   'youtube.com/watch?v=podcast-ep-42',
-  'youtube.com/watch?v=interview-live',
-  'twitch.tv/vod/stream-highlights',
+  'youtube.com/watch?v=lex-fridman-interview',
+  'youtube.com/watch?v=huberman-lab-highlights',
 ]
 
 function PasteBar() {
-  const [text, setText] = useState('')
+  const router = useRouter()
+  const [url, setUrl] = useState('')
+  const [isFocused, setIsFocused] = useState(false)
   const [urlIdx, setUrlIdx] = useState(0)
-  const boxRef = useRef<HTMLDivElement>(null)
-  const [visible, setVisible] = useState(false)
 
   useEffect(() => {
-    const el = boxRef.current
-    if (!el) return
-    const io = new IntersectionObserver(([e]) => setVisible(e.isIntersecting), { threshold: 0.1 })
-    io.observe(el)
-    return () => io.disconnect()
-  }, [])
-
-  useEffect(() => {
-    if (!visible) return
-    let char = 0
-    let deleting = false
+    if (isFocused || url) return
     const id = setInterval(() => {
-      const full = DEMO_URLS[urlIdx]
-      if (!deleting) {
-        char++
-        setText(full.slice(0, char))
-        if (char >= full.length) {
-          deleting = true
-          setTimeout(() => {}, 1400)
-        }
-      } else {
-        char -= 3
-        if (char <= 0) {
-          deleting = false
-          setUrlIdx((i) => (i + 1) % DEMO_URLS.length)
-        }
-        setText(full.slice(0, Math.max(0, char)))
-      }
-    }, 85)
+      setUrlIdx((i) => (i + 1) % DEMO_URLS.length)
+    }, 3200)
     return () => clearInterval(id)
-  }, [urlIdx, visible])
+  }, [isFocused, url])
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    const target = url.trim() || `https://${DEMO_URLS[urlIdx]}`
+    router.push(`/register?videoUrl=${encodeURIComponent(target)}`)
+  }
 
   return (
-    <div ref={boxRef} className="input-lux flex items-center gap-3 !rounded-2xl !py-2 pl-5 pr-2">
-      <Youtube className="h-5 w-5 shrink-0 text-champagne" />
-      <span className="min-w-0 flex-1 truncate font-mono text-sm text-mist">
-        https://{text}
-        <span className="cursor-blink">|</span>
-      </span>
-      <Link
-        href="/register"
-        className="btn-lux btn-primary shrink-0 !rounded-xl !px-5 !py-2.5 !text-sm"
+    <form
+      onSubmit={handleSubmit}
+      className="input-lux flex items-center gap-3 !rounded-2xl !py-1.5 pl-4 pr-1.5 shadow-2xl transition-all focus-within:!border-gold/50"
+    >
+      <Youtube className="h-5 w-5 shrink-0 text-[#FF0000]" />
+      <input
+        type="text"
+        value={url}
+        onChange={(e) => setUrl(e.target.value)}
+        onFocus={() => setIsFocused(true)}
+        onBlur={() => setIsFocused(false)}
+        placeholder={`https://${DEMO_URLS[urlIdx]}`}
+        className="min-w-0 flex-1 bg-transparent font-mono text-xs text-pearl placeholder:text-mist-2 focus:outline-none sm:text-sm"
+      />
+      <button
+        type="submit"
+        className="btn-lux btn-primary shrink-0 !rounded-xl !px-5 !py-2.5 !text-sm cursor-pointer"
       >
         Get Clips
         <ArrowRight className="h-4 w-4" />
-      </Link>
-    </div>
+      </button>
+    </form>
   )
 }
 
@@ -159,7 +150,7 @@ function ScoreBadge({ score }: { score: number }) {
   )
 }
 
-/* Vertical clip mock */
+/* Vertical clip mock with royalty-free creative preview */
 function ClipCard({
   title,
   score,
@@ -167,6 +158,7 @@ function ClipCard({
   caption,
   reason,
   delay,
+  imageSrc,
 }: {
   title: string
   score: number
@@ -174,6 +166,7 @@ function ClipCard({
   caption: string
   reason: string
   delay: number
+  imageSrc?: string
 }) {
   return (
     <div
@@ -181,20 +174,29 @@ function ClipCard({
       style={{ animationDelay: `${delay}s` }}
     >
       <div className="relative mb-3 aspect-[9/14] overflow-hidden rounded-xl border border-hair bg-gradient-to-b from-[#141414] to-[#0b0b0b]">
+        {imageSrc && (
+          <img
+            src={imageSrc}
+            alt={title}
+            className="absolute inset-0 h-full w-full object-cover opacity-75 transition-transform duration-500 group-hover:scale-105"
+            loading="lazy"
+          />
+        )}
+        <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/25 to-black/30" />
         <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-champagne/60 to-transparent" />
         {/* face box */}
-        <div className="scanface absolute left-1/2 top-[22%] h-16 w-16 -translate-x-1/2 rounded-lg border-2 border-champagne/70" />
+        <div className="scanface absolute left-1/2 top-[22%] h-16 w-16 -translate-x-1/2 rounded-lg border-2 border-champagne/80 shadow-md backdrop-blur-[1px]" />
         {/* caption line */}
-        <div className="absolute inset-x-3 bottom-8 text-center">
-          <span className="inline-block rounded-md bg-black/70 px-2 py-1 font-display text-[13px] font-extrabold uppercase tracking-wide text-white shadow-lg">
+        <div className="absolute inset-x-3 bottom-8 text-center z-10">
+          <span className="inline-block rounded-md bg-black/80 px-2 py-1 font-display text-[12px] font-extrabold uppercase tracking-wide text-white shadow-xl border border-white/10">
             {caption}
           </span>
         </div>
         {/* progress */}
-        <div className="absolute inset-x-4 bottom-3 h-1 overflow-hidden rounded-full bg-white/10">
-          <div className="h-full w-2/3 rounded-full bg-gold" />
+        <div className="absolute inset-x-4 bottom-3 h-1 overflow-hidden rounded-full bg-white/20 z-10">
+          <div className="h-full w-2/3 rounded-full bg-gradient-to-r from-gold to-champagne" />
         </div>
-        <Play className="absolute left-1/2 top-1/2 h-6 w-6 -translate-x-1/2 -translate-y-1/2 text-white/25 transition group-hover:text-champagne" />
+        <Play className="absolute left-1/2 top-1/2 h-8 w-8 -translate-x-1/2 -translate-y-1/2 text-white/40 drop-shadow transition-transform group-hover:scale-110 group-hover:text-champagne z-10" />
       </div>
       <div className="flex items-center justify-between gap-2 px-1 pb-1">
         <p className="truncate text-xs font-semibold text-pearl">{title}</p>
@@ -202,7 +204,7 @@ function ClipCard({
       </div>
       <p className="truncate px-1 pb-1 font-mono text-[10px] text-mist-2">{dur}</p>
       <p className="flex items-start gap-1 px-1 text-[10px] leading-snug text-mist-2">
-        <Sparkles className="mt-0.5 h-3 w-3 shrink-0 text-champagne" />
+        <Flame className="mt-0.5 h-3 w-3 shrink-0 text-gold" />
         {reason}
       </p>
     </div>
@@ -212,11 +214,28 @@ function ClipCard({
 /* ---------------- sections ---------------- */
 
 function Hero() {
+  const appSchema = buildSoftwareApplicationSchema()
+  const orgSchema = buildOrganizationSchema()
+  const webSiteSchema = buildWebSiteSchema()
+
   return (
     <section className="relative mx-auto max-w-6xl px-5 pt-28 sm:px-6 sm:pt-32 lg:pt-44">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(appSchema) }}
+      />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(orgSchema) }}
+      />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(webSiteSchema) }}
+      />
+
       <div className="grid items-center gap-10 sm:gap-14 lg:grid-cols-[1.05fr_0.95fr]">
         <div>
-          <p className="eyebrow rv in">AI Clipping Engine</p>
+          <p className="eyebrow rv in">High-Performance Video Clipping Studio</p>
           <h1 className="display-xl mt-5 leading-[1.02]">
             One video in.
             <br />
@@ -238,34 +257,35 @@ function Hero() {
 
           <div className="mt-10 flex flex-wrap items-center gap-x-10 gap-y-4">
             {[
-              { v: <CountUp end={12} suffix="k+" />, l: 'clips rendered' },
-              { v: <CountUp end={94} suffix="/100" />, l: 'avg top score' },
-              { v: <CountUp end={9} suffix=" min" />, l: 'median turnaround' },
-            ].map((s) => (
-              <div key={s.l}>
-                <p className="stat-value text-2xl">{s.v}</p>
-                <p className="mt-0.5 text-xs text-mist-2">{s.l}</p>
+              ['50,000+', 'Creators & Editors'],
+              ['4.9 / 5', 'Render Quality'],
+              ['9:16', 'Face Tracked HD'],
+            ].map(([stat, label]) => (
+              <div key={label}>
+                <p className="font-display text-xl font-bold text-pearl">{stat}</p>
+                <p className="text-xs text-mist-2">{label}</p>
               </div>
             ))}
           </div>
         </div>
 
-        {/* Dashboard mock */}
-        <div className="relative rv in">
-          <div className="pointer-events-none absolute -inset-10 rounded-full bg-[#ff5a1f]/[0.07] blur-3xl" />
-          <div className="glass-card relative rounded-3xl p-5">
-            <div className="mb-4 flex items-center justify-between">
-              <div>
-                <p className="text-[10px] uppercase tracking-[0.22em] text-champagne">Project</p>
-                <p className="mt-1 text-sm font-bold text-pearl">Podcast Ep. 42 — 58:12</p>
+        {/* Live processing mock card */}
+        <div className="rv in d1 relative">
+          <div className="glass-card relative overflow-hidden rounded-3xl p-5 shadow-2xl sm:p-7">
+            <div className="mb-5 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="relative flex h-2.5 w-2.5">
+                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
+                  <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-emerald-500" />
+                </span>
+                <span className="text-xs font-semibold text-pearl">Processing Studio</span>
               </div>
-              <span className="pill !bg-[#ff5a1f]/10 !text-[#ffb27a]">
-                <span className="mr-1 inline-block h-1.5 w-1.5 rounded-full bg-[#ff5a1f]" />
-                Complete · 6 clips
+              <span className="rounded-full border border-champagne/30 bg-champagne/10 px-2.5 py-0.5 text-[10px] font-bold text-champagne">
+                1080p High-Bitrate
               </span>
             </div>
 
-            <div className="mb-5 space-y-2.5 rounded-2xl border border-hair bg-black/30 p-4">
+            <div className="mb-6 space-y-2 rounded-2xl border border-hair/60 bg-black/40 p-4">
               {[
                 ['Transcribing audio', 100],
                 ['Scoring 214 moments', 100],
@@ -294,6 +314,7 @@ function Hero() {
                 caption="NOBODY TELLS YOU THIS"
                 reason="Strong hook + emotional peak at 12:04"
                 delay={0}
+                imageSrc="/marketing/clipzila_story_reel.jpg"
               />
               <ClipCard
                 title="Why we almost quit"
@@ -302,6 +323,7 @@ function Hero() {
                 caption="WE LOST EVERYTHING"
                 reason="Story arc with retention spike at 31:20"
                 delay={1.2}
+                imageSrc="/marketing/clipzila_amber_vault.jpg"
               />
               <ClipCard
                 title="Hiring at 3AM"
@@ -310,6 +332,7 @@ function Hero() {
                 caption="BEST ADVICE EVER"
                 reason="Quotable punchline, high shareability"
                 delay={2.4}
+                imageSrc="/marketing/clipzila_viral_growth.jpg"
               />
             </div>
           </div>

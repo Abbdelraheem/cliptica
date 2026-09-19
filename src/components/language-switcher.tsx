@@ -21,35 +21,49 @@ export function LanguageSwitcher({ currentLocale = DEFAULT_LOCALE }: { currentLo
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
 
+  const [activeLocale, setActiveLocale] = useState<Locale>(currentLocale)
+
+  useEffect(() => {
+    // Read stored locale from cookie or document
+    const match = document.cookie.match(/(?:^|;\s*)NEXT_LOCALE=([a-z]{2})/)
+    if (match && match[1] && LOCALES.includes(match[1] as Locale)) {
+      setActiveLocale(match[1] as Locale)
+    }
+  }, [])
+
   const handleSelectLocale = (targetLocale: Locale) => {
-    // Set 1-year persistence cookie
+    // Set 1-year persistence cookies for Next.js and in-place translator
     document.cookie = `NEXT_LOCALE=${targetLocale}; path=/; max-age=31536000; SameSite=Lax`
+    document.cookie = `googtrans=/auto/${targetLocale}; path=/; max-age=31536000; SameSite=Lax`
+    try {
+      document.cookie = `googtrans=/auto/${targetLocale}; path=/; domain=.clipzila.com; max-age=31536000; SameSite=Lax`
+    } catch {}
 
-    // Calculate the target path
-    const segments = pathname.split('/').filter(Boolean)
-    const currentFirstSeg = segments[0] as Locale | undefined
-    const isPrefixed = currentFirstSeg && LOCALES.includes(currentFirstSeg)
-
-    let subPath = ''
-    if (isPrefixed) {
-      subPath = segments.slice(1).join('/')
+    setActiveLocale(targetLocale)
+    if (targetLocale === 'ar') {
+      document.documentElement.setAttribute('dir', 'rtl')
+      document.documentElement.setAttribute('lang', 'ar')
     } else {
-      subPath = segments.join('/')
+      document.documentElement.setAttribute('dir', 'ltr')
+      document.documentElement.setAttribute('lang', targetLocale)
     }
 
-    const cleanSub = subPath ? `/${subPath}` : ''
-    let targetUrl = '/'
-    if (targetLocale === DEFAULT_LOCALE) {
-      targetUrl = cleanSub || '/'
+    // If currently on legacy prefixed subpath (e.g. /ar), normalize to clean path
+    const segments = pathname.split('/').filter(Boolean)
+    const currentFirstSeg = segments[0] as Locale | undefined
+    if (currentFirstSeg && LOCALES.includes(currentFirstSeg)) {
+      const subPath = segments.slice(1).join('/')
+      router.push(subPath ? `/${subPath}` : '/')
     } else {
-      targetUrl = `/${targetLocale}${cleanSub}`
+      // Trigger in-place reload/refresh of messages without changing URL
+      window.dispatchEvent(new CustomEvent('localechange', { detail: targetLocale }))
+      window.location.reload()
     }
 
     setOpen(false)
-    router.push(targetUrl)
   }
 
-  const activeLocaleMeta = LOCALE_NAMES[currentLocale] || LOCALE_NAMES[DEFAULT_LOCALE]
+  const activeLocaleMeta = LOCALE_NAMES[activeLocale] || LOCALE_NAMES[currentLocale] || LOCALE_NAMES[DEFAULT_LOCALE]
 
   return (
     <div className="relative inline-block text-left" ref={dropdownRef}>
@@ -72,7 +86,7 @@ export function LanguageSwitcher({ currentLocale = DEFAULT_LOCALE }: { currentLo
           </div>
           {LOCALES.map((loc) => {
             const info = LOCALE_NAMES[loc]
-            const isSelected = loc === currentLocale
+            const isSelected = loc === activeLocale
 
             return (
               <button

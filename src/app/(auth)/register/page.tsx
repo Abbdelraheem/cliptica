@@ -18,11 +18,21 @@ export default function RegisterPage() {
   const [loading, setLoading] = useState(false)
   const [deviceId, setDeviceId] = useState('')
   const [refCode, setRefCode] = useState('')
+  const [websiteHp, setWebsiteHp] = useState('')
+  const [pendingVideo, setPendingVideo] = useState('')
 
   useEffect(() => {
     getDeviceId().then(setDeviceId)
-    const ref = new URLSearchParams(window.location.search).get('ref')
+    const params = new URLSearchParams(window.location.search)
+    const ref = params.get('ref')
+    const vUrl = params.get('videoUrl') || params.get('url')
     if (ref) setRefCode(ref)
+    if (vUrl) {
+      setPendingVideo(vUrl)
+      try {
+        sessionStorage.setItem('clipzila_pending_video_url', vUrl)
+      } catch {}
+    }
   }, [])
 
   async function handleSubmit(e: React.FormEvent) {
@@ -33,7 +43,14 @@ export default function RegisterPage() {
       const res = await fetchWithTimeout('/api/auth/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, email, password, deviceId, ref: refCode || undefined }),
+        body: JSON.stringify({
+          name,
+          email,
+          password,
+          deviceId,
+          ref: refCode || undefined,
+          website_hp: websiteHp || undefined,
+        }),
       })
       if (!res.ok) {
         const data = await res.json().catch(() => null)
@@ -48,7 +65,8 @@ export default function RegisterPage() {
         return
       }
       setLoading(false)
-      router.push(`/verify-email?email=${encodeURIComponent(email)}&registered=true`)
+      const redirectParam = pendingVideo ? `&next=${encodeURIComponent(`/dashboard/projects/new?url=${encodeURIComponent(pendingVideo)}`)}` : ''
+      router.push(`/verify-email?email=${encodeURIComponent(email)}&registered=true${redirectParam}`)
     } catch {
       setError('Network error. Try again.')
       setLoading(false)
@@ -132,6 +150,20 @@ export default function RegisterPage() {
                 {error}
               </p>
             )}
+
+            {/* Honeypot field for bot deterrence */}
+            <div className="hidden pointer-events-none opacity-0 h-0 w-0 overflow-hidden" aria-hidden="true">
+              <label htmlFor="website_hp">Leave this empty</label>
+              <input
+                id="website_hp"
+                name="website_hp"
+                type="text"
+                tabIndex={-1}
+                autoComplete="off"
+                value={websiteHp}
+                onChange={(e) => setWebsiteHp(e.target.value)}
+              />
+            </div>
 
             <button type="submit" disabled={loading} className="btn-lux btn-gold w-full disabled:opacity-60">
               {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Start free — 5 credits'}

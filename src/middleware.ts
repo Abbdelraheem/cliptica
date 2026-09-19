@@ -58,27 +58,19 @@ import { isCrawler, COUNTRY_TO_LOCALE, isValidLocale } from '@/lib/seo/constants
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
 
-  // Locale routing for public root '/' — crawlers are NEVER redirected
-  if (pathname === '/') {
-    const userAgent = request.headers.get('user-agent')
-    if (!isCrawler(userAgent)) {
-      const cookieLocale = request.cookies.get('NEXT_LOCALE')?.value
-      if (cookieLocale && cookieLocale !== 'en' && isValidLocale(cookieLocale)) {
-        return NextResponse.redirect(new URL(`/${cookieLocale}`, request.url), 307)
-      }
-
-      if (!cookieLocale) {
-        const country = (
-          request.headers.get('x-vercel-ip-country') ||
-          request.headers.get('cf-ipcountry') ||
-          request.headers.get('x-country-code')
-        )?.toUpperCase()
-
-        if (country && COUNTRY_TO_LOCALE[country] && COUNTRY_TO_LOCALE[country] !== 'en') {
-          return NextResponse.redirect(new URL(`/${COUNTRY_TO_LOCALE[country]}`, request.url), 307)
-        }
-      }
-    }
+  // Handle CORS preflight OPTIONS requests immediately
+  if (request.method === 'OPTIONS') {
+    const origin = request.headers.get('origin') || process.env.NEXT_PUBLIC_APP_URL || 'https://clipzila.com'
+    return new NextResponse(null, {
+      status: 204,
+      headers: {
+        'Access-Control-Allow-Origin': origin,
+        'Access-Control-Allow-Methods': 'GET,DELETE,PATCH,POST,PUT,OPTIONS',
+        'Access-Control-Allow-Headers': 'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version, Authorization',
+        'Access-Control-Allow-Credentials': 'true',
+        'Access-Control-Max-Age': '86400',
+      },
+    })
   }
 
   if (pathname.startsWith('/api/auth/callback')) {
