@@ -29,6 +29,7 @@ export function initMonitoring() {
 }
 
 export function reportError(err: unknown, context?: Record<string, unknown>) {
+  console.error('[Clipzila Error Report]', err, context)
   if (!process.env.NEXT_PUBLIC_SENTRY_DSN) return
   Sentry.captureException(err, { extra: context })
 }

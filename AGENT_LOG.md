@@ -1024,3 +1024,42 @@ Executed `scripts/test-render-styles.mjs` rendering 1080x1920 video with burned-
 - **Verification**:
   - `npm test`: 19/19 test files passed, 273/273 tests passed (100%).
   - `npx tsc --noEmit`: 0 errors.
+
+---
+
+## 2026-09-20 — Round 20: Investigation of Unhandled Client-Side Error & Error Monitoring Gap
+
+### Step 1: Real Evidence from Production Logs
+- **Log inspection (`/var/log/nology/web-err.log`)**:
+  - Found recurring server-side errors around Server Actions:
+    ```
+    2026-09-19T02:36:05: [Error: The Server Reference ID did not match the expected format. Received "x".
+    Read more: https://nextjs.org/docs/messages/failed-to-find-server-action]
+    2026-09-19T16:17:15: [Error: The Server Reference ID did not match the expected format. Received "x".
+    Read more: https://nextjs.org/docs/messages/failed-to-find-server-action]
+    ```
+    Analysis: External vulnerability scanner probes submitting invalid Server Action IDs (`Next-Action: x`), which Next.js logs as HTTP 500 when attempting to resolve unmapped actions.
+  - Found recurring font rendering error:
+    ```
+    2026-09-19T11:56:14: Failed to load dynamic font for ✦ . Error: Error: Failed to download dynamic font. Status: 400
+        at hm (.next/server/app/opengraph-image/route.js:56:64052)
+    ```
+    Analysis: `src/app/opengraph-image.tsx` rendered the special unicode character `✦` (U+2726), causing Satori / `@vercel/og` to attempt dynamic Google Font downloads that returned HTTP 400, failing OpenGraph link previews. Fixed by replacing with standard bullet character `•`.
+- **Sentry Audit**:
+  - `NEXT_PUBLIC_SENTRY_DSN` is **NOT set** in `/opt/nology/.env.production` on EC2.
+  - `src/lib/monitoring.ts` explicitly guards: `if (!process.env.NEXT_PUBLIC_SENTRY_DSN) return;`
+  - Finding: Error telemetry has been silently disabled in production, preventing client-side exception stack traces from reaching an observability dashboard.
+
+### Step 2: Review of Recent High-Risk Changes
+- **Icon / Favicon Metadata (`src/app/layout.tsx`, commit `d580590`)**:
+  - `src/app/icon.tsx` was deleted and replaced by static `icon.png` and explicit `icons` array in metadata. Static icons verify cleanly and do not execute client JS.
+- **Logo / Branding Change (`src/components/logo.tsx`, commit `aba7f4f`)**:
+  - `ClipzilaMark` was converted to `next/image` (`src="/brand/logo.png"`).
+  - Asset exists at `public/brand/logo.png` (629x629 PNG).
+- **Payment Providers (`src/app/(dashboard)/dashboard/billing/page.tsx`, commit `3ba5e6a`)**:
+  - Whop redirect logic was previously intercepting checkouts. Completely replaced with exclusive direct Paddle.js checkout overlay.
+  - All 6 Paddle price IDs mapped (Basic, Starter, Pro, and 50/150/500 Credit Packs).
+
+### Step 3: Actionable Next Steps
+- Sentry DSN configuration required in production `.env.production`.
+- Regression test for OpenGraph dynamic glyph generation added.

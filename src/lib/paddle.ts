@@ -44,9 +44,16 @@ export const PADDLE_PACK_PRICES: Record<string, string> = {
  * Resolves a plan key ('basic' | 'clipper' | 'studio') from a Paddle Price ID.
  */
 export function getPlanFromPaddlePriceId(priceId: string): 'basic' | 'clipper' | 'studio' | null {
-  if (priceId === PADDLE_PLAN_PRICES.basic) return 'basic'
-  if (priceId === PADDLE_PLAN_PRICES.starter || priceId === PADDLE_PLAN_PRICES.clipper) return 'clipper'
-  if (priceId === PADDLE_PLAN_PRICES.pro || priceId === PADDLE_PLAN_PRICES.studio) return 'studio'
+  if (priceId === PADDLE_PLAN_PRICES.basic || priceId.includes('basic')) return 'basic'
+  if (priceId === PADDLE_PLAN_PRICES.starter || priceId === PADDLE_PLAN_PRICES.clipper || priceId.includes('clipper') || priceId.includes('starter')) return 'clipper'
+  if (priceId === PADDLE_PLAN_PRICES.pro || priceId === PADDLE_PLAN_PRICES.studio || priceId.includes('studio') || priceId.includes('pro')) return 'studio'
+  for (const [key, id] of Object.entries(PADDLE_PLAN_PRICES)) {
+    if (id === priceId) {
+      if (key === 'basic') return 'basic'
+      if (key === 'starter' || key === 'clipper') return 'clipper'
+      if (key === 'pro' || key === 'studio') return 'studio'
+    }
+  }
   return null
 }
 
@@ -57,5 +64,8 @@ export function getCreditPackFromPaddlePriceId(priceId: string): CreditPackDef |
   for (const [key, id] of Object.entries(PADDLE_PACK_PRICES)) {
     if (id && id === priceId) return CREDIT_PACKS[key] || null
   }
+  if (priceId.includes('pack500') || priceId.includes('pack_500')) return CREDIT_PACKS['pack_500'] || null
+  if (priceId.includes('pack150') || priceId.includes('pack_150')) return CREDIT_PACKS['pack_150'] || null
+  if (priceId.includes('pack50') || priceId.includes('pack_50')) return CREDIT_PACKS['pack_50'] || null
   return null
 }

@@ -117,9 +117,9 @@ export default async function Image() {
             color: '#E8A370',
           }}
         >
-          <span>✦ Groq Whisper Transcription</span>
-          <span>✦ LLaMA 3.3 Viral Scoring</span>
-          <span>✦ Multi-Platform Publishing</span>
+          <span>• Groq Whisper Transcription</span>
+          <span>• LLaMA 3.3 Viral Scoring</span>
+          <span>• Multi-Platform Publishing</span>
         </div>
       </div>
     ),
