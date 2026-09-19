@@ -177,38 +177,9 @@ export default function BillingPage() {
   const isSuccessPack = searchParams.get('success') === 'pack' || searchParams.get('success') === 'whop_pack'
   const addedCredits = searchParams.get('credits')
 
-  const WHOP_CHECKOUT_URLS: Record<string, string> = {
-    basic: 'https://whop.com/clipzila-com/basic-plans/',
-    clipper: 'https://whop.com/clipzila-com/starter-plans/',
-    starter: 'https://whop.com/clipzila-com/starter-plans/',
-    studio: 'https://whop.com/clipzila-com/pro-creator-plan/',
-    pro: 'https://whop.com/clipzila-com/pro-creator-plan/',
-    pack_50: 'https://whop.com/clipzila-com/credits-50/',
-    pack_150: 'https://whop.com/clipzila-com/credits-150/',
-    pack_500: 'https://whop.com/clipzila-com/credits-500/',
-  }
-
   async function upgrade(planKey: string) {
     setError('')
     setLoading(planKey)
-
-    // Primary: Whop Instant Checkout with user metadata
-    const whopBase = WHOP_CHECKOUT_URLS[planKey]
-    if (whopBase) {
-      try {
-        const u = new URL(whopBase)
-        if (session?.user?.id) {
-          u.searchParams.set('metadata[userId]', session.user.id)
-        }
-        if (session?.user?.email) {
-          u.searchParams.set('email', session.user.email)
-        }
-        window.location.href = u.toString()
-        return
-      } catch (err) {
-        console.warn('Whop URL formatting error, falling back:', err)
-      }
-    }
 
     try {
       let p = paddle
@@ -268,24 +239,6 @@ export default function BillingPage() {
   async function buyPack(packId: string) {
     setError('')
     setLoading(packId)
-
-    // Primary: Whop Instant Checkout with user metadata
-    const whopBase = WHOP_CHECKOUT_URLS[packId]
-    if (whopBase) {
-      try {
-        const u = new URL(whopBase)
-        if (session?.user?.id) {
-          u.searchParams.set('metadata[userId]', session.user.id)
-        }
-        if (session?.user?.email) {
-          u.searchParams.set('email', session.user.email)
-        }
-        window.location.href = u.toString()
-        return
-      } catch (err) {
-        console.warn('Whop URL formatting error, falling back:', err)
-      }
-    }
 
     try {
       const selected = CREDIT_PACKS.find((p) => p.id === packId)

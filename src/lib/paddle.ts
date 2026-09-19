@@ -23,31 +23,30 @@ export function getPaddleInstance(): Paddle {
 /**
  * Mapping of Clipzila plan keys to Paddle Price IDs.
  */
-export const PADDLE_PLAN_PRICES: Record<'clipper' | 'studio', string | undefined> = {
-  clipper: process.env.PADDLE_PRICE_CLIPPER_MONTHLY,
-  studio: process.env.PADDLE_PRICE_STUDIO_MONTHLY,
+export const PADDLE_PLAN_PRICES: Record<string, string> = {
+  basic: process.env.PADDLE_PRICE_BASIC || 'pri_01m2wsjgyn37f85t920yeqpkjs',
+  starter: process.env.PADDLE_PRICE_CLIPPER_MONTHLY || 'pri_01m2wsnkn3qeswx68fx71c1p6y',
+  clipper: process.env.PADDLE_PRICE_CLIPPER_MONTHLY || 'pri_01m2wsnkn3qeswx68fx71c1p6y',
+  pro: process.env.PADDLE_PRICE_STUDIO_MONTHLY || 'pri_01m2wsscq76fefjd7sfkf1awnv',
+  studio: process.env.PADDLE_PRICE_STUDIO_MONTHLY || 'pri_01m2wsscq76fefjd7sfkf1awnv',
 }
 
 /**
  * Mapping of Clipzila credit pack keys to Paddle Price IDs.
  */
-export const PADDLE_PACK_PRICES: Record<string, string | undefined> = {
-  pack_50: process.env.PADDLE_PRICE_PACK_50,
-  pack_150: process.env.PADDLE_PRICE_PACK_150,
-  pack_500: process.env.PADDLE_PRICE_PACK_500,
+export const PADDLE_PACK_PRICES: Record<string, string> = {
+  pack_50: process.env.PADDLE_PRICE_PACK_50 || 'pri_01m2x2qyx780p7crsd2p2ggmm1',
+  pack_150: process.env.PADDLE_PRICE_PACK_150 || 'pri_01m2x2t7vp1ajkpq1w2be4s47w',
+  pack_500: process.env.PADDLE_PRICE_PACK_500 || 'pri_01m2x2xa5wvsxnhq990vyrycan',
 }
 
 /**
- * Resolves a plan key ('clipper' | 'studio') from a Paddle Price ID.
+ * Resolves a plan key ('basic' | 'clipper' | 'studio') from a Paddle Price ID.
  */
-export function getPlanFromPaddlePriceId(priceId: string): 'clipper' | 'studio' | null {
-  const planPrices: Record<'clipper' | 'studio', string | undefined> = {
-    clipper: process.env.PADDLE_PRICE_CLIPPER_MONTHLY || PADDLE_PLAN_PRICES.clipper,
-    studio: process.env.PADDLE_PRICE_STUDIO_MONTHLY || PADDLE_PLAN_PRICES.studio,
-  }
-  for (const [key, id] of Object.entries(planPrices)) {
-    if (id && id === priceId) return key as 'clipper' | 'studio'
-  }
+export function getPlanFromPaddlePriceId(priceId: string): 'basic' | 'clipper' | 'studio' | null {
+  if (priceId === PADDLE_PLAN_PRICES.basic) return 'basic'
+  if (priceId === PADDLE_PLAN_PRICES.starter || priceId === PADDLE_PLAN_PRICES.clipper) return 'clipper'
+  if (priceId === PADDLE_PLAN_PRICES.pro || priceId === PADDLE_PLAN_PRICES.studio) return 'studio'
   return null
 }
 
@@ -55,12 +54,7 @@ export function getPlanFromPaddlePriceId(priceId: string): 'clipper' | 'studio' 
  * Resolves a CreditPack definition from a Paddle Price ID.
  */
 export function getCreditPackFromPaddlePriceId(priceId: string): CreditPackDef | null {
-  const packPrices: Record<string, string | undefined> = {
-    pack_50: process.env.PADDLE_PRICE_PACK_50 || PADDLE_PACK_PRICES.pack_50,
-    pack_150: process.env.PADDLE_PRICE_PACK_150 || PADDLE_PACK_PRICES.pack_150,
-    pack_500: process.env.PADDLE_PRICE_PACK_500 || PADDLE_PACK_PRICES.pack_500,
-  }
-  for (const [key, id] of Object.entries(packPrices)) {
+  for (const [key, id] of Object.entries(PADDLE_PACK_PRICES)) {
     if (id && id === priceId) return CREDIT_PACKS[key] || null
   }
   return null

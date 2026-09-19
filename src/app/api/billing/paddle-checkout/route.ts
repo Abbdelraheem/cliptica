@@ -11,18 +11,15 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json().catch(() => ({}))
-    const plan = typeof body.plan === 'string' ? body.plan : undefined
+    const plan = typeof body.plan === 'string' ? body.plan.toLowerCase() : undefined
     const packId = typeof body.packId === 'string' ? body.packId : undefined
 
     let priceId: string | undefined
 
-    if (plan === 'clipper') {
-      priceId = process.env.PADDLE_PRICE_CLIPPER_MONTHLY || PADDLE_PLAN_PRICES.clipper
-    } else if (plan === 'studio') {
-      priceId = process.env.PADDLE_PRICE_STUDIO_MONTHLY || PADDLE_PLAN_PRICES.studio
-    } else if (packId) {
-      const envKey = `PADDLE_PRICE_${packId.toUpperCase()}`
-      priceId = process.env[envKey] || (packId in PADDLE_PACK_PRICES ? PADDLE_PACK_PRICES[packId as keyof typeof PADDLE_PACK_PRICES] : undefined)
+    if (plan && plan in PADDLE_PLAN_PRICES) {
+      priceId = PADDLE_PLAN_PRICES[plan as keyof typeof PADDLE_PLAN_PRICES]
+    } else if (packId && packId in PADDLE_PACK_PRICES) {
+      priceId = PADDLE_PACK_PRICES[packId]
     }
 
     if (!priceId) {
@@ -37,7 +34,7 @@ export async function POST(request: Request) {
       email: session.user.email,
       userId: session.user.id,
       clientToken: process.env.NEXT_PUBLIC_PADDLE_CLIENT_TOKEN || '',
-      environment: process.env.NEXT_PUBLIC_PADDLE_ENV || 'sandbox',
+      environment: process.env.NEXT_PUBLIC_PADDLE_ENV || 'production',
     })
   } catch (error) {
     console.error('[paddle-checkout] Error resolving checkout price:', error)

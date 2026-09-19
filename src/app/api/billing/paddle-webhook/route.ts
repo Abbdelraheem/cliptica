@@ -148,7 +148,7 @@ async function handleSubscriptionUpdated(tx: Tx, subscription: PaddleSubscriptio
 
   let role: UserRole = user.role
   if (subscription.status === 'active' || subscription.status === 'trialing') {
-    if (planKey === 'clipper') role = 'CLIPPER'
+    if (planKey === 'basic' || planKey === 'clipper') role = 'CLIPPER'
     if (planKey === 'studio') role = 'STUDIO'
   } else if (subscription.status === 'canceled' || subscription.status === 'past_due') {
     role = 'FREE'
