@@ -4,6 +4,7 @@ import './globals.css'
 import { Providers } from './providers'
 import { CookieConsent } from '@/components/cookie-consent'
 import { Analytics } from '@/components/analytics'
+import { GoogleTranslator } from '@/components/google-translator'
 
 const manrope = Manrope({
   variable: '--font-display',
@@ -80,6 +81,7 @@ export default function RootLayout({
       </head>
       <body className="grain min-h-full bg-onyx text-pearl antialiased">
         <Providers>
+          <GoogleTranslator />
           {children}
           <CookieConsent />
           <Analytics />

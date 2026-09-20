@@ -5,7 +5,7 @@ import { useCallback, useEffect, useState } from 'react'
 import {
   ArrowLeft, Loader2, AlertTriangle, Download, Sparkles,
   Captions, ScanFace, Clock, Flame,
-  Copy, Check, Share2, Scissors, Zap, Send, ExternalLink, X, Trash2,
+  Copy, Check, CheckCircle2, Share2, Scissors, Zap, Send, ExternalLink, X, Trash2,
 } from 'lucide-react'
 import { ConnectionSummary } from '@/lib/social/types'
 
@@ -120,10 +120,86 @@ export default function ProjectDetail({ projectId }: { projectId: string }) {
     }
   }, [projectId])
 
-  const handleSelectFinalClip = (clipId: string) => {
-    setSelectedFinalClipId(clipId)
-    if (projectId && typeof window !== 'undefined') {
-      localStorage.setItem(`clipzila_final_clip_${projectId}`, clipId)
+  const [selectedClipIds, setSelectedClipIds] = useState<Set<string>>(new Set())
+  const [purging, setPurging] = useState(false)
+
+  // Initialize selected clips when project clips load
+  useEffect(() => {
+    if (project?.clips && project.clips.length > 0) {
+      setSelectedClipIds((prev) => {
+        if (prev.size === 0) {
+          return new Set(project.clips.map((c) => c.id))
+        }
+        const valid = new Set<string>()
+        project.clips.forEach((c) => {
+          if (prev.has(c.id)) valid.add(c.id)
+        })
+        return valid.size > 0 ? valid : new Set(project.clips.map((c) => c.id))
+      })
+    }
+  }, [project?.clips])
+
+  const toggleSelectClip = (clipId: string) => {
+    setSelectedClipIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(clipId)) {
+        next.delete(clipId)
+      } else {
+        next.add(clipId)
+      }
+      return next
+    })
+  }
+
+  const handleSelectAllClips = () => {
+    if (!project) return
+    setSelectedClipIds(new Set(project.clips.map((c) => c.id)))
+  }
+
+  const handleDeselectAllClips = () => {
+    setSelectedClipIds(new Set())
+  }
+
+  const handlePurgeUnselected = async () => {
+    if (!project) return
+    const total = project.clips.length
+    const keepCount = selectedClipIds.size
+    const deleteCount = total - keepCount
+
+    if (keepCount === 0) {
+      alert('Please select at least 1 clip to keep.')
+      return
+    }
+    if (deleteCount <= 0) {
+      alert('All clips are selected. To delete unwanted clips, unselect them first.')
+      return
+    }
+
+    const msg = `Are you sure you want to KEEP ${keepCount} selected clip(s) and PERMANENTLY DELETE the other ${deleteCount} unselected clip(s)?\n\nThis action cannot be undone.`
+    if (!confirm(msg)) return
+
+    setPurging(true)
+    try {
+      const res = await fetch(`/api/projects/${projectId}/clips/purge-unselected`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ keepClipIds: Array.from(selectedClipIds) }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Failed to purge unselected clips')
+
+      setProject((cur) => {
+        if (!cur) return cur
+        return {
+          ...cur,
+          clips: cur.clips.filter((c) => selectedClipIds.has(c.id)),
+        }
+      })
+      alert(`Success! Kept ${data.kept} clip(s). The other ${data.deleted} unselected clip(s) were removed.`)
+    } catch (e) {
+      alert(e instanceof Error ? e.message : 'Could not purge unselected clips')
+    } finally {
+      setPurging(false)
     }
   }
 
@@ -385,9 +461,62 @@ export default function ProjectDetail({ projectId }: { projectId: string }) {
       )}
 
       {/* Clips */}
-      <h2 className="mt-12 mb-5 flex items-center gap-2 text-sm font-semibold uppercase tracking-[0.2em] text-mist">
-        <Flame className="h-4 w-4 text-gold" /> Clips ({project.clips.length})
-      </h2>
+      <div className="mt-12 mb-5 flex flex-wrap items-center justify-between gap-4">
+        <h2 className="flex items-center gap-2 text-sm font-semibold uppercase tracking-[0.2em] text-mist">
+          <Flame className="h-4 w-4 text-gold" /> Generated Clips ({project.clips.length})
+        </h2>
+      </div>
+
+      {project.clips.length > 1 && (
+        <div className="mb-6 rounded-2xl border border-gold/30 bg-onyx-2/95 p-4 shadow-2xl backdrop-blur-xl flex flex-wrap items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gold/15 text-gold border border-gold/30">
+              <Sparkles className="h-5 w-5" />
+            </div>
+            <div>
+              <h4 className="text-sm font-semibold text-white">Clip Curation & Selection</h4>
+              <p className="text-xs text-mist-2">
+                Choose 1 or more clips you like. Discard the rest with one click to keep your project clean.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2.5">
+            <span className="rounded-xl border border-hair/80 bg-black/40 px-3 py-1.5 font-mono text-xs text-pearl">
+              Selected: <span className="font-bold text-gold">{selectedClipIds.size}</span> of {project.clips.length}
+            </span>
+
+            <button
+              type="button"
+              onClick={handleSelectAllClips}
+              className="btn-lux btn-outline !py-1.5 !px-3 !text-xs !font-normal"
+            >
+              Select All
+            </button>
+
+            <button
+              type="button"
+              onClick={handleDeselectAllClips}
+              className="btn-lux btn-outline !py-1.5 !px-3 !text-xs !font-normal text-mist-2 hover:text-white"
+            >
+              Clear
+            </button>
+
+            {selectedClipIds.size < project.clips.length && selectedClipIds.size > 0 && (
+              <button
+                type="button"
+                onClick={handlePurgeUnselected}
+                disabled={purging}
+                className="btn-lux btn-gold !py-1.5 !px-3.5 !text-xs !font-semibold flex items-center gap-1.5 shadow-[0_0_20px_rgba(212,175,55,0.3)] hover:scale-[1.02] transition-transform"
+                title="Keep only the selected clips and permanently delete the unselected ones"
+              >
+                {purging ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
+                <span>Keep Selected & Discard {project.clips.length - selectedClipIds.size} Remaining</span>
+              </button>
+            )}
+          </div>
+        </div>
+      )}
 
       {project.clips.length === 0 ? (
         <p className="rounded-2xl border border-dashed border-hair/50 px-6 py-14 text-center text-sm font-light text-mist">
@@ -396,14 +525,14 @@ export default function ProjectDetail({ projectId }: { projectId: string }) {
       ) : (
         <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
           {project.clips.map((c, cIndex) => {
-            const isFinal = selectedFinalClipId === c.id
+            const isSelectedToKeep = selectedClipIds.has(c.id)
             return (
             <div
               key={c.id}
               className={`glass-card group !p-0 overflow-hidden transition-all duration-300 ${
-                isFinal
+                isSelectedToKeep
                   ? 'border-2 border-gold shadow-[0_0_35px_rgba(212,175,55,0.25)] ring-1 ring-gold/60'
-                  : 'hover:-translate-y-1'
+                  : 'border border-hair/50 opacity-80 hover:opacity-100 hover:-translate-y-1'
               }`}
             >
               <div className="relative aspect-[9/13] bg-black">
@@ -442,13 +571,13 @@ export default function ProjectDetail({ projectId }: { projectId: string }) {
                     <span className="text-white/80 font-medium">{c.viralScore}%</span>
                   )}
                 </div>
-                {isFinal ? (
+                {isSelectedToKeep ? (
                   <span className="absolute left-2.5 top-2.5 flex items-center gap-1.5 rounded-lg border border-gold bg-black/90 px-2.5 py-1 font-mono text-[11px] font-bold uppercase tracking-wider text-gold backdrop-blur z-20 shadow-lg">
-                    <Check className="h-3.5 w-3.5 text-gold" /> Final Selected Clip
+                    <CheckCircle2 className="h-3.5 w-3.5 text-gold" /> Selected to Keep
                   </span>
                 ) : (
-                  <span className="absolute left-2.5 top-2.5 rounded-lg border border-white/10 bg-black/60 px-2 py-0.5 font-mono text-[10px] text-mist-2 backdrop-blur z-20">
-                    Option {cIndex + 1} of {project.clips.length}
+                  <span className="absolute left-2.5 top-2.5 rounded-lg border border-red-500/30 bg-black/75 px-2 py-0.5 font-mono text-[10px] text-red-300 backdrop-blur z-20">
+                    Unselected (Will be deleted)
                   </span>
                 )}
               </div>
@@ -489,30 +618,32 @@ export default function ProjectDetail({ projectId }: { projectId: string }) {
                 </div>
 
                 <div className="mt-4 space-y-2 pt-2 border-t border-hair-soft">
-                  {/* Final Clip Selection Button */}
+                  {/* Multi-Clip Selection Toggle */}
                   <button
                     type="button"
-                    onClick={() => handleSelectFinalClip(c.id)}
+                    onClick={() => toggleSelectClip(c.id)}
                     disabled={c.status === 'GENERATING'}
                     className={`w-full flex items-center justify-center gap-2 rounded-xl py-2 px-3 text-xs font-semibold transition-all ${
-                      isFinal
+                      isSelectedToKeep
                         ? 'bg-gradient-to-r from-gold to-champagne text-black shadow-[0_0_15px_rgba(212,175,55,0.35)]'
-                        : 'border border-gold/40 bg-gold/10 text-gold hover:bg-gold/20 hover:border-gold'
+                        : 'border border-hair/80 bg-white/5 text-mist hover:text-white hover:border-gold/50'
                     }`}
                   >
-                    {isFinal ? (
+                    {isSelectedToKeep ? (
                       <>
-                        <Check className="h-4 w-4" />
-                        <span>Selected Final Video</span>
+                        <CheckCircle2 className="h-4 w-4 stroke-[2.5]" />
+                        <span>Selected to Keep (مُختار للحفظ)</span>
                       </>
                     ) : (
                       <>
-                        <Sparkles className="h-4 w-4" />
-                        <span>Select as Final Video</span>
+                        <Sparkles className="h-4 w-4 text-mist-2" />
+                        <span>Select to Keep (اختر للحفظ)</span>
                       </>
                     )}
                   </button>
-                  <p className="text-[10px] text-center text-mist-2">1 credit = 1 final video</p>
+                  <p className="text-[10px] text-center text-mist-2">
+                    {isSelectedToKeep ? '✓ Saved clip' : '⚠ Will be deleted if you discard unselected'}
+                  </p>
 
                   <div className="flex gap-2">
                     <button

@@ -32,12 +32,30 @@ export function LanguageSwitcher({ currentLocale = DEFAULT_LOCALE }: { currentLo
   }, [])
 
   const handleSelectLocale = (targetLocale: Locale) => {
-    // Set 1-year persistence cookies for Next.js and in-place translator
-    document.cookie = `NEXT_LOCALE=${targetLocale}; path=/; max-age=31536000; SameSite=Lax`
-    document.cookie = `googtrans=/auto/${targetLocale}; path=/; max-age=31536000; SameSite=Lax`
-    try {
-      document.cookie = `googtrans=/auto/${targetLocale}; path=/; domain=.clipzila.com; max-age=31536000; SameSite=Lax`
-    } catch {}
+    const hostname = typeof window !== 'undefined' ? window.location.hostname : ''
+
+    if (targetLocale === 'en') {
+      document.cookie = 'googtrans=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT'
+      if (hostname) {
+        document.cookie = `googtrans=; path=/; domain=.${hostname}; expires=Thu, 01 Jan 1970 00:00:00 GMT`
+      }
+      try {
+        document.cookie = 'googtrans=; path=/; domain=.clipzila.com; expires=Thu, 01 Jan 1970 00:00:00 GMT'
+      } catch {}
+      document.cookie = 'NEXT_LOCALE=en; path=/; max-age=31536000; SameSite=Lax'
+    } else {
+      document.cookie = `NEXT_LOCALE=${targetLocale}; path=/; max-age=31536000; SameSite=Lax`
+      document.cookie = `googtrans=/en/${targetLocale}; path=/; max-age=31536000; SameSite=Lax`
+      document.cookie = `googtrans=/auto/${targetLocale}; path=/; max-age=31536000; SameSite=Lax`
+      if (hostname) {
+        document.cookie = `googtrans=/en/${targetLocale}; path=/; domain=.${hostname}; max-age=31536000; SameSite=Lax`
+        document.cookie = `googtrans=/auto/${targetLocale}; path=/; domain=.${hostname}; max-age=31536000; SameSite=Lax`
+      }
+      try {
+        document.cookie = `googtrans=/en/${targetLocale}; path=/; domain=.clipzila.com; max-age=31536000; SameSite=Lax`
+        document.cookie = `googtrans=/auto/${targetLocale}; path=/; domain=.clipzila.com; max-age=31536000; SameSite=Lax`
+      } catch {}
+    }
 
     setActiveLocale(targetLocale)
     if (targetLocale === 'ar') {
@@ -55,9 +73,18 @@ export function LanguageSwitcher({ currentLocale = DEFAULT_LOCALE }: { currentLo
       const subPath = segments.slice(1).join('/')
       router.push(subPath ? `/${subPath}` : '/')
     } else {
-      // Trigger in-place reload/refresh of messages without changing URL
+      // Trigger Google Translate combo if already loaded in DOM
+      try {
+        const combo = document.querySelector('.goog-te-combo') as HTMLSelectElement | null
+        if (combo) {
+          combo.value = targetLocale
+          combo.dispatchEvent(new Event('change'))
+        }
+      } catch {}
       window.dispatchEvent(new CustomEvent('localechange', { detail: targetLocale }))
-      window.location.reload()
+      setTimeout(() => {
+        window.location.reload()
+      }, 50)
     }
 
     setOpen(false)

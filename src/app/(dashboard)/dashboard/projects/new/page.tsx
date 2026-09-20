@@ -555,7 +555,14 @@ export default function NewProjectPage() {
             <input
               type="url"
               value={url}
-              onChange={(e) => setUrl(e.target.value)}
+              onChange={(e) => {
+                const val = e.target.value
+                setUrl(val)
+                if (/whop\.com|contentreward/i.test(val)) {
+                  setCampaignUrl(val)
+                  setTab('campaign')
+                }
+              }}
               placeholder="https://www.youtube.com/watch?v=…"
               className="input-lux !pl-11"
             />

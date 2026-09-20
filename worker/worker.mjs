@@ -192,6 +192,8 @@ function ytdlpArgs(extra) {
     denoPath,
     '--impersonate',
     'Safari-18.4',
+    '--remote-components',
+    'ejs:github',
     '--extractor-args',
     'youtube:player_client=mweb,web_creator,android',
   ]
