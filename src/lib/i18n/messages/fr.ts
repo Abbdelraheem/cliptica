@@ -150,7 +150,7 @@ export const fr: MessageCatalog = {
     {
       question: 'Puis-je annuler ou changer de forfait à tout moment ?',
       answer:
-        'Oui. Vous pouvez modifier ou annuler votre abonnement à tout instant via le portail Stripe depuis vos paramètres. Vos crédits restants restent utilisables jusqu’à la fin du cycle.',
+        'Oui. Vous pouvez modifier ou annuler votre abonnement à tout instant via le portail Paddle depuis vos paramètres. Vos crédits restants restent utilisables jusqu’à la fin du cycle.',
     },
   ],
   footer: {

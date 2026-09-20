@@ -150,7 +150,7 @@ export const de: MessageCatalog = {
     {
       question: 'Kann ich mein Abonnement jederzeit kündigen oder ändern?',
       answer:
-        'Ja. Du kannst dein Abonnement jederzeit über das Stripe-Kundenportal in deinen Kontoeinstellungen upgraden, downgraden oder kündigen. Nicht genutzte Credits bleiben bis zum Ende der Periode erhalten.',
+        'Ja. Du kannst dein Abonnement jederzeit über das Paddle-Kundenportal in deinen Kontoeinstellungen upgraden, downgraden oder kündigen. Nicht genutzte Credits bleiben bis zum Ende der Periode erhalten.',
     },
   ],
   footer: {

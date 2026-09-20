@@ -201,8 +201,11 @@ export function MarketingLayout({
               </nav>
             ))}
           </div>
-          <div className="mt-14 border-t border-hair/40 pt-8 text-sm text-mist-2">
-            © {new Date().getFullYear()} Clipzila. All rights reserved.
+          <div className="mt-14 border-t border-hair/40 pt-8 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 text-xs text-mist-2">
+            <p>© {new Date().getFullYear()} Clipzila. All rights reserved.</p>
+            <p className="max-w-md text-[11px] leading-relaxed text-mist-2/80">
+              Our order process is conducted by our online reseller Paddle.com. Paddle.com is the Merchant of Record for all our orders. Paddle provides customer service inquiries and handles returns.
+            </p>
           </div>
         </div>
       </footer>

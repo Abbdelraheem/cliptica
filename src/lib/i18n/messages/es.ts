@@ -150,7 +150,7 @@ export const es: MessageCatalog = {
     {
       question: '¿Puedo cancelar o cambiar mi suscripción cuando quiera?',
       answer:
-        'Sí. Puedes cambiar de plan o cancelar tu suscripción en cualquier momento a través del portal de Stripe en tus ajustes. Tus créditos restantes seguirán disponibles hasta el final del periodo.',
+        'Sí. Puedes cambiar de plan o cancelar tu suscripción en cualquier momento a través del portal de Paddle en tus ajustes. Tus créditos restantes seguirán disponibles hasta el final del periodo.',
     },
   ],
   footer: {

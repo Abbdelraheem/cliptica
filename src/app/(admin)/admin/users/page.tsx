@@ -347,7 +347,7 @@ export default function AdminUsersPage() {
             {editing.mode === 'plan' ? (
               <div className="mt-5 space-y-4">
                 <p className="text-xs text-mist">
-                  Grant a subscription without requiring Stripe payment. Sets active status and unlocks plan benefits.
+                  Grant a subscription without requiring online checkout. Sets active status and unlocks plan benefits.
                 </p>
 
                 <div className="grid grid-cols-3 gap-2.5">

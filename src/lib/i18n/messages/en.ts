@@ -150,7 +150,7 @@ export const en: MessageCatalog = {
     {
       question: 'Can I cancel or change my subscription at any time?',
       answer:
-        'Yes. You can upgrade, downgrade, or cancel your subscription at any time via the Stripe Customer Portal in your billing settings. Your existing credits remain valid until the end of the billing period.',
+        'Yes. You can upgrade, downgrade, or cancel your subscription at any time via the Paddle Customer Portal in your billing settings. Your existing credits remain valid until the end of the billing period.',
     },
   ],
   footer: {

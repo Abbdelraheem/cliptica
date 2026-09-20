@@ -70,11 +70,11 @@ export default function RefundPolicyPage() {
             </p>
             <ol className="list-decimal pl-5 space-y-1">
               <li>Your registered account email address.</li>
-              <li>The Stripe invoice or transaction date.</li>
+              <li>The Paddle order number or transaction date.</li>
               <li>A brief note explaining the reason for your refund request.</li>
             </ol>
             <p className="mt-2">
-              Our billing team reviews all requests within 2 business days and issues approved refunds directly via Stripe.
+              Our billing team reviews all requests within 2 business days and issues approved refunds directly via our Merchant of Record, Paddle.com.
             </p>
           </section>
         </div>

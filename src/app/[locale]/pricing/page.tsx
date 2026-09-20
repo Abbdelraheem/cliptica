@@ -348,6 +348,16 @@ export default async function LocalizedPricingPage({
             </div>
           </div>
 
+          {/* Paddle Merchant of Record Trust Note */}
+          <div className="mt-8 text-center text-xs text-mist-2">
+            <p>
+              Payments are securely processed by our Merchant of Record, <strong className="text-pearl">Paddle.com</strong>.
+            </p>
+            <p className="mt-1 text-[11px] text-mist-2/70">
+              Supports Visa, Mastercard, American Express, PayPal, Apple Pay, and Google Pay with global tax and PCI-DSS Level 1 compliance.
+            </p>
+          </div>
+
           {/* FAQ Section */}
           <div className="mt-16 border-t border-hair pt-12">
             <h2 className="font-display text-2xl font-bold text-pearl text-center">

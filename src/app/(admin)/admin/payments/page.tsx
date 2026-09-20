@@ -184,7 +184,7 @@ export default function AdminPaymentsPage() {
       {/* Recent webhooks */}
       <section className="mt-8 glass-card !p-6">
         <h2 className="flex items-center gap-2 font-display text-lg font-semibold">
-          <Webhook className="h-5 w-5 text-gold" /> Recent Stripe webhooks
+          <Webhook className="h-5 w-5 text-gold" /> Recent Payment webhooks
         </h2>
         <div className="mt-4 space-y-1">
           {data?.recentWebhooks.map((w) => (
@@ -196,7 +196,7 @@ export default function AdminPaymentsPage() {
             </div>
           ))}
           {(data?.recentWebhooks ?? []).length === 0 && !query.isLoading && (
-            <p className="text-sm font-light text-mist">No webhooks processed yet. (Stripe live events will appear here.)</p>
+            <p className="text-sm font-light text-mist">No webhooks processed yet. (Live payment events will appear here.)</p>
           )}
         </div>
       </section>

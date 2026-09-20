@@ -24,6 +24,9 @@ type UserDetail = {
   role: string
   canCreateCampaigns?: boolean
   credits: number
+  paddleCustomerId?: string | null
+  paddleSubscriptionId?: string | null
+  paddlePriceId?: string | null
   stripeCustomerId?: string | null
   stripeSubscriptionId?: string | null
   stripePriceId?: string | null
@@ -216,13 +219,15 @@ export default function AdminUserDetailPage() {
             <div className="mt-5 grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-3">
               <p className="font-light text-mist">
                 Subscription: <span className="font-medium text-pearl">{user.subscriptionStatus ?? '—'}</span>{' '}
-                {user.stripePriceId && <span className="text-mist-2">({user.stripePriceId})</span>}
+                {(user.paddlePriceId || user.stripePriceId) && (
+                  <span className="text-mist-2">({user.paddlePriceId || user.stripePriceId})</span>
+                )}
               </p>
               <p className="font-light text-mist">
-                Stripe customer: <span className="font-mono text-xs text-pearl">{user.stripeCustomerId ?? '—'}</span>
+                Paddle Customer: <span className="font-mono text-xs text-pearl">{user.paddleCustomerId ?? user.stripeCustomerId ?? '—'}</span>
               </p>
               <p className="font-light text-mist">
-                Stripe subscription: <span className="font-mono text-xs text-pearl">{user.stripeSubscriptionId ?? '—'}</span>
+                Paddle Subscription: <span className="font-mono text-xs text-pearl">{user.paddleSubscriptionId ?? user.stripeSubscriptionId ?? '—'}</span>
               </p>
             </div>
           </div>
