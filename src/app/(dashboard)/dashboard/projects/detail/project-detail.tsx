@@ -175,7 +175,15 @@ export default function ProjectDetail({ projectId }: { projectId: string }) {
       return
     }
 
-    const msg = `Are you sure you want to KEEP ${keepCount} selected clip(s) and PERMANENTLY DELETE the other ${deleteCount} unselected clip(s)?\n\nThis action cannot be undone.`
+    const alreadyPaid = project.creditsUsed ?? 1
+    const additionalCost = Math.max(0, keepCount - alreadyPaid)
+
+    const costDetails =
+      additionalCost > 0
+        ? `Keeping ${keepCount} final videos costs ${keepCount} credits (1 credit per final video).\nThis will deduct ${additionalCost} additional credit(s) from your balance.`
+        : `Keeping ${keepCount} final video is covered by your initial project credit.`
+
+    const msg = `Final Video Confirmation:\n\n• Final Videos Kept: ${keepCount}\n• Pricing: 1 credit per final video\n• ${costDetails}\n• Clips to Discard: ${deleteCount}\n\nProceed to save your selected videos and delete the rest?`
     if (!confirm(msg)) return
 
     setPurging(true)
@@ -192,10 +200,21 @@ export default function ProjectDetail({ projectId }: { projectId: string }) {
         if (!cur) return cur
         return {
           ...cur,
+          creditsUsed: data.totalCreditsUsed ?? keepCount,
           clips: cur.clips.filter((c) => selectedClipIds.has(c.id)),
         }
       })
-      alert(`Success! Kept ${data.kept} clip(s). The other ${data.deleted} unselected clip(s) were removed.`)
+
+      // Dispatch event to instantly update navbar credit counter
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new Event('credits-updated'))
+      }
+
+      alert(
+        `Success! Kept ${data.kept} final video(s) (1 credit each). ${
+          data.creditsDeducted > 0 ? `Deducted ${data.creditsDeducted} additional credit(s).` : ''
+        }`.trim()
+      )
     } catch (e) {
       alert(e instanceof Error ? e.message : 'Could not purge unselected clips')
     } finally {
@@ -482,9 +501,17 @@ export default function ProjectDetail({ projectId }: { projectId: string }) {
           </div>
 
           <div className="flex flex-wrap items-center gap-2.5">
-            <span className="rounded-xl border border-hair/80 bg-black/40 px-3 py-1.5 font-mono text-xs text-pearl">
-              Selected: <span className="font-bold text-gold">{selectedClipIds.size}</span> of {project.clips.length}
+            <span className="rounded-xl border border-hair/80 bg-black/40 px-3 py-1.5 font-mono text-xs text-pearl flex items-center gap-1.5">
+              <span>Final Videos:</span>
+              <span className="font-bold text-gold">{selectedClipIds.size}</span>
+              <span className="text-mist-2">({selectedClipIds.size} credit{selectedClipIds.size === 1 ? '' : 's'} — 1 credit each)</span>
             </span>
+
+            {selectedClipIds.size > (project.creditsUsed ?? 1) && (
+              <span className="rounded-lg bg-gold/15 border border-gold/40 px-2.5 py-1 text-[11px] font-medium text-champagne">
+                +{selectedClipIds.size - (project.creditsUsed ?? 1)} credit(s) from balance
+              </span>
+            )}
 
             <button
               type="button"
