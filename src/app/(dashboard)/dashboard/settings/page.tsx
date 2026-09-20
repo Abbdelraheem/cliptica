@@ -20,7 +20,6 @@ import {
   ShieldAlert,
   Trash2,
   Megaphone,
-  DollarSign,
   TrendingUp,
   Video,
 } from 'lucide-react'
@@ -1091,7 +1090,7 @@ export default function SettingsPage() {
                   <label className="text-xs font-medium uppercase tracking-wider text-mist">Type</label>
                   <select
                     value={newCampType}
-                    onChange={(e) => setNewCampType(e.target.value as any)}
+                    onChange={(e) => setNewCampType(e.target.value as CampaignItem['type'])}
                     className="input-lux mt-1.5 w-full text-xs"
                   >
                     <option value="WHOP_CONTENT_REWARDS">Whop Content Rewards</option>
