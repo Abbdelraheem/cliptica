@@ -41,6 +41,7 @@ type Project = {
   aspectRatio?: string
   instructions: string | null
   duration: number
+  creditsUsed?: number
   createdAt: string
   clips: Clip[]
   processingJobs: { status: string; progress: number; error: string | null; result?: { stage?: string } | null }[]
@@ -111,15 +112,6 @@ export default function ProjectDetail({ projectId }: { projectId: string }) {
   const [publishError, setPublishError] = useState<string | null>(null)
   const [publishSuccess, setPublishSuccess] = useState<{ message: string; postUrl?: string } | null>(null)
   const [socialConnections, setSocialConnections] = useState<ConnectionSummary[]>([])
-  const [selectedFinalClipId, setSelectedFinalClipId] = useState<string | null>(null)
-
-  useEffect(() => {
-    if (projectId && typeof window !== 'undefined') {
-      const saved = localStorage.getItem(`clipzila_final_clip_${projectId}`) || localStorage.getItem(`cliptica_final_clip_${projectId}`)
-      if (saved) setSelectedFinalClipId(saved)
-    }
-  }, [projectId])
-
   const [selectedClipIds, setSelectedClipIds] = useState<Set<string>>(new Set())
   const [purging, setPurging] = useState(false)
 
@@ -551,7 +543,7 @@ export default function ProjectDetail({ projectId }: { projectId: string }) {
         </p>
       ) : (
         <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-          {project.clips.map((c, cIndex) => {
+          {project.clips.map((c, _cIndex) => {
             const isSelectedToKeep = selectedClipIds.has(c.id)
             return (
             <div
