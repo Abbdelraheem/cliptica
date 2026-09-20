@@ -1,11 +1,12 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import Link from 'next/link'
 import { useMutation } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import {
   AlertTriangle, Save, RotateCcw, Sparkles, Cpu, Coins,
-  Shield, CheckCircle2, Loader2, Play, Layers
+  Shield, CheckCircle2, Loader2, Play, Layers, Megaphone
 } from 'lucide-react'
 
 type SettingsState = Record<string, boolean | number | string>
@@ -465,6 +466,32 @@ export default function AdminSettingsPage() {
               💡 <strong>How to get this:</strong> Install the free Chrome/Edge extension <span className="text-champagne font-medium">Get cookies.txt LOCALLY</span>, visit YouTube while logged in, click Export, and paste the text above. Automatically synced to <code className="text-white/80">/opt/nology/cookies.txt</code> on save.
             </p>
           </div>
+        </section>
+
+        {/* 6. Clipping Campaigns & Bounty Pools */}
+        <section className="glass-card !p-6">
+          <div className="flex flex-wrap items-center justify-between gap-4 border-b border-hair/30 pb-4">
+            <div className="flex items-center gap-2.5">
+              <Megaphone className="h-5 w-5 text-gold" />
+              <div>
+                <h2 className="font-display text-lg font-semibold">Clipping Campaigns & Bounty Pools</h2>
+                <p className="text-xs text-mist font-light">
+                  Add and configure creator reward programs (Whop Content Rewards, Brand Deals, and Bounties)
+                </p>
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <Link
+                href="/dashboard/settings"
+                className="btn-lux btn-gold !py-2 !px-3.5 !text-xs flex items-center gap-1.5"
+              >
+                <span>Add & Manage Campaigns</span>
+              </Link>
+            </div>
+          </div>
+          <p className="mt-4 text-xs text-mist leading-relaxed font-light">
+            Creators on Clipzila can link videos to active campaigns and submit clips. You can configure campaigns with custom rates ($/1K views), total budgets, platforms (TikTok, YouTube Shorts, Reels), and deadlines.
+          </p>
         </section>
 
         <p className="flex items-start gap-2 rounded-xl border border-champagne/20 bg-champagne/5 px-4 py-3 text-xs font-light text-mist">

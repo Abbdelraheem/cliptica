@@ -7,10 +7,11 @@ import { apiMutationLimiter, enforceRateLimit } from '@/lib/rate-limit'
 const campaignSchema = z.object({
   name: z.string().min(1).max(100),
   type: z.enum(['WHOP_CONTENT_REWARDS', 'BRAND_DEAL', 'OWN_CHANNEL']),
+  platform: z.string().optional(),
   ratePer1k: z.number().positive(),
   flatFee: z.number().optional(),
   budget: z.number().positive().optional(),
-  deadline: z.string().datetime().optional(),
+  deadline: z.string().optional(),
 })
 
 export async function GET() {

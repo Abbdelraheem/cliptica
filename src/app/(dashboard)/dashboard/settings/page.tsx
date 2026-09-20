@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import Link from 'next/link'
 import { useSession } from 'next-auth/react'
 import {
   Bell,
@@ -18,6 +19,10 @@ import {
   CheckCircle2,
   ShieldAlert,
   Trash2,
+  Megaphone,
+  DollarSign,
+  TrendingUp,
+  Video,
 } from 'lucide-react'
 import { ConnectionSummary } from '@/lib/social/types'
 
@@ -42,6 +47,21 @@ interface NotificationPrefs {
   notifyOnComplete: boolean
   notifyOnLowCredits: boolean
   notifyOnWeeklyDigest: boolean
+}
+
+interface CampaignItem {
+  id: string
+  name: string
+  type: 'WHOP_CONTENT_REWARDS' | 'BRAND_DEAL' | 'OWN_CHANNEL'
+  platform: string | null
+  ratePer1k: string | number
+  flatFee?: string | number | null
+  budget?: string | number | null
+  deadline?: string | null
+  isActive: boolean
+  createdAt: string
+  _count?: { clips: number }
+  clips?: { views: number; estEarnings: string | number }[]
 }
 
 export default function SettingsPage() {
@@ -91,6 +111,120 @@ export default function SettingsPage() {
   const [loadingConnections, setLoadingConnections] = useState(true)
   const [disconnectingPlatform, setDisconnectingPlatform] = useState<string | null>(null)
   const [socialBanner, setSocialBanner] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
+
+  // Campaigns state
+  const [campaignsList, setCampaignsList] = useState<CampaignItem[]>([])
+  const [loadingCampaigns, setLoadingCampaigns] = useState(true)
+  const [showNewCampaignModal, setShowNewCampaignModal] = useState(false)
+  const [creatingCampaign, setCreatingCampaign] = useState(false)
+  const [campaignFormError, setCampaignFormError] = useState('')
+  const [campaignActionId, setCampaignActionId] = useState<string | null>(null)
+
+  // New campaign form fields
+  const [newCampName, setNewCampName] = useState('')
+  const [newCampType, setNewCampType] = useState<'WHOP_CONTENT_REWARDS' | 'BRAND_DEAL' | 'OWN_CHANNEL'>('WHOP_CONTENT_REWARDS')
+  const [newCampPlatform, setNewCampPlatform] = useState('tiktok')
+  const [newCampRate, setNewCampRate] = useState('1.50')
+  const [newCampBudget, setNewCampBudget] = useState('')
+  const [newCampFlatFee, setNewCampFlatFee] = useState('')
+  const [newCampDeadline, setNewCampDeadline] = useState('')
+
+  const fetchCampaigns = async () => {
+    try {
+      const res = await fetch('/api/campaigns')
+      if (res.ok) {
+        const data = await res.json()
+        setCampaignsList(data.campaigns || [])
+      }
+    } catch {
+    } finally {
+      setLoadingCampaigns(false)
+    }
+  }
+
+  const handleCreateCampaign = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setCampaignFormError('')
+    if (!newCampName.trim()) {
+      setCampaignFormError('Please enter a campaign name')
+      return
+    }
+    const rate = parseFloat(newCampRate)
+    if (isNaN(rate) || rate <= 0) {
+      setCampaignFormError('Please enter a valid rate per 1k views')
+      return
+    }
+
+    setCreatingCampaign(true)
+    try {
+      const payload: Record<string, unknown> = {
+        name: newCampName.trim(),
+        type: newCampType,
+        platform: newCampPlatform,
+        ratePer1k: rate,
+      }
+      if (newCampBudget) payload.budget = parseFloat(newCampBudget)
+      if (newCampFlatFee) payload.flatFee = parseFloat(newCampFlatFee)
+      if (newCampDeadline) payload.deadline = newCampDeadline
+
+      const res = await fetch('/api/campaigns', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to create campaign')
+      }
+
+      await fetchCampaigns()
+      setShowNewCampaignModal(false)
+      setNewCampName('')
+      setNewCampBudget('')
+      setNewCampFlatFee('')
+      setNewCampDeadline('')
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Error creating campaign'
+      setCampaignFormError(message)
+    } finally {
+      setCreatingCampaign(false)
+    }
+  }
+
+  const handleToggleCampaignActive = async (id: string, current: boolean) => {
+    setCampaignActionId(id)
+    try {
+      const res = await fetch(`/api/campaigns/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ isActive: !current }),
+      })
+      if (res.ok) {
+        setCampaignsList((prev) =>
+          prev.map((c) => (c.id === id ? { ...c, isActive: !current } : c))
+        )
+      }
+    } catch {}
+    setCampaignActionId(null)
+  }
+
+  const handleDeleteCampaign = async (id: string) => {
+    if (!confirm('Are you sure you want to delete this campaign?')) return
+    setCampaignActionId(id)
+    try {
+      const res = await fetch(`/api/campaigns/${id}`, {
+        method: 'DELETE',
+      })
+      if (res.ok) {
+        setCampaignsList((prev) => prev.filter((c) => c.id !== id))
+      }
+    } catch {}
+    setCampaignActionId(null)
+  }
+
+  useEffect(() => {
+    fetchCampaigns()
+  }, [])
 
   useEffect(() => {
     if (session?.user?.name) setName(session.user.name)
@@ -772,6 +906,295 @@ export default function SettingsPage() {
           </div>
         )}
       </section>
+
+      {/* Clipping Campaigns & Bounties */}
+      <section className="mt-8 rounded-3xl border border-hair bg-gradient-to-b from-pearl/[0.05] to-pearl/[0.01] p-8 backdrop-blur-xl">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div className="flex items-center gap-2.5">
+            <Megaphone className="h-5 w-5 text-gold" />
+            <div>
+              <h2 className="font-display text-2xl font-semibold">Clipping Campaigns & Bounties</h2>
+              <p className="mt-1 text-sm font-light text-mist">
+                Add and manage clipping campaigns (Whop Content Rewards, Brand Deals, and Bounties).
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-3">
+            <Link
+              href="/dashboard/campaigns"
+              className="btn-lux btn-outline !py-2 !px-3.5 !text-xs flex items-center gap-1.5"
+            >
+              <TrendingUp className="h-3.5 w-3.5 text-champagne" />
+              <span>Full Analytics</span>
+            </Link>
+            <button
+              type="button"
+              onClick={() => setShowNewCampaignModal(true)}
+              className="btn-lux btn-gold !py-2 !px-3.5 !text-xs flex items-center gap-1.5"
+            >
+              <Plus className="h-4 w-4" />
+              <span>Add Campaign</span>
+            </button>
+          </div>
+        </div>
+
+        {loadingCampaigns ? (
+          <div className="flex items-center justify-center p-8 text-sm text-mist">
+            <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Loading campaigns...
+          </div>
+        ) : campaignsList.length === 0 ? (
+          <div className="mt-6 rounded-2xl border border-dashed border-hair/60 bg-onyx/40 p-8 text-center">
+            <p className="text-sm font-light text-mist">
+              No clipping campaigns configured yet. Add your first campaign to start clipping and tracking rewards.
+            </p>
+            <button
+              type="button"
+              onClick={() => setShowNewCampaignModal(true)}
+              className="btn-lux btn-gold mt-4 inline-flex items-center gap-2 !py-2 !px-4 !text-xs"
+            >
+              <Plus className="h-4 w-4" />
+              <span>Create First Campaign</span>
+            </button>
+          </div>
+        ) : (
+          <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {campaignsList.map((camp) => (
+              <div
+                key={camp.id}
+                className="flex flex-col justify-between rounded-2xl border border-hair/60 bg-onyx/40 p-5 transition-all hover:border-hair"
+              >
+                <div>
+                  <div className="flex items-center justify-between gap-2">
+                    <span
+                      className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${
+                        camp.isActive
+                          ? 'bg-emerald-400/15 text-emerald-300 border border-emerald-400/20'
+                          : 'bg-white/5 text-mist-2 border border-white/10'
+                      }`}
+                    >
+                      {camp.isActive ? 'Active' : 'Paused'}
+                    </span>
+                    <span className="rounded-md border border-hair/40 bg-surface/50 px-2 py-0.5 text-[10px] uppercase font-mono text-champagne">
+                      {camp.platform || 'Multi-Platform'}
+                    </span>
+                  </div>
+
+                  <h3 className="mt-3 font-display text-base font-semibold text-pearl line-clamp-1">{camp.name}</h3>
+                  <p className="text-xs text-mist-2 mt-0.5">
+                    {camp.type === 'WHOP_CONTENT_REWARDS'
+                      ? 'Whop Content Rewards'
+                      : camp.type === 'BRAND_DEAL'
+                      ? 'Brand Deal Sponsorship'
+                      : 'Own Channel Content'}
+                  </p>
+
+                  <div className="mt-4 grid grid-cols-2 gap-2 rounded-xl border border-hair/40 bg-surface/30 p-3 text-xs">
+                    <div>
+                      <span className="text-[10px] text-mist-2 block">Rate / 1K</span>
+                      <span className="font-semibold text-gold">${Number(camp.ratePer1k).toFixed(2)}</span>
+                    </div>
+                    <div>
+                      <span className="text-[10px] text-mist-2 block">Clips Linked</span>
+                      <span className="font-semibold text-pearl">{camp._count?.clips ?? 0}</span>
+                    </div>
+                    {camp.budget ? (
+                      <div className="col-span-2 pt-1 border-t border-hair/20">
+                        <span className="text-[10px] text-mist-2 block">Pool Budget</span>
+                        <span className="font-semibold text-pearl">${Number(camp.budget).toLocaleString()}</span>
+                      </div>
+                    ) : null}
+                  </div>
+                </div>
+
+                <div className="mt-5 pt-3 border-t border-hair-soft flex items-center justify-between gap-2">
+                  <Link
+                    href="/dashboard/projects/new?tab=campaign"
+                    className="btn-lux btn-outline !py-1.5 !px-3 !text-xs flex items-center gap-1 text-pearl hover:text-gold"
+                  >
+                    <Video className="h-3.5 w-3.5 text-champagne" />
+                    <span>Clip Video</span>
+                  </Link>
+                  <div className="flex items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={() => handleToggleCampaignActive(camp.id, camp.isActive)}
+                      disabled={campaignActionId === camp.id}
+                      className="rounded-lg border border-hair/40 bg-surface/40 px-2.5 py-1.5 text-xs text-mist hover:text-pearl transition-colors disabled:opacity-50"
+                    >
+                      {camp.isActive ? 'Pause' : 'Resume'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteCampaign(camp.id)}
+                      disabled={campaignActionId === camp.id}
+                      aria-label="Delete campaign"
+                      className="rounded-lg p-1.5 text-mist-2 hover:bg-red-400/10 hover:text-red-300 transition-colors disabled:opacity-50"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
+
+      {/* New Campaign Modal */}
+      {showNewCampaignModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-onyx/80 px-6 backdrop-blur-sm"
+          role="dialog"
+          aria-modal="true"
+          onClick={() => setShowNewCampaignModal(false)}
+        >
+          <div
+            className="w-full max-w-lg rounded-3xl border border-hair bg-onyx-2 p-7 shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-hair/40 pb-4">
+              <div className="flex items-center gap-2">
+                <Megaphone className="h-5 w-5 text-gold" />
+                <h3 className="font-display text-xl font-semibold text-pearl">Create Clipping Campaign</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowNewCampaignModal(false)}
+                className="text-mist hover:text-pearl text-sm"
+              >
+                ✕
+              </button>
+            </div>
+
+            {campaignFormError && (
+              <div className="mt-4 flex items-center gap-2 rounded-xl border border-red-500/30 bg-red-500/10 p-3 text-xs text-red-300">
+                <AlertCircle className="h-4 w-4 shrink-0" />
+                <span>{campaignFormError}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleCreateCampaign} className="mt-5 space-y-4">
+              <div>
+                <label className="text-xs font-medium uppercase tracking-wider text-mist">Campaign Name *</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. Whop AI Content Rewards, Tech Brand Deal"
+                  value={newCampName}
+                  onChange={(e) => setNewCampName(e.target.value)}
+                  className="input-lux mt-1.5 w-full text-xs"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-medium uppercase tracking-wider text-mist">Type</label>
+                  <select
+                    value={newCampType}
+                    onChange={(e) => setNewCampType(e.target.value as any)}
+                    className="input-lux mt-1.5 w-full text-xs"
+                  >
+                    <option value="WHOP_CONTENT_REWARDS">Whop Content Rewards</option>
+                    <option value="BRAND_DEAL">Brand Deal Sponsorship</option>
+                    <option value="OWN_CHANNEL">Own Channel Growth</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="text-xs font-medium uppercase tracking-wider text-mist">Platform</label>
+                  <select
+                    value={newCampPlatform}
+                    onChange={(e) => setNewCampPlatform(e.target.value)}
+                    className="input-lux mt-1.5 w-full text-xs"
+                  >
+                    <option value="tiktok">TikTok</option>
+                    <option value="youtube">YouTube Shorts</option>
+                    <option value="instagram">Instagram Reels</option>
+                    <option value="all">Multi-Platform</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-medium uppercase tracking-wider text-mist">Rate per 1,000 Views ($) *</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0.01"
+                    required
+                    placeholder="1.50"
+                    value={newCampRate}
+                    onChange={(e) => setNewCampRate(e.target.value)}
+                    className="input-lux mt-1.5 w-full font-mono text-xs"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs font-medium uppercase tracking-wider text-mist">Total Budget ($)</label>
+                  <input
+                    type="number"
+                    step="1"
+                    min="0"
+                    placeholder="Optional (e.g. 500)"
+                    value={newCampBudget}
+                    onChange={(e) => setNewCampBudget(e.target.value)}
+                    className="input-lux mt-1.5 w-full font-mono text-xs"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-medium uppercase tracking-wider text-mist">Flat Fee / Base Pay ($)</label>
+                  <input
+                    type="number"
+                    step="1"
+                    min="0"
+                    placeholder="Optional (e.g. 50)"
+                    value={newCampFlatFee}
+                    onChange={(e) => setNewCampFlatFee(e.target.value)}
+                    className="input-lux mt-1.5 w-full font-mono text-xs"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs font-medium uppercase tracking-wider text-mist">Deadline Date</label>
+                  <input
+                    type="date"
+                    value={newCampDeadline}
+                    onChange={(e) => setNewCampDeadline(e.target.value)}
+                    className="input-lux mt-1.5 w-full text-xs"
+                  />
+                </div>
+              </div>
+
+              <div className="pt-3 flex items-center justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={() => setShowNewCampaignModal(false)}
+                  className="btn-lux btn-ghost !py-2 !px-4 text-xs"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={creatingCampaign}
+                  className="btn-lux btn-gold !py-2 !px-5 text-xs flex items-center gap-2 disabled:opacity-60"
+                >
+                  {creatingCampaign ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" /> Saving…
+                    </>
+                  ) : (
+                    'Save Campaign'
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* Danger zone */}
       <section className="mt-8 rounded-3xl border border-red-400/25 bg-red-400/[0.04] p-8">
