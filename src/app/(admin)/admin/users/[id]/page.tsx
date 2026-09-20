@@ -1,8 +1,9 @@
 'use client'
 
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
+import { toast } from 'sonner'
 import {
   ArrowLeft,
   AlertTriangle,
@@ -21,6 +22,7 @@ type UserDetail = {
   name?: string | null
   avatar?: string | null
   role: string
+  canCreateCampaigns?: boolean
   credits: number
   stripeCustomerId?: string | null
   stripeSubscriptionId?: string | null
@@ -94,6 +96,28 @@ export default function AdminUserDetailPage() {
     },
   })
 
+  const queryClient = useQueryClient()
+  const campaignPermissionMutation = useMutation({
+    mutationFn: async (canCreateCampaigns: boolean) => {
+      const res = await fetch(`/api/admin/users/${id}/campaign-permission`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ canCreateCampaigns }),
+      })
+      if (!res.ok) throw new Error('Failed to update campaign permission')
+      return res.json()
+    },
+    onSuccess: (data) => {
+      toast.success(
+        data.user.canCreateCampaigns
+          ? 'Campaign creation permission GRANTED'
+          : 'Campaign creation permission REVOKED'
+      )
+      queryClient.invalidateQueries({ queryKey: ['admin-user', id] })
+    },
+    onError: () => toast.error('Could not update campaign permission'),
+  })
+
   const user = query.data?.user
 
   return (
@@ -141,6 +165,26 @@ export default function AdminUserDetailPage() {
                         <BadgeCheck className="h-3 w-3" /> Verified
                       </span>
                     )}
+                    {/* Campaign Creator Toggle Button */}
+                    <button
+                      type="button"
+                      onClick={() => campaignPermissionMutation.mutate(!user.canCreateCampaigns)}
+                      disabled={user.role === 'ADMIN' || campaignPermissionMutation.isPending}
+                      className={`flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] uppercase tracking-wider transition-colors ${
+                        user.role === 'ADMIN' || user.canCreateCampaigns
+                          ? 'border border-emerald-500/40 bg-emerald-500/15 text-emerald-300 hover:bg-emerald-500/25'
+                          : 'border border-hair/50 bg-black/20 text-mist-2 hover:border-gold/40 hover:text-gold'
+                      }`}
+                    >
+                      <Megaphone className="h-3 w-3" />
+                      <span>
+                        {user.role === 'ADMIN'
+                          ? 'Campaign Creator (Admin)'
+                          : user.canCreateCampaigns
+                          ? 'Campaigns: Enabled ✓'
+                          : 'Campaigns: Disabled'}
+                      </span>
+                    </button>
                   </div>
                   <p className="mt-1 text-sm font-light text-mist">{user.email}</p>
                 </div>

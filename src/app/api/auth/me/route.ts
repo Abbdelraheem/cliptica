@@ -22,6 +22,7 @@ export async function GET() {
         name: true,
         avatar: true,
         role: true,
+        canCreateCampaigns: true,
         credits: true,
         createdAt: true,
         stripeCustomerId: true,

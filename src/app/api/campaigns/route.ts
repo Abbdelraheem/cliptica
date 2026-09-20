@@ -21,13 +21,22 @@ export async function GET() {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    const dbUser = await prisma.user.findUnique({
+      where: { id: session.user.id },
+      select: { role: true, canCreateCampaigns: true },
+    })
+    const isAdmin = dbUser?.role === 'ADMIN'
+
     const campaigns = await prisma.campaign.findMany({
-      where: { userId: session.user.id },
+      where: isAdmin ? {} : { userId: session.user.id },
       orderBy: { createdAt: 'desc' },
       include: {
         _count: { select: { clips: true } },
         clips: {
           include: { clip: true },
+        },
+        user: {
+          select: { id: true, name: true, email: true },
         },
       },
     })
@@ -44,6 +53,18 @@ export async function POST(request: Request) {
     const session = await auth()
     if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const dbUser = await prisma.user.findUnique({
+      where: { id: session.user.id },
+      select: { role: true, canCreateCampaigns: true },
+    })
+    const isAllowed = dbUser?.role === 'ADMIN' || Boolean(dbUser?.canCreateCampaigns)
+    if (!isAllowed) {
+      return NextResponse.json(
+        { error: 'Adding campaigns is restricted to administrators and authorized partners only.' },
+        { status: 403 }
+      )
     }
 
     const limited = await enforceRateLimit(apiMutationLimiter, `camp:${session.user.id}`)

@@ -132,20 +132,22 @@ export const authOptions: NextAuthOptions = {
         // and OAuth, whose profile ids are provider-specific, not ours).
         const dbUser = await prisma.user.findUnique({
           where: { email: user.email.toLowerCase() },
-          select: { id: true, role: true, credits: true, name: true },
+          select: { id: true, role: true, credits: true, name: true, canCreateCampaigns: true },
         })
         if (dbUser) {
           token.id = dbUser.id
           token.role = dbUser.role
           token.credits = dbUser.credits
           token.name = dbUser.name ?? user.name ?? token.name
+          token.canCreateCampaigns = dbUser.canCreateCampaigns
         }
       }
       if (trigger === 'update' && session) {
-        const s = session as { credits?: number; role?: string; name?: string }
+        const s = session as { credits?: number; role?: string; name?: string; canCreateCampaigns?: boolean }
         if (s.credits !== undefined) token.credits = s.credits
         if (s.role !== undefined) token.role = s.role
         if (s.name !== undefined) token.name = s.name
+        if (s.canCreateCampaigns !== undefined) token.canCreateCampaigns = s.canCreateCampaigns
       }
       return token
     },
@@ -154,6 +156,7 @@ export const authOptions: NextAuthOptions = {
         ;(session.user as { id?: string }).id = token.id as string
         ;(session.user as { role?: string }).role = token.role as string
         ;(session.user as { credits?: number }).credits = token.credits as number
+        ;(session.user as { canCreateCampaigns?: boolean }).canCreateCampaigns = Boolean(token.canCreateCampaigns)
         session.user.name = (token.name as string | null) ?? session.user.name
       }
       return session

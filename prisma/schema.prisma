@@ -54,6 +54,7 @@ model User {
   avatar               String?
   passwordHash         String?
   role                 UserRole  @default(FREE)
+  canCreateCampaigns   Boolean   @default(false)
   credits              Int       @default(5)
   stripeCustomerId     String?
   stripeSubscriptionId String?

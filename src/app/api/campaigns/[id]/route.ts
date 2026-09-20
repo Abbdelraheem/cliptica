@@ -35,9 +35,20 @@ export async function PATCH(
       return NextResponse.json({ error: 'Invalid input', details: validated.error.flatten() }, { status: 400 })
     }
 
-    // Verify ownership
+    // Check user role and permissions
+    const dbUser = await prisma.user.findUnique({
+      where: { id: session.user.id },
+      select: { role: true, canCreateCampaigns: true },
+    })
+    const isAdmin = dbUser?.role === 'ADMIN'
+    const isAllowed = isAdmin || Boolean(dbUser?.canCreateCampaigns)
+    if (!isAllowed) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
+
+    // Admins can manage any campaign; authorized users manage their own
     const existing = await prisma.campaign.findFirst({
-      where: { id, userId: session.user.id },
+      where: isAdmin ? { id } : { id, userId: session.user.id },
     })
     if (!existing) {
       return NextResponse.json({ error: 'Campaign not found' }, { status: 404 })
@@ -71,8 +82,21 @@ export async function DELETE(
     }
 
     const { id } = await params
+
+    // Check user role and permissions
+    const dbUser = await prisma.user.findUnique({
+      where: { id: session.user.id },
+      select: { role: true, canCreateCampaigns: true },
+    })
+    const isAdmin = dbUser?.role === 'ADMIN'
+    const isAllowed = isAdmin || Boolean(dbUser?.canCreateCampaigns)
+    if (!isAllowed) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
+
+    // Admins can delete any campaign; authorized users delete their own
     const existing = await prisma.campaign.findFirst({
-      where: { id, userId: session.user.id },
+      where: isAdmin ? { id } : { id, userId: session.user.id },
     })
     if (!existing) {
       return NextResponse.json({ error: 'Campaign not found' }, { status: 404 })

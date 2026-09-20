@@ -118,6 +118,12 @@ export default function SettingsPage() {
   const [creatingCampaign, setCreatingCampaign] = useState(false)
   const [campaignFormError, setCampaignFormError] = useState('')
   const [campaignActionId, setCampaignActionId] = useState<string | null>(null)
+  const [userCanCreateCampaigns, setUserCanCreateCampaigns] = useState(false)
+
+  const canManageCampaigns =
+    (session?.user as { role?: string; canCreateCampaigns?: boolean })?.role === 'ADMIN' ||
+    Boolean((session?.user as { role?: string; canCreateCampaigns?: boolean })?.canCreateCampaigns) ||
+    userCanCreateCampaigns
 
   // New campaign form fields
   const [newCampName, setNewCampName] = useState('')
@@ -222,8 +228,23 @@ export default function SettingsPage() {
   }
 
   useEffect(() => {
-    fetchCampaigns()
+    fetch('/api/auth/me')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (d?.user) {
+          if (d.user.role === 'ADMIN' || d.user.canCreateCampaigns) {
+            setUserCanCreateCampaigns(true)
+          }
+        }
+      })
+      .catch(() => {})
   }, [])
+
+  useEffect(() => {
+    if (canManageCampaigns) {
+      fetchCampaigns()
+    }
+  }, [canManageCampaigns])
 
   useEffect(() => {
     if (session?.user?.name) setName(session.user.name)
@@ -906,141 +927,143 @@ export default function SettingsPage() {
         )}
       </section>
 
-      {/* Clipping Campaigns & Bounties */}
-      <section className="mt-8 rounded-3xl border border-hair bg-gradient-to-b from-pearl/[0.05] to-pearl/[0.01] p-8 backdrop-blur-xl">
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          <div className="flex items-center gap-2.5">
-            <Megaphone className="h-5 w-5 text-gold" />
-            <div>
-              <h2 className="font-display text-2xl font-semibold">Clipping Campaigns & Bounties</h2>
-              <p className="mt-1 text-sm font-light text-mist">
-                Add and manage clipping campaigns (Whop Content Rewards, Brand Deals, and Bounties).
-              </p>
+      {/* Clipping Campaigns & Bounties (Restricted to Admin and Authorized Partners) */}
+      {canManageCampaigns && (
+        <section className="mt-8 rounded-3xl border border-hair bg-gradient-to-b from-pearl/[0.05] to-pearl/[0.01] p-8 backdrop-blur-xl">
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div className="flex items-center gap-2.5">
+              <Megaphone className="h-5 w-5 text-gold" />
+              <div>
+                <h2 className="font-display text-2xl font-semibold">Clipping Campaigns & Bounties</h2>
+                <p className="mt-1 text-sm font-light text-mist">
+                  Add and manage clipping campaigns (Whop Content Rewards, Brand Deals, and Bounties).
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              <Link
+                href="/dashboard/campaigns"
+                className="btn-lux btn-outline !py-2 !px-3.5 !text-xs flex items-center gap-1.5"
+              >
+                <TrendingUp className="h-3.5 w-3.5 text-champagne" />
+                <span>Full Analytics</span>
+              </Link>
+              <button
+                type="button"
+                onClick={() => setShowNewCampaignModal(true)}
+                className="btn-lux btn-gold !py-2 !px-3.5 !text-xs flex items-center gap-1.5"
+              >
+                <Plus className="h-4 w-4" />
+                <span>Add Campaign</span>
+              </button>
             </div>
           </div>
-          <div className="flex items-center gap-3">
-            <Link
-              href="/dashboard/campaigns"
-              className="btn-lux btn-outline !py-2 !px-3.5 !text-xs flex items-center gap-1.5"
-            >
-              <TrendingUp className="h-3.5 w-3.5 text-champagne" />
-              <span>Full Analytics</span>
-            </Link>
-            <button
-              type="button"
-              onClick={() => setShowNewCampaignModal(true)}
-              className="btn-lux btn-gold !py-2 !px-3.5 !text-xs flex items-center gap-1.5"
-            >
-              <Plus className="h-4 w-4" />
-              <span>Add Campaign</span>
-            </button>
-          </div>
-        </div>
 
-        {loadingCampaigns ? (
-          <div className="flex items-center justify-center p-8 text-sm text-mist">
-            <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Loading campaigns...
-          </div>
-        ) : campaignsList.length === 0 ? (
-          <div className="mt-6 rounded-2xl border border-dashed border-hair/60 bg-onyx/40 p-8 text-center">
-            <p className="text-sm font-light text-mist">
-              No clipping campaigns configured yet. Add your first campaign to start clipping and tracking rewards.
-            </p>
-            <button
-              type="button"
-              onClick={() => setShowNewCampaignModal(true)}
-              className="btn-lux btn-gold mt-4 inline-flex items-center gap-2 !py-2 !px-4 !text-xs"
-            >
-              <Plus className="h-4 w-4" />
-              <span>Create First Campaign</span>
-            </button>
-          </div>
-        ) : (
-          <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {campaignsList.map((camp) => (
-              <div
-                key={camp.id}
-                className="flex flex-col justify-between rounded-2xl border border-hair/60 bg-onyx/40 p-5 transition-all hover:border-hair"
+          {loadingCampaigns ? (
+            <div className="flex items-center justify-center p-8 text-sm text-mist">
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Loading campaigns...
+            </div>
+          ) : campaignsList.length === 0 ? (
+            <div className="mt-6 rounded-2xl border border-dashed border-hair/60 bg-onyx/40 p-8 text-center">
+              <p className="text-sm font-light text-mist">
+                No clipping campaigns configured yet. Add your first campaign to start clipping and tracking rewards.
+              </p>
+              <button
+                type="button"
+                onClick={() => setShowNewCampaignModal(true)}
+                className="btn-lux btn-gold mt-4 inline-flex items-center gap-2 !py-2 !px-4 !text-xs"
               >
-                <div>
-                  <div className="flex items-center justify-between gap-2">
-                    <span
-                      className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${
-                        camp.isActive
-                          ? 'bg-emerald-400/15 text-emerald-300 border border-emerald-400/20'
-                          : 'bg-white/5 text-mist-2 border border-white/10'
-                      }`}
-                    >
-                      {camp.isActive ? 'Active' : 'Paused'}
-                    </span>
-                    <span className="rounded-md border border-hair/40 bg-surface/50 px-2 py-0.5 text-[10px] uppercase font-mono text-champagne">
-                      {camp.platform || 'Multi-Platform'}
-                    </span>
-                  </div>
-
-                  <h3 className="mt-3 font-display text-base font-semibold text-pearl line-clamp-1">{camp.name}</h3>
-                  <p className="text-xs text-mist-2 mt-0.5">
-                    {camp.type === 'WHOP_CONTENT_REWARDS'
-                      ? 'Whop Content Rewards'
-                      : camp.type === 'BRAND_DEAL'
-                      ? 'Brand Deal Sponsorship'
-                      : 'Own Channel Content'}
-                  </p>
-
-                  <div className="mt-4 grid grid-cols-2 gap-2 rounded-xl border border-hair/40 bg-surface/30 p-3 text-xs">
-                    <div>
-                      <span className="text-[10px] text-mist-2 block">Rate / 1K</span>
-                      <span className="font-semibold text-gold">${Number(camp.ratePer1k).toFixed(2)}</span>
+                <Plus className="h-4 w-4" />
+                <span>Create First Campaign</span>
+              </button>
+            </div>
+          ) : (
+            <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {campaignsList.map((camp) => (
+                <div
+                  key={camp.id}
+                  className="flex flex-col justify-between rounded-2xl border border-hair/60 bg-onyx/40 p-5 transition-all hover:border-hair"
+                >
+                  <div>
+                    <div className="flex items-center justify-between gap-2">
+                      <span
+                        className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${
+                          camp.isActive
+                            ? 'bg-emerald-400/15 text-emerald-300 border border-emerald-400/20'
+                            : 'bg-white/5 text-mist-2 border border-white/10'
+                        }`}
+                      >
+                        {camp.isActive ? 'Active' : 'Paused'}
+                      </span>
+                      <span className="rounded-md border border-hair/40 bg-surface/50 px-2 py-0.5 text-[10px] uppercase font-mono text-champagne">
+                        {camp.platform || 'Multi-Platform'}
+                      </span>
                     </div>
-                    <div>
-                      <span className="text-[10px] text-mist-2 block">Clips Linked</span>
-                      <span className="font-semibold text-pearl">{camp._count?.clips ?? 0}</span>
-                    </div>
-                    {camp.budget ? (
-                      <div className="col-span-2 pt-1 border-t border-hair/20">
-                        <span className="text-[10px] text-mist-2 block">Pool Budget</span>
-                        <span className="font-semibold text-pearl">${Number(camp.budget).toLocaleString()}</span>
+
+                    <h3 className="mt-3 font-display text-base font-semibold text-pearl line-clamp-1">{camp.name}</h3>
+                    <p className="text-xs text-mist-2 mt-0.5">
+                      {camp.type === 'WHOP_CONTENT_REWARDS'
+                        ? 'Whop Content Rewards'
+                        : camp.type === 'BRAND_DEAL'
+                        ? 'Brand Deal Sponsorship'
+                        : 'Own Channel Content'}
+                    </p>
+
+                    <div className="mt-4 grid grid-cols-2 gap-2 rounded-xl border border-hair/40 bg-surface/30 p-3 text-xs">
+                      <div>
+                        <span className="text-[10px] text-mist-2 block">Rate / 1K</span>
+                        <span className="font-semibold text-gold">${Number(camp.ratePer1k).toFixed(2)}</span>
                       </div>
-                    ) : null}
+                      <div>
+                        <span className="text-[10px] text-mist-2 block">Clips Linked</span>
+                        <span className="font-semibold text-pearl">{camp._count?.clips ?? 0}</span>
+                      </div>
+                      {camp.budget ? (
+                        <div className="col-span-2 pt-1 border-t border-hair/20">
+                          <span className="text-[10px] text-mist-2 block">Pool Budget</span>
+                          <span className="font-semibold text-pearl">${Number(camp.budget).toLocaleString()}</span>
+                        </div>
+                      ) : null}
+                    </div>
                   </div>
-                </div>
 
-                <div className="mt-5 pt-3 border-t border-hair-soft flex items-center justify-between gap-2">
-                  <Link
-                    href="/dashboard/projects/new?tab=campaign"
-                    className="btn-lux btn-outline !py-1.5 !px-3 !text-xs flex items-center gap-1 text-pearl hover:text-gold"
-                  >
-                    <Video className="h-3.5 w-3.5 text-champagne" />
-                    <span>Clip Video</span>
-                  </Link>
-                  <div className="flex items-center gap-1">
-                    <button
-                      type="button"
-                      onClick={() => handleToggleCampaignActive(camp.id, camp.isActive)}
-                      disabled={campaignActionId === camp.id}
-                      className="rounded-lg border border-hair/40 bg-surface/40 px-2.5 py-1.5 text-xs text-mist hover:text-pearl transition-colors disabled:opacity-50"
+                  <div className="mt-5 pt-3 border-t border-hair-soft flex items-center justify-between gap-2">
+                    <Link
+                      href="/dashboard/projects/new?tab=campaign"
+                      className="btn-lux btn-outline !py-1.5 !px-3 !text-xs flex items-center gap-1 text-pearl hover:text-gold"
                     >
-                      {camp.isActive ? 'Pause' : 'Resume'}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleDeleteCampaign(camp.id)}
-                      disabled={campaignActionId === camp.id}
-                      aria-label="Delete campaign"
-                      className="rounded-lg p-1.5 text-mist-2 hover:bg-red-400/10 hover:text-red-300 transition-colors disabled:opacity-50"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
+                      <Video className="h-3.5 w-3.5 text-champagne" />
+                      <span>Clip Video</span>
+                    </Link>
+                    <div className="flex items-center gap-1">
+                      <button
+                        type="button"
+                        onClick={() => handleToggleCampaignActive(camp.id, camp.isActive)}
+                        disabled={campaignActionId === camp.id}
+                        className="rounded-lg border border-hair/40 bg-surface/40 px-2.5 py-1.5 text-xs text-mist hover:text-pearl transition-colors disabled:opacity-50"
+                      >
+                        {camp.isActive ? 'Pause' : 'Resume'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteCampaign(camp.id)}
+                        disabled={campaignActionId === camp.id}
+                        aria-label="Delete campaign"
+                        className="rounded-lg p-1.5 text-mist-2 hover:bg-red-400/10 hover:text-red-300 transition-colors disabled:opacity-50"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </section>
+              ))}
+            </div>
+          )}
+        </section>
+      )}
 
       {/* New Campaign Modal */}
-      {showNewCampaignModal && (
+      {canManageCampaigns && showNewCampaignModal && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-onyx/80 px-6 backdrop-blur-sm"
           role="dialog"

@@ -14,6 +14,9 @@ vi.mock('@/lib/rate-limit', () => ({
 
 // Mock prisma
 const mockPrisma = {
+  user: {
+    findUnique: vi.fn(),
+  },
   campaign: {
     findMany: vi.fn(),
     findFirst: vi.fn(),
@@ -31,6 +34,10 @@ describe('Campaign Management API', () => {
     vi.clearAllMocks()
     mockAuth.mockResolvedValue({
       user: { id: 'user_test_123', email: 'creator@clipzila.com' },
+    })
+    mockPrisma.user.findUnique.mockResolvedValue({
+      role: 'ADMIN',
+      canCreateCampaigns: true,
     })
   })
 
@@ -155,4 +162,66 @@ describe('Campaign Management API', () => {
       where: { id: 'camp_1' },
     })
   })
+
+  it('POST /api/campaigns returns 403 when user is not admin and canCreateCampaigns is false', async () => {
+    const { POST } = await import('@/app/api/campaigns/route')
+
+    mockPrisma.user.findUnique.mockResolvedValue({
+      role: 'USER',
+      canCreateCampaigns: false,
+    })
+
+    const request = new Request('http://localhost/api/campaigns', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: 'Unauthorized Campaign',
+        type: 'WHOP_CONTENT_REWARDS',
+        platform: 'tiktok',
+        ratePer1k: 2.50,
+      }),
+    })
+
+    const res = await POST(request)
+    expect(res.status).toBe(403)
+    const json = await res.json()
+    expect(json.error).toContain('restricted to administrators and authorized partners')
+  })
+
+  it('POST /api/campaigns succeeds for non-admin user when canCreateCampaigns is true', async () => {
+    const { POST } = await import('@/app/api/campaigns/route')
+
+    mockPrisma.user.findUnique.mockResolvedValue({
+      role: 'USER',
+      canCreateCampaigns: true,
+    })
+
+    const newCampaign = {
+      id: 'camp_authorized',
+      userId: 'user_test_123',
+      name: 'Authorized Partner Campaign',
+      type: 'WHOP_CONTENT_REWARDS',
+      platform: 'youtube',
+      ratePer1k: 3.0,
+      isActive: true,
+    }
+    mockPrisma.campaign.create.mockResolvedValue(newCampaign)
+
+    const request = new Request('http://localhost/api/campaigns', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: 'Authorized Partner Campaign',
+        type: 'WHOP_CONTENT_REWARDS',
+        platform: 'youtube',
+        ratePer1k: 3.0,
+      }),
+    })
+
+    const res = await POST(request)
+    expect(res.status).toBe(200)
+    const json = await res.json()
+    expect(json.campaign.name).toBe('Authorized Partner Campaign')
+  })
 })
+

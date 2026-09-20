@@ -4,7 +4,7 @@ import { useMemo, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import Link from 'next/link'
 import { toast } from 'sonner'
-import { Search, Plus, Minus, AlertTriangle, ChevronLeft, ChevronRight, Coins, Gift } from 'lucide-react'
+import { Search, Plus, Minus, AlertTriangle, ChevronLeft, ChevronRight, Coins, Gift, Megaphone } from 'lucide-react'
 
 type UserRow = {
   id: string
@@ -12,6 +12,7 @@ type UserRow = {
   name?: string | null
   role: string
   credits: number
+  canCreateCampaigns?: boolean
   subscriptionStatus?: string | null
   emailVerified?: string | null
   createdAt: string
@@ -169,6 +170,27 @@ export default function AdminUsersPage() {
     onError: (e) => toast.error(e instanceof Error ? e.message : 'Could not grant plan'),
   })
 
+  const campaignPermissionMutation = useMutation({
+    mutationFn: async ({ id, canCreateCampaigns }: { id: string; canCreateCampaigns: boolean }) => {
+      const res = await fetch(`/api/admin/users/${id}/campaign-permission`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ canCreateCampaigns }),
+      })
+      if (!res.ok) throw new Error('Failed to update campaign permission')
+      return res.json()
+    },
+    onSuccess: (data) => {
+      toast.success(
+        data.user.canCreateCampaigns
+          ? `Campaign permission GRANTED to ${data.user.email}`
+          : `Campaign permission REVOKED from ${data.user.email}`
+      )
+      queryClient.invalidateQueries({ queryKey: ['admin-users'] })
+    },
+    onError: () => toast.error('Could not update campaign permission'),
+  })
+
   const users = usersQuery.data?.users ?? []
 
   return (
@@ -248,6 +270,36 @@ export default function AdminUsersPage() {
                     className="flex items-center gap-1 rounded-md border border-gold/40 bg-gold/10 px-1.5 py-0.5 text-[10px] font-medium text-gold transition-colors hover:bg-gold/20"
                   >
                     <Gift className="h-2.5 w-2.5" /> Plan
+                  </button>
+                  <button
+                    onClick={() =>
+                      campaignPermissionMutation.mutate({
+                        id: u.id,
+                        canCreateCampaigns: !u.canCreateCampaigns,
+                      })
+                    }
+                    disabled={u.role === 'ADMIN' || campaignPermissionMutation.isPending}
+                    title={
+                      u.role === 'ADMIN'
+                        ? 'Admin always has campaign permissions'
+                        : u.canCreateCampaigns
+                        ? 'Click to revoke campaign creation permission'
+                        : 'Click to grant campaign creation permission'
+                    }
+                    className={`flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-[10px] font-medium transition-colors ${
+                      u.role === 'ADMIN' || u.canCreateCampaigns
+                        ? 'border-emerald-500/40 bg-emerald-500/15 text-emerald-300 hover:bg-emerald-500/25'
+                        : 'border-hair/50 bg-black/20 text-mist-2 hover:border-gold/40 hover:text-gold'
+                    }`}
+                  >
+                    <Megaphone className="h-2.5 w-2.5" />
+                    <span>
+                      {u.role === 'ADMIN'
+                        ? 'Admin'
+                        : u.canCreateCampaigns
+                        ? 'Campaigns ✓'
+                        : '+ Campaign'}
+                    </span>
                   </button>
                 </div>
                 <div className="flex items-center gap-2 md:justify-end">

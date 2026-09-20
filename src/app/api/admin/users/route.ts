@@ -43,6 +43,7 @@ export async function GET(request: Request) {
           name: true,
           avatar: true,
           role: true,
+          canCreateCampaigns: true,
           credits: true,
           subscriptionStatus: true,
           stripePriceId: true,
