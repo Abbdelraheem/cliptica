@@ -45,14 +45,15 @@ export default function TermsPage() {
           </section>
 
           <section className="space-y-3">
-            <h2 className="text-xl font-semibold text-pearl">4. Subscriptions and Recurring Billing</h2>
+            <h2 className="text-xl font-semibold text-pearl">4. Subscriptions, Merchant of Record &amp; Billing</h2>
             <p>
-              Paid subscription plans (e.g., Clipper, Studio) are billed in advance on a recurring monthly basis. By subscribing, you authorize our third-party
-              payment processor (Stripe) to automatically charge your designated payment method at the beginning of each billing cycle until you cancel.
+              Our order process is conducted by our online reseller Paddle.com. Paddle.com is the Merchant of Record for all our orders. Paddle provides all customer service inquiries and handles returns.
             </p>
             <p>
-              You may cancel your subscription at any time through the Billing dashboard. Upon cancellation, your subscription remains active until the conclusion
-              of your current paid billing period.
+              Paid subscription plans (e.g., Starter, Pro Creator) and credit packs are billed in advance. By subscribing, you authorize Paddle.com to charge your designated payment method at the beginning of each billing cycle until you cancel.
+            </p>
+            <p>
+              You may cancel your subscription at any time through the Billing dashboard. Upon cancellation, your subscription remains active until the conclusion of your current paid billing period.
             </p>
           </section>
 

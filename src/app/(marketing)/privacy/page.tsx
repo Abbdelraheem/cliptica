@@ -23,7 +23,7 @@ export default function PrivacyPage() {
               <li><strong className="text-pearl">Account Information:</strong> Your email address, full name, and encrypted password hash (via bcrypt).</li>
               <li><strong className="text-pearl">Media Submissions:</strong> Video URLs submitted for processing, video/audio files uploaded directly, and resulting AI-generated transcripts.</li>
               <li><strong className="text-pearl">Device &amp; Telemetry Data:</strong> Browser User-Agent, IP address, device identifier hashes (used strictly for one-account-per-device verification to prevent bot abuse), and session tokens.</li>
-              <li><strong className="text-pearl">Payment Information:</strong> Financial transactions are handled entirely by Stripe. We do not store credit card numbers, CVVs, or expiration dates on our infrastructure. We store only Stripe customer tokens, subscription IDs, and purchase history.</li>
+              <li><strong className="text-pearl">Payment Information:</strong> Financial transactions are handled entirely by our online reseller and Merchant of Record, Paddle.com. We do not store credit card numbers, CVVs, or expiration dates on our infrastructure. We store only Paddle customer tokens, subscription IDs, and purchase history.</li>
             </ul>
           </section>
 
@@ -43,8 +43,8 @@ export default function PrivacyPage() {
             <p>To provide high-performance transcription and video delivery, data passes through the following secure third-party processors:</p>
             <div className="grid gap-4 sm:grid-cols-3 mt-4">
               <div className="rounded-xl border border-hair bg-white/[0.02] p-4">
-                <h3 className="font-semibold text-champagne text-base">Stripe, Inc.</h3>
-                <p className="mt-2 text-xs text-mist leading-normal">Processes all subscription billing, credit purchases, and payouts with PCI-DSS Level 1 certification.</p>
+                <h3 className="font-semibold text-champagne text-base">Paddle.com</h3>
+                <p className="mt-2 text-xs text-mist leading-normal">Merchant of Record that handles all subscription billing, credit pack purchases, and tax compliance with PCI-DSS Level 1 certification.</p>
               </div>
               <div className="rounded-xl border border-hair bg-white/[0.02] p-4">
                 <h3 className="font-semibold text-champagne text-base">Cloudflare R2</h3>

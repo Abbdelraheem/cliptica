@@ -24,7 +24,7 @@ export default function RefundPolicyPage() {
               <strong className="text-pearl">5 credits</strong> from your plan allowance.
             </p>
             <p>
-              If your request meets these criteria, we will process a 100% refund back to your original payment method via Stripe.
+              If your request meets these criteria, we will process a 100% refund back to your original payment method via Paddle.com. Refunds are processed through our Merchant of Record, Paddle.com, or upon request to our creator support team at support@clipzila.com.
             </p>
           </section>
 
