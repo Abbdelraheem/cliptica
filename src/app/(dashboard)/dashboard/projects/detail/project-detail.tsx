@@ -8,6 +8,7 @@ import {
   Copy, Check, CheckCircle2, Share2, Scissors, Zap, Send, ExternalLink, X, Trash2,
 } from 'lucide-react'
 import { ConnectionSummary } from '@/lib/social/types'
+import StudioVideoEditor from '@/components/studio-video-editor'
 
 type Clip = {
   id: string
@@ -88,6 +89,7 @@ export default function ProjectDetail({ projectId }: { projectId: string }) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [copiedId, setCopiedId] = useState<string | null>(null)
+  const [studioEditorClip, setStudioEditorClip] = useState<Clip | null>(null)
 
   const [editingClipId, setEditingClipId] = useState<string | null>(null)
   const [adjustState, setAdjustState] = useState<{ start: number; end: number; captionStyle: string }>({
@@ -268,17 +270,7 @@ export default function ProjectDetail({ projectId }: { projectId: string }) {
   }
 
   const openAdjust = (c: Clip) => {
-    if (editingClipId === c.id) {
-      setEditingClipId(null)
-      return
-    }
-    setEditingClipId(c.id)
-    setAdjustState({
-      start: c.sourceStart ?? 0,
-      end: c.sourceEnd ?? (c.sourceStart ?? 0) + (c.duration || 30),
-      captionStyle: c.captionStyle || project?.captionStyle || 'hormozi',
-    })
-    setAdjustError(null)
+    setStudioEditorClip(c)
   }
 
   const nudgeStart = (delta: number) => {
@@ -566,7 +558,16 @@ export default function ProjectDetail({ projectId }: { projectId: string }) {
                     </div>
                   </div>
                 ) : c.videoUrl ? (
-                  <video src={c.videoUrl} poster={c.thumbnailUrl ?? undefined} controls preload="metadata" className="h-full w-full object-cover" />
+                  <video
+                    src={c.videoUrl}
+                    poster={c.thumbnailUrl ?? undefined}
+                    controls
+                    controlsList="nodownload nofullscreen noplaybackrate"
+                    disablePictureInPicture
+                    onContextMenu={(e) => e.preventDefault()}
+                    preload="metadata"
+                    className="h-full w-full object-cover select-none"
+                  />
                 ) : (
                   <div className={`absolute inset-0 flex items-center justify-center ${working ? 'animate-pulse' : ''}`}>
                     {c.thumbnailUrl ? (
@@ -690,18 +691,46 @@ export default function ProjectDetail({ projectId }: { projectId: string }) {
                     </button>
 
                     {(c.exportUrl || c.videoUrl) && (
-                      <button
-                        type="button"
-                        onClick={() => copyVideoLink(c)}
-                        className="btn-lux btn-outline !py-1.5 !px-2.5 !text-xs"
-                        title="Copy direct video stream link"
-                      >
-                        {copiedId === `link-${c.id}` ? (
-                          <Check className="h-3.5 w-3.5 text-emerald-400" />
-                        ) : (
-                          <Share2 className="h-3.5 w-3.5 text-mist-2 hover:text-white" />
-                        )}
-                      </button>
+                      isSelectedToKeep ? (
+                        <>
+                          <a
+                            href={c.exportUrl || c.videoUrl || '#'}
+                            download={`${(c.title || 'clip').replace(/[^a-zA-Z0-9_\u0600-\u06FF-]/g, '_')}.mp4`}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="btn-lux btn-gold !py-1.5 !px-3 !text-xs !font-bold flex items-center gap-1.5 shadow-[0_0_15px_rgba(212,175,55,0.3)]"
+                            title="تنزيل الفيديو بدقة عالية"
+                          >
+                            <Download className="h-3.5 w-3.5" />
+                            <span>تنزيل</span>
+                          </a>
+                          <button
+                            type="button"
+                            onClick={() => copyVideoLink(c)}
+                            className="btn-lux btn-outline !py-1.5 !px-2.5 !text-xs"
+                            title="Copy direct video stream link"
+                          >
+                            {copiedId === `link-${c.id}` ? (
+                              <Check className="h-3.5 w-3.5 text-emerald-400" />
+                            ) : (
+                              <Share2 className="h-3.5 w-3.5 text-mist-2 hover:text-white" />
+                            )}
+                          </button>
+                        </>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            toggleSelectClip(c.id)
+                            alert('تم تحديد المقطع للحفظ وتأكيد اختياره — أصبح زر التنزيل متاحاً لك الآن!')
+                          }}
+                          className="btn-lux btn-outline !py-1.5 !px-2.5 !text-xs !font-medium flex items-center gap-1.5 text-mist hover:text-white border-hair/60"
+                          title="يجب تحديد المقطع للحفظ وتأكيد اختياره قبل التنزيل"
+                        >
+                          <Download className="h-3.5 w-3.5 text-gold/60" />
+                          <span>تنزيل (اختر للحفظ)</span>
+                        </button>
+                      )
                     )}
 
                     <button
@@ -1321,6 +1350,35 @@ export default function ProjectDetail({ projectId }: { projectId: string }) {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Comprehensive Studio Video Editor Modal */}
+      {studioEditorClip && (
+        <StudioVideoEditor
+          isOpen={Boolean(studioEditorClip)}
+          onClose={() => setStudioEditorClip(null)}
+          clip={studioEditorClip}
+          projectDuration={project.duration}
+          onSave={async (clipId, params) => {
+            const res = await fetch(`/api/projects/${projectId}/clips/${clipId}/adjust`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(params),
+            })
+            const data = await res.json()
+            if (!res.ok) {
+              throw new Error(data.error || 'Failed to adjust clip')
+            }
+            setProject((cur) => {
+              if (!cur) return cur
+              return {
+                ...cur,
+                clips: cur.clips.map((c) => (c.id === clipId ? { ...c, status: 'GENERATING' } : c)),
+              }
+            })
+            load()
+          }}
+        />
       )}
     </div>
   )

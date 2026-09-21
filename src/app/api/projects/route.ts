@@ -89,13 +89,15 @@ export async function POST(request: Request) {
     const startOfDay = new Date()
     startOfDay.setHours(0, 0, 0, 0)
 
+    const isAdmin = user.role === 'ADMIN'
+
     // Exactly 1 credit per video generation operation (flat per-video pricing model).
     const minCredits = 1
     const todaysCount = plan
       ? await prisma.project.count({ where: { userId: session.user.id, createdAt: { gte: startOfDay } } })
       : 0
 
-    if (user.credits < minCredits) {
+    if (!isAdmin && user.credits < minCredits) {
       return NextResponse.json(
         { error: 'Insufficient credits', required: minCredits, available: user.credits },
         { status: 402 }
@@ -103,7 +105,7 @@ export async function POST(request: Request) {
     }
 
     // Per-plan daily cap — keeps one account from monopolising the worker.
-    if (plan && todaysCount >= plan.maxDailyVideos) {
+    if (!isAdmin && plan && todaysCount >= plan.maxDailyVideos) {
       return NextResponse.json(
         { error: 'Daily project limit reached', limit: plan.maxDailyVideos },
         { status: 429 }
@@ -117,31 +119,32 @@ export async function POST(request: Request) {
         : (d.fileName ?? 'Uploaded project'))
 
     // Atomic credit reservation: hold minCredits upfront so concurrent requests
-    // cannot overdraft the balance. The worker deducts any remaining balance
-    // upon completion or refunds minCredits if the job fails.
+    // cannot overdraft the balance. Admins bypass credit deduction.
     const project = await prisma.$transaction(async (tx) => {
       const u = await tx.user.findUnique({
         where: { id: session.user.id },
         select: { credits: true },
       })
-      if (!u || u.credits < minCredits) {
+      if (!isAdmin && (!u || u.credits < minCredits)) {
         throw new Error('INSUFFICIENT_CREDITS')
       }
 
-      await tx.user.update({
-        where: { id: session.user.id },
-        data: { credits: { decrement: minCredits } },
-      })
+      if (!isAdmin) {
+        await tx.user.update({
+          where: { id: session.user.id },
+          data: { credits: { decrement: minCredits } },
+        })
 
-      await tx.creditTransaction.create({
-        data: {
-          userId: session.user.id,
-          amount: -minCredits,
-          type: 'usage',
-          description: `Credit reservation for "${title.slice(0, 60)}"`,
-          metadata: { minCreditsReserved: minCredits },
-        },
-      })
+        await tx.creditTransaction.create({
+          data: {
+            userId: session.user.id,
+            amount: -minCredits,
+            type: 'usage',
+            description: `Credit reservation for "${title.slice(0, 60)}"`,
+            metadata: { minCreditsReserved: minCredits },
+          },
+        })
+      }
 
       const p = await tx.project.create({
         data: {

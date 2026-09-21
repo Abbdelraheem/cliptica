@@ -37,7 +37,14 @@ export async function GET() {
       return NextResponse.json({ error: 'User not found' }, { status: 404 })
     }
 
-    return NextResponse.json({ user })
+    const isAdmin = user.role === 'ADMIN'
+    const payload = {
+      ...user,
+      credits: isAdmin ? 999999 : user.credits,
+      canCreateCampaigns: isAdmin || Boolean(user.canCreateCampaigns),
+    }
+
+    return NextResponse.json({ user: payload })
   } catch (error) {
     console.error('Me fetch error:', error)
     return NextResponse.json({ error: 'Failed to fetch user' }, { status: 500 })

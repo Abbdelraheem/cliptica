@@ -234,13 +234,13 @@ async function download(url, dir) {
 
   const out = path.join(dir, 'source.%(ext)s')
 
-  const attempt = (proxy) =>
+  const attempt = (proxy, timeoutMs = 1000 * 60 * 3) =>
     sh(
       '/opt/nology-venv/bin/yt-dlp',
       ytdlpArgs([
         ...(proxy ? ['--proxy', proxy] : []),
         '--socket-timeout',
-        proxy ? '10' : '15',
+        proxy ? '10' : '12',
         '--retries',
         '1',
         '--fragment-retries',
@@ -248,7 +248,7 @@ async function download(url, dir) {
         '-N',
         '8',
         '-f',
-        'bv*[height<=1080]+ba/b[height<=1080]/b',
+        'bv*[height<=1080][ext=mp4]+ba[ext=m4a]/bv*[height<=1080]+ba/b[height<=1080]/bv*[height<=720]+ba/b',
         '--merge-output-format',
         'mp4',
         '--max-filesize',
@@ -259,14 +259,14 @@ async function download(url, dir) {
         out,
         url,
       ]),
-      { timeout: 1000 * 60 * 5 }
+      { timeout: timeoutMs }
     )
 
-  // Direct first — most stable when YouTube isn't flagging the IP.
+  // Direct first with fast 35s timeout — if YouTube throttles, immediately rotate to proxies.
   let directErr = null
   const t0 = Date.now()
   try {
-    await attempt(null)
+    await attempt(null, 35000)
     const sourceFile = await findFile(dir, /^source\./)
     const dur = Date.now() - t0
     console.log(`[worker:download] proxy=direct duration_ms=${dur} outcome=success`)
@@ -278,7 +278,7 @@ async function download(url, dir) {
     console.warn(
       `[worker:download] proxy=direct duration_ms=${dur} outcome=failure error_type=${errType} error="${e.message
         .split('\n')[0]
-        .slice(0, 100)}" — trying proxies`
+        .slice(0, 100)}" — switching immediately to proxy pool`
     )
   }
 
@@ -758,7 +758,7 @@ async function faceTrack(src, moment, dir, idx) {
   const outJson = path.join(dir, `faces${idx}.json`)
   try {
     await sh(PYTHON_BIN, [FACES_SCRIPT, 'track', src, String(moment.start), String(moment.end), outJson], {
-      timeout: 1000 * 60 * 10,
+      timeout: 35_000,
       env: { ...process.env, FACE_FPS: CFG.faceFps, OUT_W: String(CFG.outW), OUT_H: String(CFG.outH) },
     })
     const data = JSON.parse(await readFile(outJson, 'utf8'))
@@ -828,6 +828,15 @@ async function renderClip(src, moment, dir, idx, transcript, mode = 'smart', cap
 
   let vfCore
   switch (mode) {
+    case 'gaming':
+    case 'gaming_split':
+    case 'facecam_top': {
+      // 9:16 Gaming Vertical Split: Top 35% Facecam/Presenter, Bottom 65% Gameplay
+      const topH = Math.round(H * 0.35)
+      const botH = H - topH
+      vfCore = `split[gcam][gplay];[gcam]crop=iw/3:ih/2:0:0,scale=${W}:${topH}:force_original_aspect_ratio=increase,crop=${W}:${topH}[facecam];[gplay]crop=iw:ih:0:0,scale=${W}:${botH}:force_original_aspect_ratio=increase,crop=${W}:${botH}[gameplay];[facecam][gameplay]vstack`
+      break
+    }
     case 'split':
     case 'podcast_split': {
       const halfH = Math.round(H / 2)
@@ -914,11 +923,12 @@ async function probeSize(file) {
   return srcProbeCache
 }
 
-/** Render all clips with bounded parallelism. */
-async function renderAll(src, moments, dir, transcript, framing = 'smart', captionStyle = 'hormozi', aspectRatio = '9:16', watermark = false) {
+/** Render all clips with bounded parallelism and per-clip progress reporting. */
+async function renderAll(src, moments, dir, transcript, framing = 'smart', captionStyle = 'hormozi', aspectRatio = '9:16', watermark = false, onProgress = null) {
   const VARIETY = ['face', 'blur', 'center']
   const results = new Array(moments.length)
   let next = 0
+  let doneCount = 0
   async function lane() {
     for (;;) {
       const i = next++
@@ -926,6 +936,10 @@ async function renderAll(src, moments, dir, transcript, framing = 'smart', capti
       const mode = framing === 'variety' ? VARIETY[i % VARIETY.length] : framing
       console.log(`[worker] rendering clip ${i + 1}/${moments.length} [${mode}, style=${captionStyle}, ratio=${aspectRatio}, watermark=${watermark}]`)
       results[i] = await renderClip(src, moments[i], dir, i, transcript, mode, captionStyle, aspectRatio, watermark)
+      doneCount++
+      if (typeof onProgress === 'function') {
+        await onProgress(doneCount, moments.length).catch(() => {})
+      }
     }
   }
   await Promise.all(Array.from({ length: Math.min(CFG.renderParallel, moments.length) }, lane))
@@ -1151,8 +1165,21 @@ async function processJob(job) {
     const aspectRatio = project.aspectRatio ?? '9:16'
     const applyWatermark = !owner?.role || owner.role === 'FREE' || owner.role === 'USER'
     console.log(`[worker] rendering ${moments.length} clips (premium=${CFG.premium}, framing=${project.framing}, style=${captionStyle}, ratio=${aspectRatio}, watermark=${applyWatermark})`)
-    await setP(58, 'Reframing vertical layout & rendering karaoke captions...')
-    const files = await renderAll(src, moments, dir, transcript, project.framing ?? 'smart', captionStyle, aspectRatio, applyWatermark)
+    await setP(58, `Reframing vertical layout & rendering clip 1 of ${moments.length}...`)
+    const files = await renderAll(
+      src,
+      moments,
+      dir,
+      transcript,
+      project.framing ?? 'smart',
+      captionStyle,
+      aspectRatio,
+      applyWatermark,
+      async (done, total) => {
+        const pct = Math.min(88, 58 + Math.round((done / total) * 30))
+        await setP(pct, `Rendered clip ${done} of ${total} (vertical framing & karaoke captions)...`)
+      }
+    )
 
     for (let i = 0; i < moments.length; i++) {
       const m = moments[i]
@@ -1189,7 +1216,7 @@ async function processJob(job) {
           motionGraphics: { cropMode: files[i].cropMode },
         },
       })
-      await setP(62 + Math.round(((i + 1) / moments.length) * 36), `Uploading clip ${i + 1} of ${moments.length} to Cloudflare R2...`)
+      await setP(88 + Math.round(((i + 1) / moments.length) * 11), `Uploading clip ${i + 1} of ${moments.length} to Cloudflare R2...`)
     }
 
     await prisma.project.update({ where: { id: project.id }, data: { status: 'COMPLETED' } })
@@ -1202,8 +1229,13 @@ async function processJob(job) {
     const diff = creditsSpent - alreadyPaid
 
     await prisma.$transaction(async (tx) => {
+      const owner = await tx.user.findUnique({ where: { id: project.userId }, select: { credits: true, role: true } })
+      if (owner?.role === 'ADMIN') {
+        // Admin accounts have infinite credits — bypass billing
+        return
+      }
+
       if (diff > 0) {
-        const owner = await tx.user.findUnique({ where: { id: project.userId }, select: { credits: true } })
         const charged = Math.max(0, Math.min(diff, owner?.credits ?? 0))
         if (charged > 0) {
           await tx.user.update({ where: { id: project.userId }, data: { credits: { decrement: charged } } })
@@ -1351,12 +1383,18 @@ async function checkAutoPilotChannels() {
           select: { credits: true, role: true },
         })
 
-        if (!owner || owner.credits < 1) {
+        if (!owner || (owner.role !== 'STUDIO' && owner.role !== 'ADMIN')) {
+          console.log(`[autopilot] user ${ch.userId} role "${owner?.role}" is not Studio/Admin — pausing channel`)
+          await prisma.autoPilotChannel.update({ where: { id: ch.id }, data: { isActive: false } })
+          continue
+        }
+
+        if (owner.role !== 'ADMIN' && owner.credits < 1) {
           console.log(`[autopilot] user ${ch.userId} has insufficient credits (${owner?.credits ?? 0})`)
           continue
         }
 
-        // Daily AutoPilot project circuit breaker
+        // Daily AutoPilot project circuit breaker (bypassed for Admin)
         const maxDaily = parseInt(process.env.AUTOPILOT_MAX_DAILY_PROJECTS || '10', 10)
         const startOfDay = new Date()
         startOfDay.setHours(0, 0, 0, 0)
@@ -1368,7 +1406,7 @@ async function checkAutoPilotChannels() {
           },
         })
 
-        if (todaysCount >= maxDaily) {
+        if (owner.role !== 'ADMIN' && todaysCount >= maxDaily) {
           console.log(`[autopilot] user ${ch.userId} reached daily limit (${todaysCount}/${maxDaily}) — skipping`)
           continue
         }
@@ -1376,7 +1414,7 @@ async function checkAutoPilotChannels() {
         // Fast duration probe to avoid downloading out-of-plan long videos
         const videoUrl = `https://www.youtube.com/watch?v=${videoId}`
         const durSec = await probeUrlDuration(videoUrl)
-        if (durSec && exceedsPlanMinutes(durSec / 60, owner.role)) {
+        if (durSec && owner.role !== 'ADMIN' && exceedsPlanMinutes(durSec / 60, owner.role)) {
           const maxMin = planMaxMinutes(owner.role)
           console.log(
             `[autopilot] video ${videoId} is ~${Math.round(durSec / 60)} min, exceeding ${maxMin} min plan limit for ${owner.role || 'FREE'} — skipping`
@@ -1389,18 +1427,20 @@ async function checkAutoPilotChannels() {
         }
 
         await prisma.$transaction(async (tx) => {
-          await tx.user.update({
-            where: { id: ch.userId },
-            data: { credits: { decrement: 1 } },
-          })
-          await tx.creditTransaction.create({
-            data: {
-              userId: ch.userId,
-              amount: -1,
-              type: 'usage',
-              description: `Auto-Pilot: "${(videoTitle || 'New Video').slice(0, 60)}"`,
-            },
-          })
+          if (owner.role !== 'ADMIN') {
+            await tx.user.update({
+              where: { id: ch.userId },
+              data: { credits: { decrement: 1 } },
+            })
+            await tx.creditTransaction.create({
+              data: {
+                userId: ch.userId,
+                amount: -1,
+                type: 'usage',
+                description: `Auto-Pilot: "${(videoTitle || 'New Video').slice(0, 60)}"`,
+              },
+            })
+          }
           const p = await tx.project.create({
             data: {
               userId: ch.userId,
@@ -1412,7 +1452,7 @@ async function checkAutoPilotChannels() {
               captionStyle: ch.captionStyle || 'arabic_luxury',
               aspectRatio: ch.aspectRatio || '9:16',
               status: 'PENDING',
-              creditsUsed: 1,
+              creditsUsed: owner.role === 'ADMIN' ? 0 : 1,
             },
           })
           await tx.processingJob.create({

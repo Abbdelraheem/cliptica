@@ -1,8 +1,9 @@
 'use client'
 
 import { useState } from 'react'
+import Link from 'next/link'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Megaphone, Plus, TrendingUp, Eye, DollarSign, Loader2, AlertTriangle } from 'lucide-react'
+import { Megaphone, Plus, TrendingUp, Eye, DollarSign, Loader2, AlertTriangle, Sparkles } from 'lucide-react'
 import { toast } from 'sonner'
 
 type Campaign = {
@@ -28,6 +29,18 @@ function num(v: string | number) {
 export default function CampaignsPage() {
   const queryClient = useQueryClient()
   const [creating, setCreating] = useState(false)
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false)
+
+  const userQuery = useQuery({
+    queryKey: ['me'],
+    queryFn: async () => {
+      const res = await fetch('/api/auth/me')
+      if (!res.ok) return null
+      return res.json() as Promise<{ user: { role: string; canCreateCampaigns?: boolean } }>
+    },
+  })
+  const user = userQuery.data?.user
+  const canCreate = user?.role === 'ADMIN' || user?.role === 'STUDIO' || Boolean(user?.canCreateCampaigns)
 
   const campaignsQuery = useQuery({
     queryKey: ['campaigns'],
@@ -68,7 +81,16 @@ export default function CampaignsPage() {
           <p className="text-xs uppercase tracking-[0.3em] text-champagne">The books</p>
           <h1 className="display-md mt-2.5">Campaigns</h1>
         </div>
-        <button onClick={() => setCreating(true)} className="btn-lux btn-gold !py-3">
+        <button
+          onClick={() => {
+            if (!canCreate) {
+              setShowUpgradeModal(true)
+            } else {
+              setCreating(true)
+            }
+          }}
+          className="btn-lux btn-gold !py-3"
+        >
           <Plus className="h-4 w-4" />
           New campaign
         </button>
@@ -194,6 +216,47 @@ export default function CampaignsPage() {
                 Cancel
               </button>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Studio Tier Upgrade Modal */}
+      {showUpgradeModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 px-6 backdrop-blur-md"
+          role="dialog"
+          aria-modal="true"
+          onClick={() => setShowUpgradeModal(false)}
+        >
+          <div
+            className="w-full max-w-md rounded-3xl border border-gold/40 bg-onyx-2 p-8 shadow-[0_0_50px_rgba(212,175,55,0.15)] text-center"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-gold/15 border border-gold/30 text-gold mb-4 shadow-lg shadow-gold/10">
+              <Megaphone className="h-7 w-7" />
+            </div>
+            <p className="text-xs uppercase tracking-[0.3em] text-champagne font-semibold">Studio Exclusive Feature</p>
+            <h2 className="display-md mt-2 text-2xl font-bold">ميزة استوديو المحتوى (Studio $59)</h2>
+            <p className="mt-3 text-sm font-light text-mist leading-relaxed">
+              إنشاء وإدارة الحملات الإعلانية وتتبع أرباح المشاهدات ومكافآت المحتوى (Whop / ContentRewards) مخصص حصرياً لمشتركي باقة <span className="font-semibold text-pearl">Studio ($59/mo)</span> وحسابات الإدارة.
+            </p>
+
+            <div className="mt-6 space-y-3">
+              <Link
+                href="/dashboard/billing"
+                className="btn-lux btn-gold w-full flex items-center justify-center gap-2 font-bold py-3.5"
+              >
+                <Sparkles className="h-4 w-4" />
+                الترقية لباقة Studio ($59/mo)
+              </Link>
+              <button
+                type="button"
+                onClick={() => setShowUpgradeModal(false)}
+                className="btn-lux btn-ghost w-full text-xs text-mist-2"
+              >
+                إغلاق
+              </button>
+            </div>
           </div>
         </div>
       )}

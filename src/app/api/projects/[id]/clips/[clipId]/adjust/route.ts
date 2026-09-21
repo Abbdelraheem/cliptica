@@ -67,14 +67,15 @@ export async function POST(
       )
     }
 
-    // Credit policy: free within 15 minutes of clip creation, 1 credit thereafter
-    const cost = calcClipAdjustCost(clip.createdAt)
+    // Credit policy: free within 15 minutes of clip creation, 1 credit thereafter (Admin always free)
+    const user = await prisma.user.findUnique({
+      where: { id: session.user.id },
+      select: { credits: true, role: true },
+    })
+    const isAdmin = user?.role === 'ADMIN'
+    const cost = isAdmin ? 0 : calcClipAdjustCost(clip.createdAt)
 
     if (cost > 0) {
-      const user = await prisma.user.findUnique({
-        where: { id: session.user.id },
-        select: { credits: true },
-      })
       if (!user || user.credits < cost) {
         return NextResponse.json(
           {

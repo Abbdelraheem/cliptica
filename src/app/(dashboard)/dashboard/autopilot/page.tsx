@@ -1,9 +1,10 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import Link from 'next/link'
 import {
   Radio, Plus, Trash2, CheckCircle2, AlertCircle, Loader2,
-  ExternalLink, Youtube, Pause, Play
+  ExternalLink, Youtube, Pause, Play, Lock, Sparkles
 } from 'lucide-react'
 
 type AutoPilotChannel = {
@@ -45,6 +46,7 @@ export default function AutoPilotPage() {
   const [channelTitle, setChannelTitle] = useState('')
   const [captionStyle, setCaptionStyle] = useState('arabic_luxury')
   const [framing, setFraming] = useState('smart')
+  const [userRole, setUserRole] = useState<string | null>(null)
 
   const fetchChannels = async () => {
     try {
@@ -63,7 +65,13 @@ export default function AutoPilotPage() {
 
   useEffect(() => {
     fetchChannels()
+    fetch('/api/auth/me')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => setUserRole(d?.user?.role || 'FREE'))
+      .catch(() => setUserRole('FREE'))
   }, [])
+
+  const isStudioOrAdmin = userRole === 'STUDIO' || userRole === 'ADMIN'
 
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -149,16 +157,41 @@ export default function AutoPilotPage() {
         </div>
       </div>
 
-      {/* Add New Channel Form */}
-      <div className="mt-8 rounded-3xl border border-hair/60 bg-onyx-2 p-6 md:p-8 shadow-xl">
-        <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-red-500/10 text-red-400 border border-red-500/20">
-            <Youtube className="h-5 w-5" />
+      {/* Studio Tier Locked Banner if not Studio or Admin */}
+      {userRole !== null && !isStudioOrAdmin ? (
+        <div className="mt-8 rounded-3xl border border-gold/40 bg-gradient-to-b from-onyx-2 via-black/80 to-onyx-2 p-8 shadow-[0_0_50px_rgba(212,175,55,0.12)] text-center relative overflow-hidden">
+          <div className="absolute -right-12 -top-12 h-40 w-40 rounded-full bg-gold/10 blur-3xl pointer-events-none" />
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-gold/15 border border-gold/30 text-gold mb-4 shadow-lg">
+            <Lock className="h-6 w-6 text-gold" />
           </div>
-          <h2 className="font-display text-lg font-bold text-pearl">
-            Add Channel for Automated Monitoring
-          </h2>
+          <span className="inline-block rounded-full bg-gold/10 border border-gold/30 px-3 py-1 text-xs font-semibold uppercase tracking-wider text-champagne">
+            Exclusive Studio Tier Feature ($59/mo)
+          </span>
+          <h2 className="display-md mt-3 text-2xl font-bold">الأوتوبايلوت التلقائي للقنوات</h2>
+          <p className="mt-2 text-sm font-light text-mist max-w-xl mx-auto leading-relaxed">
+            ميزة السحب والتفريغ والمونتاج الآلي مخصصة حصرياً لباقة <span className="font-semibold text-pearl">Studio ($59/mo)</span> وحسابات الإدارة. اربط قنوات يوتيوب وسيقوم الذكاء الاصطناعي بتحويل أي فيديو جديد فور نزوله إلى مقاطع شورتس وريلز جاهزة للنشر دون أي تدخل منك!
+          </p>
+          <div className="mt-6 flex justify-center">
+            <Link
+              href="/dashboard/billing"
+              className="btn-lux btn-gold !py-3 !px-8 text-sm font-bold inline-flex items-center gap-2 shadow-[0_0_25px_rgba(212,175,55,0.3)] hover:scale-105 transition-transform"
+            >
+              <Sparkles className="h-4 w-4" />
+              <span>ترقية الحساب إلى Studio ($59/mo)</span>
+            </Link>
+          </div>
         </div>
+      ) : (
+        /* Add New Channel Form */
+        <div className="mt-8 rounded-3xl border border-hair/60 bg-onyx-2 p-6 md:p-8 shadow-xl">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-red-500/10 text-red-400 border border-red-500/20">
+              <Youtube className="h-5 w-5" />
+            </div>
+            <h2 className="font-display text-lg font-bold text-pearl">
+              Add Channel for Automated Monitoring
+            </h2>
+          </div>
 
         <form onSubmit={handleAdd} className="mt-6 space-y-4">
           <div className="grid gap-4 md:grid-cols-2">
@@ -259,6 +292,7 @@ export default function AutoPilotPage() {
           </div>
         </form>
       </div>
+      )}
 
       {/* Active Watchlist */}
       <div className="mt-12">

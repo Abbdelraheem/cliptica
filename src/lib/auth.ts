@@ -137,26 +137,40 @@ export const authOptions: NextAuthOptions = {
         if (dbUser) {
           token.id = dbUser.id
           token.role = dbUser.role
-          token.credits = dbUser.credits
+          token.credits = dbUser.role === 'ADMIN' ? 999999 : dbUser.credits
           token.name = dbUser.name ?? user.name ?? token.name
-          token.canCreateCampaigns = dbUser.canCreateCampaigns
+          token.canCreateCampaigns = dbUser.role === 'ADMIN' || Boolean(dbUser.canCreateCampaigns)
         }
+      } else if (token.id && (!token.role || token.role === 'ADMIN')) {
+        // Refresh role and credits periodically for active sessions
+        try {
+          const fresh = await prisma.user.findUnique({
+            where: { id: token.id as string },
+            select: { role: true, credits: true, canCreateCampaigns: true },
+          })
+          if (fresh) {
+            token.role = fresh.role
+            token.credits = fresh.role === 'ADMIN' ? 999999 : fresh.credits
+            token.canCreateCampaigns = fresh.role === 'ADMIN' || Boolean(fresh.canCreateCampaigns)
+          }
+        } catch {}
       }
       if (trigger === 'update' && session) {
         const s = session as { credits?: number; role?: string; name?: string; canCreateCampaigns?: boolean }
-        if (s.credits !== undefined) token.credits = s.credits
+        if (s.credits !== undefined) token.credits = token.role === 'ADMIN' ? 999999 : s.credits
         if (s.role !== undefined) token.role = s.role
         if (s.name !== undefined) token.name = s.name
-        if (s.canCreateCampaigns !== undefined) token.canCreateCampaigns = s.canCreateCampaigns
+        if (s.canCreateCampaigns !== undefined) token.canCreateCampaigns = token.role === 'ADMIN' || s.canCreateCampaigns
       }
       return token
     },
     async session({ session, token }) {
       if (session.user) {
+        const isAdmin = token.role === 'ADMIN'
         ;(session.user as { id?: string }).id = token.id as string
-        ;(session.user as { role?: string }).role = token.role as string
-        ;(session.user as { credits?: number }).credits = token.credits as number
-        ;(session.user as { canCreateCampaigns?: boolean }).canCreateCampaigns = Boolean(token.canCreateCampaigns)
+        ;(session.user as { role?: string }).role = (token.role as string) || 'FREE'
+        ;(session.user as { credits?: number }).credits = isAdmin ? 999999 : (token.credits as number) ?? 0
+        ;(session.user as { canCreateCampaigns?: boolean }).canCreateCampaigns = isAdmin || Boolean(token.canCreateCampaigns)
         session.user.name = (token.name as string | null) ?? session.user.name
       }
       return session

@@ -119,13 +119,24 @@ export function DashboardLayout({ children }: { children: ReactNode }) {
         <Link href="/dashboard" className="flex items-center gap-2.5">
           <Wordmark size={26} />
         </Link>
-        <button
-          onClick={() => setMobileOpen((o) => !o)}
-          aria-label="Toggle menu"
-          className="text-pearl"
-        >
-          {mobileOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
-        </button>
+        <div className="flex items-center gap-2">
+          {currentRole === 'ADMIN' && (
+            <Link
+              href="/admin"
+              className="flex items-center gap-1 rounded-lg border border-gold/40 bg-gold/15 px-2.5 py-1 text-xs font-semibold text-gold"
+            >
+              <ShieldCheck className="h-3.5 w-3.5" />
+              <span>Admin</span>
+            </Link>
+          )}
+          <button
+            onClick={() => setMobileOpen((o) => !o)}
+            aria-label="Toggle menu"
+            className="text-pearl"
+          >
+            {mobileOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
+          </button>
+        </div>
       </div>
 
       {/* Sidebar */}
@@ -145,11 +156,11 @@ export function DashboardLayout({ children }: { children: ReactNode }) {
             <Link
               href="/admin"
               onClick={() => setMobileOpen(false)}
-              className="group mb-2 flex items-center gap-3 rounded-xl border border-gold/40 bg-gold/10 px-3 py-2.5 text-sm font-semibold text-gold transition-all duration-200 hover:bg-gold/20"
+              className="group mb-2 flex items-center gap-3 rounded-xl border border-gold/40 bg-gradient-to-r from-gold/20 via-gold/10 to-transparent px-3 py-2.5 text-sm font-semibold text-gold transition-all duration-200 hover:border-gold hover:from-gold/30"
             >
               <ShieldCheck className="h-[18px] w-[18px] text-gold" />
               <span>Admin Panel</span>
-              <span className="ml-auto rounded bg-gold/25 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-gold">
+              <span className="ml-auto rounded bg-gold px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-black">
                 Admin
               </span>
             </Link>
@@ -190,17 +201,21 @@ export function DashboardLayout({ children }: { children: ReactNode }) {
             </div>
             <div className="mt-1 flex items-baseline justify-between">
               <p className="font-display text-2xl font-semibold text-gold">
-                {displayCredits}
+                {currentRole === 'ADMIN' ? '∞' : displayCredits}
               </p>
-              <span className="font-mono text-xs text-mist-2">/ {maxCredits}</span>
+              <span className="font-mono text-xs text-mist-2">
+                {currentRole === 'ADMIN' ? '/ Unlimited' : `/ ${maxCredits}`}
+              </span>
             </div>
             <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-pearl/10">
               <div
                 className="h-full rounded-full bg-gradient-to-r from-gold to-champagne transition-all duration-300"
-                style={{ width: `${creditPercent}%` }}
+                style={{ width: currentRole === 'ADMIN' ? '100%' : `${creditPercent}%` }}
               />
             </div>
-            <p className="mt-2 text-[10px] text-mist-2">1 credit = 1 final video</p>
+            <p className="mt-2 text-[10px] text-mist-2">
+              {currentRole === 'ADMIN' ? 'Unlimited Admin Credits' : '1 credit = 1 final video'}
+            </p>
           </div>
           <button
             onClick={() => signOut({ callbackUrl: '/login' })}

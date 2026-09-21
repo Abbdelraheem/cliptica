@@ -261,6 +261,16 @@ export default function AdminUsersPage() {
                   </span>
                   <button
                     onClick={() => {
+                      setEditing({ user: u, mode: 'role' })
+                      setRoleValue(u.role)
+                    }}
+                    title="تعديل صلاحية ومستوى المستخدم (مستخدم، ستوديو، أدمن)"
+                    className="flex items-center gap-1 rounded-md border border-purple-500/40 bg-purple-500/15 px-1.5 py-0.5 text-[10px] font-medium text-purple-300 transition-colors hover:bg-purple-500/25"
+                  >
+                    الصلاحية
+                  </button>
+                  <button
+                    onClick={() => {
                       setEditing({ user: u, mode: 'plan' })
                       setSelectedPlan(u.role === 'CLIPPER' ? 'STUDIO' : 'CLIPPER')
                       setAddPlanCredits(true)
@@ -407,29 +417,38 @@ export default function AdminUsersPage() {
                 </button>
               </div>
             ) : editing.mode === 'role' ? (
-              <div className="mt-5">
-                <label className="mb-1.5 block text-xs uppercase tracking-widest text-mist-2">Role</label>
-                <div className="grid grid-cols-4 gap-2">
-                  {ROLE_OPTIONS.map((r) => (
+              <div className="mt-5 space-y-4">
+                <p className="text-xs text-mist leading-relaxed">
+                  اختر الصلاحية المناسبة للمستخدم. التغيير يطبق فورياً على مستوى الحساب وميزات المنصة المتاحة.
+                </p>
+                <div className="grid grid-cols-2 gap-2.5">
+                  {[
+                    { id: 'FREE', title: 'Free (مستخدم مجاني)', desc: 'حساب عادي مع رصيد تجريبي فقط، بدون وصول للحملات' },
+                    { id: 'CLIPPER', title: 'Clipper ($29/mo)', desc: 'باقة المبتدئين للمونتاج الفردي 150 مقطع شهرياً' },
+                    { id: 'STUDIO', title: 'Studio ($59/mo)', desc: 'باقة الاستوديو: تفعيل إنشاء الحملات والأوتوبايلوت الكامل' },
+                    { id: 'ADMIN', title: 'Admin (مدير كامل)', desc: 'رصيد لا نهائي (∞) وصلاحية الوصول الكامل للوحة التحكم' },
+                  ].map((r) => (
                     <button
-                      key={r}
-                      onClick={() => setRoleValue(r)}
-                      className={`rounded-xl border px-2 py-2 text-xs font-medium transition-all ${
-                        roleValue === r
-                          ? 'border-gold bg-gold/15 text-gold'
-                          : 'border-hair/50 text-mist hover:border-hair'
+                      key={r.id}
+                      type="button"
+                      onClick={() => setRoleValue(r.id)}
+                      className={`flex flex-col items-start rounded-xl border p-3 text-left transition-all ${
+                        roleValue === r.id
+                          ? 'border-gold bg-gold/15 text-gold ring-1 ring-gold'
+                          : 'border-hair/50 bg-black/20 text-mist hover:border-hair hover:text-pearl'
                       }`}
                     >
-                      {r}
+                      <span className="text-xs font-bold text-pearl">{r.title}</span>
+                      <span className="mt-1 text-[10px] text-mist-2 leading-tight">{r.desc}</span>
                     </button>
                   ))}
                 </div>
                 <button
                   onClick={() => roleMutation.mutate({ id: editing.user.id, role: roleValue })}
                   disabled={roleValue === editing.user.role || roleMutation.isPending}
-                  className="btn-lux btn-gold mt-5 w-full"
+                  className="btn-lux btn-gold mt-4 w-full font-bold"
                 >
-                  {roleMutation.isPending ? 'Saving…' : 'Save role'}
+                  {roleMutation.isPending ? 'جاري الحفظ...' : `حفظ وتعيين كـ ${roleValue}`}
                 </button>
               </div>
             ) : (

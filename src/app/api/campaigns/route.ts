@@ -59,10 +59,10 @@ export async function POST(request: Request) {
       where: { id: session.user.id },
       select: { role: true, canCreateCampaigns: true },
     })
-    const isAllowed = dbUser?.role === 'ADMIN' || Boolean(dbUser?.canCreateCampaigns)
+    const isAllowed = dbUser?.role === 'ADMIN' || dbUser?.role === 'STUDIO' || Boolean(dbUser?.canCreateCampaigns)
     if (!isAllowed) {
       return NextResponse.json(
-        { error: 'Adding campaigns is restricted to administrators and authorized partners only.' },
+        { error: 'إنشاء وتتبع الحملات مخصص فقط لحسابات الاستوديو (Studio $59) والإدارة. يرجى ترقية باقتك إلى Studio للاستفادة من الحملات والأرباح.' },
         { status: 403 }
       )
     }

@@ -424,8 +424,8 @@ export default function NewProjectPage() {
       if (!normalised) return 'Paste a valid video link (e.g. YouTube URL).'
     }
     if (tab === 'campaign') {
-      const targetUrl = selectedAsset || url
-      if (!targetUrl) return 'Analyze the campaign and select a footage asset or paste a source URL.'
+      const targetUrl = selectedAsset || url || campaignUrl.trim()
+      if (!targetUrl) return 'Paste a Whop or ContentReward campaign URL.'
     }
     if (clipFrom && !/^\d{1,2}:\d{2}(:\d{2})?$/.test(clipFrom)) return 'Start time format: mm:ss'
     return null
@@ -437,7 +437,39 @@ export default function NewProjectPage() {
     if (v) return setError(v)
     setError('')
     setSubmitting(true)
-    const targetUrl = tab === 'campaign' ? (selectedAsset || url) : url
+    let targetUrl = tab === 'campaign' ? (selectedAsset || url) : url
+
+    // Zero-click Auto AI Analysis: if campaign URL is given but not yet inspected, resolve footage automatically
+    if (tab === 'campaign' && !targetUrl && campaignUrl.trim()) {
+      try {
+        setAnalyzingCampaign(true)
+        const res = await fetchWithTimeout('/api/campaigns/analyze', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ url: campaignUrl.trim() }),
+        }, 25000)
+        const data = await res.json()
+        if (res.ok && data.success && data.campaign) {
+          setCampaignData(data.campaign)
+          const chosen = data.campaign.primaryAsset?.url || data.campaign.assets?.[0]?.url
+          if (chosen) {
+            targetUrl = chosen
+            setSelectedAsset(chosen)
+            if (!title && data.campaign.title) setTitle(data.campaign.title)
+            if (!instructions && data.campaign.recommendedInstructions) setInstructions(data.campaign.recommendedInstructions)
+            if (data.campaign.recommendedCaptionStyle) setCaptionStyle(data.campaign.recommendedCaptionStyle)
+          }
+        }
+      } catch (err) {
+        console.warn('Auto campaign extraction:', err)
+      } finally {
+        setAnalyzingCampaign(false)
+      }
+      if (!targetUrl) {
+        targetUrl = campaignUrl.trim()
+      }
+    }
+
     try {
       const res = await fetchWithTimeout('/api/projects', {
         method: 'POST',

@@ -24,6 +24,17 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  const dbUser = await prisma.user.findUnique({
+    where: { id: session.user.id },
+    select: { role: true },
+  })
+  if (dbUser?.role !== 'ADMIN' && dbUser?.role !== 'STUDIO') {
+    return NextResponse.json(
+      { error: 'Auto-Pilot Autonomous Ingestion is an exclusive feature for Studio ($59/mo) and Admin accounts. Please upgrade to Studio to activate Auto-Pilot.' },
+      { status: 403 }
+    )
+  }
+
   try {
     const body = await request.json()
     let rawUrl = cleanUrlString(body.channelUrl)
