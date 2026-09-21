@@ -88,6 +88,7 @@ model User {
   referredByAffiliateId   String?
   referredByAffiliate     Affiliate? @relation("UserReferral", fields: [referredByAffiliateId], references: [id], onDelete: SetNull)
   referredAt              DateTime?
+  checkoutSessions        CheckoutSession[]
 
   @@index([stripeCustomerId])
   @@index([stripeSubscriptionId])
@@ -468,5 +469,36 @@ model AutoPilotChannel {
 
   @@index([userId])
   @@index([isActive])
+}
+
+enum CheckoutStatus {
+  INITIATED
+  ABANDONED
+  COMPLETED
+}
+
+model CheckoutSession {
+  id            String         @id @default(cuid())
+  userId        String
+  userEmail     String
+  userName      String?
+  itemType      String         // "PLAN" or "CREDIT_PACK"
+  itemId        String         // "basic", "starter", "pro", "pack_50", etc.
+  itemName      String         // "Starter Plan ($29/mo)", etc.
+  amount        Decimal?       @db.Decimal(10, 2)
+  currency      String         @default("USD")
+  paddlePriceId String?
+  paddleTxId    String?
+  status        CheckoutStatus @default(INITIATED)
+  notes         String?        @db.Text
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  completedAt   DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, status])
+  @@index([status, createdAt])
+  @@index([userEmail])
 }
 

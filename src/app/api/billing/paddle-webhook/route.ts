@@ -14,7 +14,7 @@ const webhookSecret = process.env.PADDLE_NOTIFICATION_WEBHOOK_SECRET || ''
 
 type Tx = Pick<
   PrismaClient,
-  'user' | 'creditTransaction' | 'processedWebhookEvent' | 'referralConversion'
+  'user' | 'creditTransaction' | 'processedWebhookEvent' | 'referralConversion' | 'checkoutSession'
 >
 
 interface PaddleCustomData {
@@ -164,6 +164,20 @@ async function handleSubscriptionUpdated(tx: Tx, subscription: PaddleSubscriptio
       role,
     },
   })
+
+  // Mark pending checkout session as completed
+  try {
+    const latestSession = await tx.checkoutSession.findFirst({
+      where: { userId: user.id, status: { in: ['INITIATED', 'ABANDONED'] } },
+      orderBy: { createdAt: 'desc' },
+    })
+    if (latestSession) {
+      await tx.checkoutSession.update({
+        where: { id: latestSession.id },
+        data: { status: 'COMPLETED', completedAt: new Date(), paddleTxId: subscription.id },
+      })
+    }
+  } catch {}
 }
 
 async function handleSubscriptionCanceled(tx: Tx, subscription: PaddleSubscriptionData) {
@@ -252,4 +266,18 @@ async function handleTransactionCompleted(tx: Tx, transaction: PaddleTransaction
       }
     }
   }
+
+  // Mark pending checkout session as completed
+  try {
+    const latestSession = await tx.checkoutSession.findFirst({
+      where: { userId: user.id, status: { in: ['INITIATED', 'ABANDONED'] } },
+      orderBy: { createdAt: 'desc' },
+    })
+    if (latestSession) {
+      await tx.checkoutSession.update({
+        where: { id: latestSession.id },
+        data: { status: 'COMPLETED', completedAt: new Date(), paddleTxId: transaction.id },
+      })
+    }
+  } catch {}
 }

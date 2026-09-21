@@ -1,11 +1,25 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
 import { useSession } from 'next-auth/react'
 import { useSearchParams } from 'next/navigation'
 import { initializePaddle, type Paddle } from '@paddle/paddle-js'
-import { Check, Zap, ShieldCheck, Gift, Copy, CheckCircle2, Users } from 'lucide-react'
+import {
+  Check,
+  Zap,
+  ShieldCheck,
+  Gift,
+  Copy,
+  CheckCircle2,
+  Users,
+  X,
+  Lock,
+  ExternalLink,
+  Loader2,
+  Sparkles,
+} from 'lucide-react'
+import { Wordmark, ClipticaMark } from '@/components/logo'
 
 const PLANS = [
   {
@@ -92,6 +106,17 @@ const CREDIT_PACKS = [
   },
 ]
 
+interface ActiveCheckoutState {
+  itemType: 'plan' | 'pack'
+  itemId: string
+  itemName: string
+  price: string
+  credits: string
+  features: string[]
+  priceId: string
+  sessionId?: string | null
+}
+
 export default function BillingPage() {
   const { data: session } = useSession()
   const [loading, setLoading] = useState<string | null>(null)
@@ -106,6 +131,10 @@ export default function BillingPage() {
     earnedCredits: number
   } | null>(null)
   const [copiedRef, setCopiedRef] = useState(false)
+
+  // Embedded Inline Checkout State
+  const [activeCheckout, setActiveCheckout] = useState<ActiveCheckoutState | null>(null)
+  const [isCheckoutLoading, setIsCheckoutLoading] = useState(false)
 
   useEffect(() => {
     let cancelled = false
@@ -137,28 +166,47 @@ export default function BillingPage() {
     }
   }, [])
 
+  const handlePaddleEvent = useCallback((event: any) => {
+    if (!event?.name) return
+    console.log('[Paddle Event]', event.name, event.data)
+
+    if (event.name === 'checkout.loaded') {
+      setIsCheckoutLoading(false)
+    }
+
+    if (event.name === 'checkout.completed') {
+      if (activeCheckout?.sessionId) {
+        fetch('/api/billing/track-checkout', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'completed',
+            checkoutSessionId: activeCheckout.sessionId,
+            paddleTxId: event.data?.transaction_id || event.data?.id,
+          }),
+        }).catch(() => {})
+      }
+      window.location.href = '/dashboard/billing?success=paddle'
+    }
+
+    if (
+      event.name === 'checkout.error' ||
+      event.name === 'checkout.failed' ||
+      event.name === 'checkout.payment.error'
+    ) {
+      console.error('[Paddle Checkout Error]', event)
+      setIsCheckoutLoading(false)
+    }
+  }, [activeCheckout?.sessionId])
+
   useEffect(() => {
     const token = process.env.NEXT_PUBLIC_PADDLE_CLIENT_TOKEN
     const env = (process.env.NEXT_PUBLIC_PADDLE_ENV || 'sandbox') as 'sandbox' | 'production'
-    if (token) {
+    if (token && !paddle) {
       initializePaddle({
         token,
         environment: env,
-        eventCallback: (event) => {
-          if (event.name) {
-            console.log('[Paddle Event]', event.name, event.data)
-          }
-          if (
-            event.name === 'checkout.error' ||
-            event.name === 'checkout.failed' ||
-            event.name === 'checkout.payment.error'
-          ) {
-            console.error('[Paddle Checkout Error]', event)
-          }
-          if (event.name === 'checkout.completed') {
-            window.location.href = '/dashboard/billing?success=paddle'
-          }
-        },
+        eventCallback: handlePaddleEvent,
       })
         .then((p) => {
           if (p) setPaddle(p)
@@ -167,7 +215,56 @@ export default function BillingPage() {
           console.warn('[Paddle] Client initialization skipped or failed:', err)
         })
     }
-  }, [])
+  }, [handlePaddleEvent, paddle])
+
+  // Open inline checkout frame whenever activeCheckout is set
+  useEffect(() => {
+    if (!activeCheckout || !paddle) return
+
+    setIsCheckoutLoading(true)
+
+    const timer = setTimeout(() => {
+      try {
+        paddle.Checkout.open({
+          items: [{ priceId: activeCheckout.priceId, quantity: 1 }],
+          customer: session?.user?.email ? { email: session.user.email } : undefined,
+          customData: {
+            userId: session?.user?.id,
+            checkoutSessionId: activeCheckout.sessionId,
+          },
+          settings: {
+            variant: 'one-page',
+            theme: 'dark',
+            displayMode: 'inline',
+            frameTarget: 'paddle-checkout-frame',
+            frameInitialHeight: 480,
+            frameStyle: 'width: 100%; min-height: 480px; background-color: transparent; border: none',
+            successUrl: `${window.location.origin}/dashboard/billing?success=${activeCheckout.itemType}`,
+          },
+        })
+      } catch (err) {
+        console.error('[Paddle inline open error]', err)
+        setIsCheckoutLoading(false)
+      }
+    }, 120)
+
+    return () => clearTimeout(timer)
+  }, [activeCheckout, paddle, session?.user])
+
+  function handleCloseCheckout() {
+    if (activeCheckout?.sessionId) {
+      fetch('/api/billing/track-checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'abandoned',
+          checkoutSessionId: activeCheckout.sessionId,
+        }),
+      }).catch(() => {})
+    }
+    setActiveCheckout(null)
+    setIsCheckoutLoading(false)
+  }
 
   const displayCredits = liveCredits ?? session?.user?.credits ?? 0
   const userRole = (session?.user?.role ?? 'FREE').toUpperCase()
@@ -177,9 +274,9 @@ export default function BillingPage() {
   const isSuccessPack = searchParams.get('success') === 'pack' || searchParams.get('success') === 'whop_pack'
   const addedCredits = searchParams.get('credits')
 
-  async function upgrade(planKey: string) {
+  async function startCheckout(type: 'plan' | 'pack', id: string) {
     setError('')
-    setLoading(planKey)
+    setLoading(id)
 
     try {
       let p = paddle
@@ -189,6 +286,7 @@ export default function BillingPage() {
             (await initializePaddle({
               token: process.env.NEXT_PUBLIC_PADDLE_CLIENT_TOKEN,
               environment: (process.env.NEXT_PUBLIC_PADDLE_ENV || 'production') as 'sandbox' | 'production',
+              eventCallback: handlePaddleEvent,
             })) || null
           if (p) setPaddle(p)
         } catch (initErr) {
@@ -199,99 +297,66 @@ export default function BillingPage() {
       const res = await fetch('/api/billing/paddle-checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ plan: planKey }),
+        body: JSON.stringify(type === 'plan' ? { plan: id } : { packId: id }),
       })
 
       const data = await res.json().catch(() => ({}))
 
       if (!res.ok || !data.priceId) {
-        setError(data.error || 'Unable to load plan checkout. Please try again.')
+        setError(data.error || 'Unable to load checkout. Please try again.')
         setLoading(null)
         return
       }
 
-      if (p) {
-        p.Checkout.open({
-          items: [{ priceId: data.priceId, quantity: 1 }],
-          customer: data.email ? { email: data.email } : undefined,
-          customData: { userId: data.userId },
-          settings: {
-            variant: 'one-page',
-            theme: 'dark',
-            displayMode: 'overlay',
-            successUrl: `${window.location.origin}/dashboard/billing?success=plan`,
-          },
+      // Track checkout initiation for admin recovery / retargeting
+      const trackRes = await fetch('/api/billing/track-checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'initiated',
+          ...(type === 'plan' ? { plan: id } : { packId: id }),
+        }),
+      })
+        .then((r) => (r.ok ? r.json() : null))
+        .catch(() => null)
+
+      const sessionId = trackRes?.checkoutSessionId || null
+
+      if (type === 'plan') {
+        const planDef = PLANS.find((pl) => pl.key === id) || PLANS[1]
+        setActiveCheckout({
+          itemType: 'plan',
+          itemId: id,
+          itemName: `${planDef.name} Plan`,
+          price: `${planDef.price} / month`,
+          credits: planDef.credits,
+          features: planDef.items,
+          priceId: data.priceId,
+          sessionId,
         })
-        setLoading(null)
-        return
       } else {
-        setError('Unable to open checkout overlay. Please disable ad-blockers and try again.')
-        setLoading(null)
-        return
+        const packDef = CREDIT_PACKS.find((pk) => pk.id === id) || CREDIT_PACKS[0]
+        setActiveCheckout({
+          itemType: 'pack',
+          itemId: id,
+          itemName: `${packDef.name} Pack`,
+          price: packDef.price,
+          credits: `${packDef.credits} Credits (Never Expire)`,
+          features: [
+            `${packDef.credits} Credits instantly added to balance`,
+            'No monthly recurring fees',
+            'Full 1080p high-bitrate export quality',
+            'All 18 subtitle presets & Arabic Luxury',
+          ],
+          priceId: data.priceId,
+          sessionId,
+        })
       }
-    } catch (err: unknown) {
-      console.error('Upgrade error:', err)
-      setError('An unexpected error occurred while starting checkout. Please try again.')
+
       setLoading(null)
-    }
-  }
-
-  async function buyPack(packId: string) {
-    setError('')
-    setLoading(packId)
-
-    try {
-      const selected = CREDIT_PACKS.find((p) => p.id === packId)
-      let p = paddle
-      if (!p && process.env.NEXT_PUBLIC_PADDLE_CLIENT_TOKEN) {
-        try {
-          p =
-            (await initializePaddle({
-              token: process.env.NEXT_PUBLIC_PADDLE_CLIENT_TOKEN,
-              environment: (process.env.NEXT_PUBLIC_PADDLE_ENV || 'production') as 'sandbox' | 'production',
-            })) || null
-          if (p) setPaddle(p)
-        } catch (initErr) {
-          console.warn('[Paddle] Re-init error:', initErr)
-        }
-      }
-
-      const res = await fetch('/api/billing/paddle-checkout', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ packId }),
-      })
-
-      const data = await res.json().catch(() => ({}))
-
-      if (!res.ok || !data.priceId) {
-        setError(data.error || 'Unable to load credit pack checkout. Please try again.')
-        setLoading(null)
-        return
-      }
-
-      if (p) {
-        p.Checkout.open({
-          items: [{ priceId: data.priceId, quantity: 1 }],
-          customer: data.email ? { email: data.email } : undefined,
-          customData: { userId: data.userId },
-          settings: {
-            variant: 'one-page',
-            theme: 'dark',
-            displayMode: 'overlay',
-            successUrl: `${window.location.origin}/dashboard/billing?success=pack&credits=${selected?.credits ?? ''}`,
-          },
-        })
-        setLoading(null)
-        return
-      } else {
-        setError('Unable to open checkout overlay. Please disable ad-blockers and try again.')
-        setLoading(null)
-        return
-      }
     } catch (err: unknown) {
-      console.error('Buy pack error:', err)
-      setError('An unexpected error occurred while purchasing credits. Please try again.')
+      console.error('Checkout error:', err)
+      setError('An unexpected error occurred while starting checkout. Please try again.')
       setLoading(null)
     }
   }
@@ -312,6 +377,12 @@ export default function BillingPage() {
         </div>
       )}
 
+      {error && (
+        <div className="mt-6 rounded-xl border border-red-500/40 bg-red-500/10 p-4 text-sm text-red-300">
+          {error}
+        </div>
+      )}
+
       {/* Credits balance */}
       <div className="glass-card mt-8 flex flex-wrap items-center justify-between gap-6 !p-8">
         <div>
@@ -319,20 +390,31 @@ export default function BillingPage() {
           <p className="stat-value mt-1">{displayCredits}</p>
           <div className="mt-3 h-1.5 w-56 overflow-hidden rounded-full bg-pearl/10">
             <div
-              className="h-full rounded-full bg-gradient-to-r from-gold to-champagne transition-all"
-              style={{ width: `${Math.min(100, (displayCredits / 800) * 100)}%` }}
+              className="h-full bg-gradient-to-r from-champagne to-gold transition-all duration-500"
+              style={{ width: `${Math.min(100, (displayCredits / 100) * 100)}%` }}
             />
           </div>
-        </div>
-        <div className="text-right">
-          <p className="max-w-xs text-sm font-light leading-relaxed text-mist">
-            1 credit per full video processed into 3–6 viral clips. Credits never expire on active accounts.
+          <p className="mt-2 text-xs font-light text-mist-2">
+            1 credit = 1 final video clip (candidates are free to preview &amp; trim)
           </p>
-          {(userRole === 'CLIPPER' || userRole === 'STUDIO') && (
+        </div>
+
+        <div className="flex flex-col items-start gap-3 sm:items-end">
+          <div className="flex items-center gap-2">
+            <span className="text-xs uppercase tracking-widest text-mist-2">Current Tier</span>
+            <span className="rounded-full border border-gold/40 bg-gold/10 px-3 py-0.5 text-xs font-semibold text-gold">
+              {userRole}
+            </span>
+          </div>
+          <p className="text-xs font-light text-mist">
+            {userRole === 'FREE'
+              ? 'Upgrade to remove watermark and unlock 1080p exports.'
+              : 'Active subscription with full features unlocked.'}
+          </p>
+          {userRole !== 'FREE' && (
             <Link
               href={hasPaddleCustomer ? '/api/billing/paddle-portal' : '/api/billing/portal'}
-              prefetch={false}
-              className="btn-lux btn-outline mt-3 !py-1.5 !px-3 !text-xs inline-flex"
+              className="btn-lux btn-outline text-xs !py-1.5"
             >
               {hasPaddleCustomer ? 'Paddle Customer Portal' : 'Customer Billing Portal'}
             </Link>
@@ -340,167 +422,136 @@ export default function BillingPage() {
         </div>
       </div>
 
-      {/* Referral Program Card */}
-      <div className="mt-8 rounded-3xl border border-champagne/30 bg-gradient-to-br from-champagne/10 via-onyx-2 to-black p-6 md:p-8 shadow-xl">
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-gold/15 text-gold border border-gold/30">
-              <Gift className="h-5 w-5" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="text-xs uppercase tracking-[0.2em] font-semibold text-champagne">Viral Referral Program</span>
-                <span className="rounded-full bg-gold/20 px-2 py-0.5 text-[10px] font-bold text-gold">+5 Credits / Friend</span>
+      {/* Referral Card */}
+      {referral && (
+        <div className="glass-card mt-6 border-gold/30 bg-gradient-to-r from-gold/10 via-surface to-surface !p-6">
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gold/20 text-gold">
+                <Gift className="h-5 w-5" />
               </div>
-              <h3 className="font-display text-xl font-bold text-pearl mt-0.5">
-                Invite Creators & Earn Free Credits
-              </h3>
+              <div>
+                <p className="text-sm font-semibold text-pearl">Invite Friends, Earn 5 Free Credits Each</p>
+                <p className="text-xs text-mist">
+                  Share your link. When a creator signs up, you both get +5 complimentary credits.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-4">
+              <div className="text-right">
+                <p className="text-xs text-mist">Earned Credits</p>
+                <p className="font-mono text-lg font-bold text-gold">+{referral.earnedCredits}</p>
+              </div>
+              <div className="text-right">
+                <p className="text-xs text-mist">Signups</p>
+                <p className="font-mono text-lg font-bold text-pearl">{referral.signupsCount}</p>
+              </div>
             </div>
           </div>
-          {referral && (
-            <div className="flex items-center gap-4">
-              <div className="rounded-xl border border-hair/50 bg-black/40 px-4 py-2 text-center">
-                <p className="text-[10px] uppercase tracking-wider text-mist">Creators Joined</p>
-                <p className="font-display text-lg font-bold text-pearl flex items-center justify-center gap-1 mt-0.5">
-                  <Users className="h-3.5 w-3.5 text-champagne" />
-                  {referral.signupsCount}
-                </p>
-              </div>
-              <div className="rounded-xl border border-gold/40 bg-gold/10 px-4 py-2 text-center">
-                <p className="text-[10px] uppercase tracking-wider text-gold">Credits Earned</p>
-                <p className="font-display text-lg font-bold text-gold mt-0.5">
-                  +{referral.earnedCredits} Credits
-                </p>
-              </div>
-            </div>
-          )}
-        </div>
 
-        <p className="mt-3 max-w-2xl text-xs sm:text-sm font-light text-mist leading-relaxed">
-          Share your exclusive referral link. Any creator who signs up gets <strong>5 free credits</strong>, and you automatically earn <strong>+5 credits</strong> added instantly to your balance.
-        </p>
-
-        <div className="mt-5 flex flex-col sm:flex-row items-stretch sm:items-center gap-3 max-w-2xl">
-          <input
-            type="text"
-            readOnly
-            value={referral?.referralUrl || 'Loading referral link…'}
-            className="flex-1 rounded-xl border border-hair/60 bg-black/60 px-4 py-2.5 text-xs sm:text-sm font-mono text-pearl focus:outline-none focus:border-champagne/80"
-          />
-          <button
-            type="button"
-            onClick={() => {
-              if (referral?.referralUrl) {
+          <div className="mt-4 flex items-center gap-2 rounded-xl border border-hair/60 bg-onyx-2 p-2">
+            <input
+              type="text"
+              readOnly
+              value={referral.referralUrl}
+              className="flex-1 bg-transparent px-2 font-mono text-xs text-mist-2 focus:outline-none"
+            />
+            <button
+              onClick={() => {
                 navigator.clipboard.writeText(referral.referralUrl)
                 setCopiedRef(true)
-                setTimeout(() => setCopiedRef(false), 2500)
-              }
-            }}
-            disabled={!referral}
-            className="btn-lux btn-gold !py-2.5 !px-5 inline-flex items-center justify-center gap-2 shrink-0 text-xs font-semibold"
-          >
-            {copiedRef ? (
-              <>
-                <CheckCircle2 className="h-4 w-4 text-black" />
-                Copied!
-              </>
-            ) : (
-              <>
-                <Copy className="h-4 w-4 text-black" />
-                Copy Referral Link
-              </>
-            )}
-          </button>
+                setTimeout(() => setCopiedRef(false), 2000)
+              }}
+              className="btn-lux btn-gold flex items-center gap-1.5 !px-3 !py-1.5 text-xs font-semibold"
+            >
+              {copiedRef ? (
+                <>
+                  <CheckCircle2 className="h-3.5 w-3.5" /> Copied!
+                </>
+              ) : (
+                <>
+                  <Copy className="h-3.5 w-3.5" /> Copy Link
+                </>
+              )}
+            </button>
+          </div>
         </div>
-      </div>
-
-      {error && (
-        <p className="mt-6 rounded-lg border border-red-400/30 bg-red-400/10 px-4 py-2.5 text-sm text-red-300">
-          {error}
-        </p>
       )}
 
-      {/* Killer Value Proposition Banner */}
-      <div className="mt-10 rounded-2xl border border-gold/40 bg-gradient-to-r from-gold/15 via-onyx-2 to-gold/10 p-5 shadow-lg backdrop-blur-md">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
-          <div className="rounded-xl bg-gold/20 p-3 text-gold shrink-0">
-            <Zap className="h-6 w-6" />
-          </div>
-          <div className="flex-1">
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="rounded-full bg-gold/25 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-champagne">
-                Fair Pricing Guarantee · ضمان التسعير العادل
-              </span>
-              <h3 className="font-display text-base font-bold text-pearl">
-                1 Credit = 1 Final 1080p Video (Never pay per raw source minute)
-              </h3>
-            </div>
-            <p className="mt-1.5 text-xs sm:text-sm text-mist leading-relaxed">
-              Unlike competitors who burn your credits on raw footage minutes you never use, Clipzila only charges for completed viral clips you actually export. <strong>120 Credits = 120 Ready-to-Post Videos.</strong>
-            </p>
-          </div>
+      {/* Plans grid */}
+      <div className="mt-14">
+        <div className="text-center">
+          <p className="text-xs uppercase tracking-[0.24em] text-champagne">Choose Your Tier</p>
+          <h2 className="display-sm mt-2">Subscription Plans</h2>
+          <p className="mt-2 text-sm font-light text-mist">
+            Cancel or change plans anytime. Powered securely by Paddle, our global Merchant of Record.
+          </p>
         </div>
-      </div>
 
-      {/* Plans */}
-      <div className="mt-12">
-        <h2 className="font-display text-2xl font-semibold">Monthly Subscriptions</h2>
-        <p className="mt-1 text-sm font-light text-mist">
-          Choose a recurring plan for continuous content generation and best monthly value.
-        </p>
-
-        <div className="mt-6 grid gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="mt-10 grid gap-6 md:grid-cols-2 lg:grid-cols-4">
           {PLANS.map((plan) => {
-            const isCurrent = userRole === plan.role || (userRole === 'ADMIN' && plan.role === 'STUDIO')
+            const isCurrent = userRole === plan.role && !(plan.key === 'free' && userRole !== 'FREE')
+            const isFree = plan.key === 'free'
+
             return (
-              <div key={plan.name} className={`price-ring relative ${plan.featured ? 'feat' : ''}`}>
-                {isCurrent && (
-                  <span className="absolute right-5 top-5 rounded-full border border-champagne/40 bg-champagne/10 px-3 py-1 text-[10px] uppercase tracking-widest text-champagne">
-                    Current plan
+              <div
+                key={plan.key}
+                className={`relative flex flex-col justify-between rounded-2xl border p-6 transition-all ${
+                  plan.featured
+                    ? 'border-gold bg-gold/5 shadow-xl shadow-gold/5'
+                    : 'border-hair/50 bg-onyx-2 hover:border-hair'
+                }`}
+              >
+                {plan.featured && (
+                  <span className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full border border-gold bg-gold px-3 py-0.5 text-[10px] font-bold uppercase tracking-wider text-black">
+                    RECOMMENDED
                   </span>
                 )}
-                {plan.featured && !isCurrent && (
-                  <span className="absolute right-5 top-5 rounded-full border border-gold/40 bg-gold/15 px-3 py-1 text-[10px] font-semibold uppercase tracking-widest text-gold">
-                    Most Popular
-                  </span>
-                )}
-                <p className="text-xs uppercase tracking-[0.24em] text-champagne">{plan.name}</p>
-                <p className="mt-3.5 font-display text-4xl font-semibold">
-                  {plan.price}
-                  <small className="ml-1 align-middle font-body text-sm font-light text-mist">{plan.period}</small>
-                </p>
-                <p className="mt-2 text-sm font-medium text-gold">{plan.credits}</p>
-                <ul className="my-6 grid gap-2.5">
-                  {plan.items.map((item) => (
-                    <li key={item} className="flex items-start gap-2.5 text-sm font-light text-mist">
-                      <Check className="mt-0.5 h-4 w-4 shrink-0 text-champagne" />
-                      {item}
-                    </li>
-                  ))}
-                </ul>
-                {isCurrent ? (
-                  plan.role === 'FREE' ? (
-                    <button disabled className="btn-lux btn-outline w-full opacity-50">Current plan</button>
-                  ) : (
-                    <Link
-                      href={hasPaddleCustomer ? '/api/billing/paddle-portal' : '/api/billing/portal'}
-                      prefetch={false}
-                      className="btn-lux btn-outline w-full text-center block"
-                    >
-                      Manage subscription
-                    </Link>
-                  )
+
+                <div>
+                  <div className="flex items-baseline justify-between">
+                    <h3 className="font-display text-lg font-semibold text-pearl">{plan.name}</h3>
+                    {isCurrent && (
+                      <span className="text-[10px] uppercase tracking-wider text-champagne">
+                        Current
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="mt-3 flex items-baseline gap-1">
+                    <span className="font-display text-3xl font-bold text-pearl">{plan.price}</span>
+                    <span className="text-xs text-mist">{plan.period}</span>
+                  </div>
+                  <p className="mt-1 text-xs font-mono text-champagne">{plan.credits}</p>
+
+                  <ul className="mt-6 space-y-2.5 border-t border-hair/50 pt-6 text-xs text-mist">
+                    {plan.items.map((item) => (
+                      <li key={item} className="flex items-start gap-2">
+                        <Check className="h-3.5 w-3.5 shrink-0 text-gold" />
+                        <span>{item}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+
+                {isFree ? (
+                  <div className="mt-8 border-t border-hair/40 pt-4 text-center text-xs font-light text-mist-2">
+                    Default plan on signup
+                  </div>
                 ) : (
-                  <div className="space-y-2.5">
+                  <div className="mt-8 space-y-2 border-t border-hair/40 pt-4">
                     <button
-                      onClick={() => upgrade(plan.key)}
-                      disabled={loading !== null}
-                      className={`btn-lux w-full ${plan.featured ? 'btn-gold' : 'btn-outline'} disabled:opacity-60`}
+                      onClick={() => startCheckout('plan', plan.key)}
+                      disabled={loading !== null || isCurrent}
+                      className={`btn-lux w-full text-xs font-semibold ${
+                        plan.featured ? 'btn-gold' : 'btn-outline'
+                      } disabled:opacity-50`}
                     >
-                      {loading === plan.key ? 'Redirecting…' : `Upgrade to ${plan.name}`}
+                      {loading === plan.key ? 'Loading…' : isCurrent ? 'Active Plan' : `Select ${plan.name}`}
                     </button>
                     <p className="text-center text-[11px] leading-tight text-mist-2">
-                      Secure checkout · Instant activation · Cancel anytime
+                      Instant activation · Cancel anytime
                     </p>
                   </div>
                 )}
@@ -554,13 +605,13 @@ export default function BillingPage() {
               <p className="mt-3 text-xs leading-relaxed text-mist">{pack.desc}</p>
 
               <button
-                onClick={() => buyPack(pack.id)}
+                onClick={() => startCheckout('pack', pack.id)}
                 disabled={loading !== null}
                 className={`btn-lux mt-6 w-full text-xs font-semibold ${
                   pack.popular ? 'btn-gold' : 'btn-outline'
                 } disabled:opacity-50`}
               >
-                {loading === pack.id ? 'Redirecting…' : `Buy ${pack.credits} Credits`}
+                {loading === pack.id ? 'Loading…' : `Buy ${pack.credits} Credits`}
               </button>
             </div>
           ))}
@@ -573,6 +624,108 @@ export default function BillingPage() {
           Contact support
         </a>
       </p>
+
+      {/* ========================================================================= */}
+      {/* LUXURY EMBEDDED INLINE CHECKOUT MODAL */}
+      {/* ========================================================================= */}
+      {activeCheckout && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-onyx/85 backdrop-blur-xl animate-in fade-in duration-200">
+          <div className="relative flex flex-col w-full max-w-5xl max-h-[92vh] overflow-hidden rounded-3xl border border-hair/80 bg-onyx-2 shadow-2xl shadow-black/90">
+            {/* Top Bar */}
+            <div className="flex items-center justify-between border-b border-hair/50 px-6 py-4 bg-surface/30">
+              <div className="flex items-center gap-3">
+                <Wordmark size={24} />
+                <div className="h-4 w-px bg-hair/60" />
+                <div className="flex items-center gap-1.5 text-xs text-mist">
+                  <Lock className="h-3.5 w-3.5 text-emerald-400" />
+                  <span>Encrypted 256-Bit SSL · Merchant of Record: Paddle</span>
+                </div>
+              </div>
+
+              <button
+                onClick={handleCloseCheckout}
+                aria-label="Close checkout"
+                className="rounded-full border border-hair/60 p-1.5 text-mist transition-colors hover:bg-surface hover:text-pearl"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            {/* Split Screen Modal Body */}
+            <div className="grid flex-1 grid-cols-1 overflow-y-auto md:grid-cols-[380px_1fr]">
+              {/* Left Column: Order Summary & Luxury Guarantee */}
+              <div className="flex flex-col justify-between border-b md:border-b-0 md:border-r border-hair/50 bg-gradient-to-b from-surface/40 to-surface/10 p-6 md:p-8">
+                <div>
+                  <span className="rounded-full border border-forge/40 bg-forge/15 px-3 py-0.5 text-[10px] font-bold uppercase tracking-wider text-forge">
+                    {activeCheckout.itemType === 'plan' ? 'Subscription Tier' : 'Credit Top-Up'}
+                  </span>
+
+                  <h3 className="font-display text-2xl font-bold text-pearl mt-3">
+                    {activeCheckout.itemName}
+                  </h3>
+
+                  <div className="mt-2 flex items-baseline gap-2">
+                    <span className="font-display text-3xl font-bold text-gold">
+                      {activeCheckout.price}
+                    </span>
+                  </div>
+
+                  <p className="mt-1 font-mono text-xs text-champagne">
+                    {activeCheckout.credits}
+                  </p>
+
+                  <div className="mt-6 border-t border-hair/50 pt-5">
+                    <p className="text-xs uppercase tracking-widest text-mist-2 font-semibold mb-3">
+                      Included With Your Purchase:
+                    </p>
+                    <ul className="space-y-2.5 text-xs text-mist">
+                      {activeCheckout.features.map((f, i) => (
+                        <li key={i} className="flex items-start gap-2">
+                          <Check className="h-3.5 w-3.5 shrink-0 text-forge mt-0.5" />
+                          <span className="text-pearl/90">{f}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+
+                {/* Trust Badges */}
+                <div className="mt-8 space-y-3 border-t border-hair/50 pt-5 text-[11px] text-mist-2">
+                  <div className="flex items-center gap-2">
+                    <ShieldCheck className="h-4 w-4 text-emerald-400 shrink-0" />
+                    <span>Official Paddle Merchant of Record transaction</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Sparkles className="h-4 w-4 text-gold shrink-0" />
+                    <span>Instant automatic credit and feature activation</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Lock className="h-4 w-4 text-mist shrink-0" />
+                    <span>Taxes and VAT handled automatically by region</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Right Column: Native Embedded Paddle Checkout Frame */}
+              <div className="relative flex flex-col justify-center min-h-[500px] p-4 sm:p-8 bg-onyx-2">
+                {/* Loading state indicator */}
+                {isCheckoutLoading && (
+                  <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 bg-onyx-2/95 backdrop-blur-sm">
+                    <Loader2 className="h-8 w-8 animate-spin text-forge" />
+                    <p className="text-sm font-medium text-pearl">
+                      Connecting securely to Paddle…
+                    </p>
+                    <p className="text-xs text-mist">Preparing your payment gateway</p>
+                  </div>
+                )}
+
+                {/* The Paddle iframe target container */}
+                <div className="paddle-checkout-frame w-full min-h-[480px]" />
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
