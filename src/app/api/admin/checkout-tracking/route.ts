@@ -34,7 +34,7 @@ export async function GET(request: Request) {
     }
 
     // Try-catch wrapped prisma queries in case table is not yet migrated on the current environment
-    let sessions: any[] = []
+    let sessions: Array<Record<string, unknown>> = []
     let totalSessions = 0
     let totalCount = 0
     let abandonedCount = 0

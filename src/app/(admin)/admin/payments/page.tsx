@@ -15,7 +15,6 @@ import {
   Copy,
   Check,
   TrendingDown,
-  ArrowUpRight,
   UserCheck,
   ExternalLink,
 } from 'lucide-react'

@@ -2,9 +2,8 @@
 
 import React, { useRef, useState, useEffect, useCallback } from 'react'
 import {
-  X, Play, Pause, RotateCcw, Scissors, Sparkles, Sliders, Type,
-  Clock, Check, Loader2, Volume2, VolumeX, Eye, ChevronLeft, ChevronRight,
-  Frame, Smartphone, Monitor, Square, Flame
+  X, Play, Pause, Scissors, Sparkles, Sliders, Type,
+  Clock, Check, Loader2, Volume2, VolumeX, Eye, Flame
 } from 'lucide-react'
 
 export type ClipWord = {

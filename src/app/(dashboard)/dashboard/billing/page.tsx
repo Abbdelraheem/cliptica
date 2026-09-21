@@ -12,14 +12,12 @@ import {
   Gift,
   Copy,
   CheckCircle2,
-  Users,
   X,
   Lock,
-  ExternalLink,
   Loader2,
   Sparkles,
 } from 'lucide-react'
-import { Wordmark, ClipticaMark } from '@/components/logo'
+import { Wordmark } from '@/components/logo'
 
 const PLANS = [
   {
@@ -166,7 +164,7 @@ export default function BillingPage() {
     }
   }, [])
 
-  const handlePaddleEvent = useCallback((event: any) => {
+  const handlePaddleEvent = useCallback((event: { name?: string; data?: unknown }) => {
     if (!event?.name) return
     console.log('[Paddle Event]', event.name, event.data)
 
@@ -176,13 +174,14 @@ export default function BillingPage() {
 
     if (event.name === 'checkout.completed') {
       if (activeCheckout?.sessionId) {
+        const eventData = event.data as { transaction_id?: string; id?: string } | undefined
         fetch('/api/billing/track-checkout', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             action: 'completed',
             checkoutSessionId: activeCheckout.sessionId,
-            paddleTxId: event.data?.transaction_id || event.data?.id,
+            paddleTxId: eventData?.transaction_id || eventData?.id,
           }),
         }).catch(() => {})
       }
