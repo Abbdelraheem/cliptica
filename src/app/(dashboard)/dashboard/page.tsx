@@ -42,22 +42,30 @@ async function getJson<T>(url: string): Promise<T> {
 }
 
 export default function DashboardPage() {
-  const { data: session } = useSession()
+  const { data: session, status } = useSession()
   const firstName = session?.user?.name?.split(' ')[0] ?? 'there'
 
   const projectsQuery = useQuery({
     queryKey: ['projects', 'overview'],
     queryFn: () => getJson<{ projects: ProjectSummary[] }>('/api/projects'),
+    enabled: status === 'authenticated',
+    retry: 3,
+    retryDelay: (attempt) => Math.min(1000 * 2 ** attempt, 4000),
+    staleTime: 30_000,
   })
 
   const campaignsQuery = useQuery({
     queryKey: ['campaigns'],
     queryFn: () => getJson<{ campaigns: { isActive: boolean }[] }>('/api/campaigns'),
+    enabled: status === 'authenticated',
+    retry: 3,
+    retryDelay: (attempt) => Math.min(1000 * 2 ** attempt, 4000),
+    staleTime: 30_000,
   })
 
   const projects = projectsQuery.data?.projects ?? []
-  const loading = projectsQuery.isLoading || campaignsQuery.isLoading
-  const error = projectsQuery.error || campaignsQuery.error
+  const loading = status === 'loading' || projectsQuery.isLoading || campaignsQuery.isLoading
+  const error = status === 'authenticated' && (projectsQuery.isError || campaignsQuery.isError)
 
   const stats = [
     {

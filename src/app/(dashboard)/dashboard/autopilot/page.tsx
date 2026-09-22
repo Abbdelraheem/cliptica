@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
+import { useSession } from 'next-auth/react'
 import {
   Radio, Plus, Trash2, CheckCircle2, AlertCircle, Loader2,
   ExternalLink, Youtube, Pause, Play, Lock, Sparkles
@@ -36,6 +37,7 @@ const FRAMING_OPTIONS = [
 ]
 
 export default function AutoPilotPage() {
+  const { data: session, status } = useSession()
   const [channels, setChannels] = useState<AutoPilotChannel[]>([])
   const [loading, setLoading] = useState(true)
   const [adding, setAdding] = useState(false)
@@ -67,11 +69,15 @@ export default function AutoPilotPage() {
     fetchChannels()
     fetch('/api/auth/me')
       .then((r) => (r.ok ? r.json() : null))
-      .then((d) => setUserRole(d?.user?.role || 'FREE'))
-      .catch(() => setUserRole('FREE'))
+      .then((d) => {
+        if (d?.user?.role) setUserRole(d.user.role)
+      })
+      .catch(() => {})
   }, [])
 
-  const isStudioOrAdmin = userRole === 'STUDIO' || userRole === 'ADMIN'
+  const sessionRole = (session?.user as { role?: string })?.role
+  const effectiveRole = sessionRole || userRole || (status === 'loading' ? null : 'FREE')
+  const isStudioOrAdmin = effectiveRole === 'STUDIO' || effectiveRole === 'ADMIN'
 
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -158,7 +164,7 @@ export default function AutoPilotPage() {
       </div>
 
       {/* Studio Tier Locked Banner if not Studio or Admin */}
-      {userRole !== null && !isStudioOrAdmin ? (
+      {effectiveRole !== null && !isStudioOrAdmin ? (
         <div className="mt-8 rounded-3xl border border-gold/40 bg-gradient-to-b from-onyx-2 via-black/80 to-onyx-2 p-8 shadow-[0_0_50px_rgba(212,175,55,0.12)] text-center relative overflow-hidden">
           <div className="absolute -right-12 -top-12 h-40 w-40 rounded-full bg-gold/10 blur-3xl pointer-events-none" />
           <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-gold/15 border border-gold/30 text-gold mb-4 shadow-lg">
@@ -167,9 +173,9 @@ export default function AutoPilotPage() {
           <span className="inline-block rounded-full bg-gold/10 border border-gold/30 px-3 py-1 text-xs font-semibold uppercase tracking-wider text-champagne">
             Exclusive Studio Tier Feature ($59/mo)
           </span>
-          <h2 className="display-md mt-3 text-2xl font-bold">الأوتوبايلوت التلقائي للقنوات</h2>
+          <h2 className="display-md mt-3 text-2xl font-bold">Autonomous Auto-Pilot Ingestion</h2>
           <p className="mt-2 text-sm font-light text-mist max-w-xl mx-auto leading-relaxed">
-            ميزة السحب والتفريغ والمونتاج الآلي مخصصة حصرياً لباقة <span className="font-semibold text-pearl">Studio ($59/mo)</span> وحسابات الإدارة. اربط قنوات يوتيوب وسيقوم الذكاء الاصطناعي بتحويل أي فيديو جديد فور نزوله إلى مقاطع شورتس وريلز جاهزة للنشر دون أي تدخل منك!
+            Continuous channel ingestion, automated transcription, and hands-free viral clip rendering are exclusive to <span className="font-semibold text-pearl">Studio ($59/mo)</span> and Administrator accounts. Connect your YouTube channels and our AI pipeline will instantly convert any newly published video into ready-to-post Shorts and Reels with zero manual work!
           </p>
           <div className="mt-6 flex justify-center">
             <Link
@@ -177,7 +183,7 @@ export default function AutoPilotPage() {
               className="btn-lux btn-gold !py-3 !px-8 text-sm font-bold inline-flex items-center gap-2 shadow-[0_0_25px_rgba(212,175,55,0.3)] hover:scale-105 transition-transform"
             >
               <Sparkles className="h-4 w-4" />
-              <span>ترقية الحساب إلى Studio ($59/mo)</span>
+              <span>Upgrade Account to Studio ($59/mo)</span>
             </Link>
           </div>
         </div>

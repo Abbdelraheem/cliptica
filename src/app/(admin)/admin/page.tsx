@@ -88,6 +88,9 @@ export default function AdminOverviewPage() {
       if (!res.ok) throw new Error('Failed to load stats')
       return res.json() as Promise<Stats>
     },
+    retry: 3,
+    retryDelay: (attempt) => Math.min(1000 * 2 ** attempt, 4000),
+    staleTime: 60_000,
   })
 
   const stats = statsQuery.data

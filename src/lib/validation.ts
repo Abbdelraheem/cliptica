@@ -137,12 +137,31 @@ export const projectCreateSchema = z.object({
     .max(1000)
     .transform((v) => cleanUrlString(v))
     .optional(),
-  fileKey: z.string().max(300).optional(),
-  fileName: z.string().max(200).optional(),
-  title: z.string().trim().min(1).max(120).optional(),
-  instructions: z.string().max(2000).optional(),
+  fileKey: z.string().max(300).nullish().transform((v) => v || undefined),
+  fileName: z.string().max(200).nullish().transform((v) => v || undefined),
+  title: z
+    .string()
+    .max(120)
+    .nullish()
+    .transform((v) => (v && v.trim() ? v.trim() : undefined)),
+  instructions: z
+    .string()
+    .max(2000)
+    .nullish()
+    .transform((v) => (v && v.trim() ? v.trim() : undefined)),
   /** "mm:ss" or seconds — start clipping here */
-  clipFrom: z.union([z.string().regex(/^\d{1,2}:\d{2}(:\d{2})?$/), z.number().int().min(0)]).optional(),
+  clipFrom: z
+    .union([z.string(), z.number()])
+    .nullish()
+    .transform((v) => {
+      if (v === null || v === undefined || v === '') return undefined
+      if (typeof v === 'number') return v >= 0 ? v : 0
+      const s = String(v).trim()
+      if (!s) return undefined
+      if (/^\d+$/.test(s)) return parseInt(s, 10)
+      if (/^\d{1,2}:\d{2}(:\d{2})?$/.test(s)) return s
+      return undefined
+    }),
   framing: z.enum(PROJECT_FRAMINGS).default('smart'),
   language: z.enum(PROJECT_LANGUAGES).default('auto'),
   captionStyle: z.enum(VALID_CAPTION_STYLES).default('hormozi'),

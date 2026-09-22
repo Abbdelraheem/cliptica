@@ -5,6 +5,7 @@ import { Providers } from './providers'
 import { CookieConsent } from '@/components/cookie-consent'
 import { Analytics } from '@/components/analytics'
 import { GoogleTranslator } from '@/components/google-translator'
+import { TopLoader } from '@/components/top-loader'
 
 const manrope = Manrope({
   variable: '--font-display',
@@ -80,6 +81,8 @@ export default function RootLayout({
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
       </head>
       <body className="grain min-h-full bg-onyx text-pearl antialiased">
+        <div className="amb" aria-hidden="true" />
+        <TopLoader />
         <Providers>
           <GoogleTranslator />
           {children}

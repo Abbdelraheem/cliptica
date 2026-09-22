@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
-import { prisma } from '@/lib/prisma'
+import { prisma, withDbRetry } from '@/lib/prisma'
 import { cleanUrlString } from '@/lib/validation'
 
 export async function GET() {
@@ -10,10 +10,12 @@ export async function GET() {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const channels = await prisma.autoPilotChannel.findMany({
-    where: { userId: session.user.id },
-    orderBy: { createdAt: 'desc' },
-  })
+  const channels = await withDbRetry(() =>
+    prisma.autoPilotChannel.findMany({
+      where: { userId: session.user.id },
+      orderBy: { createdAt: 'desc' },
+    })
+  )
 
   return NextResponse.json({ channels })
 }
@@ -24,11 +26,16 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const dbUser = await prisma.user.findUnique({
-    where: { id: session.user.id },
-    select: { role: true },
-  })
-  if (dbUser?.role !== 'ADMIN' && dbUser?.role !== 'STUDIO') {
+  const userRole = session.user.role || (
+    await withDbRetry(() =>
+      prisma.user.findUnique({
+        where: { id: session.user.id },
+        select: { role: true },
+      })
+    )
+  )?.role
+
+  if (userRole !== 'ADMIN' && userRole !== 'STUDIO') {
     return NextResponse.json(
       { error: 'Auto-Pilot Autonomous Ingestion is an exclusive feature for Studio ($59/mo) and Admin accounts. Please upgrade to Studio to activate Auto-Pilot.' },
       { status: 403 }
@@ -52,18 +59,20 @@ export async function POST(request: Request) {
     const aspectRatio = body.aspectRatio || '9:16'
     const channelTitle = body.channelTitle || rawUrl.replace(/\/+$/, '').split('/').pop() || 'YouTube Channel'
 
-    const channel = await prisma.autoPilotChannel.create({
-      data: {
-        userId: session.user.id,
-        channelUrl: rawUrl,
-        channelTitle,
-        captionStyle,
-        framing,
-        aspectRatio,
-        clipsPerVideo: 3,
-        isActive: true,
-      },
-    })
+    const channel = await withDbRetry(() =>
+      prisma.autoPilotChannel.create({
+        data: {
+          userId: session.user.id,
+          channelUrl: rawUrl,
+          channelTitle,
+          captionStyle,
+          framing,
+          aspectRatio,
+          clipsPerVideo: 3,
+          isActive: true,
+        },
+      })
+    )
 
     return NextResponse.json({ channel })
   } catch (err: unknown) {

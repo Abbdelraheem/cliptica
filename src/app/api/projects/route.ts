@@ -1,13 +1,11 @@
 import { auth } from '@/lib/auth'
-import { prisma } from '@/lib/prisma'
+import { prisma, withDbRetry } from '@/lib/prisma'
 import { NextResponse } from 'next/server'
 import { apiMutationLimiter, enforceRateLimit } from '@/lib/rate-limit'
 import { parseClipFrom, normaliseVideoUrl, projectCreateSchema } from '@/lib/validation'
 import { planForRole } from '@/lib/stripe'
 
 const createSchema = projectCreateSchema
-
-
 
 export async function GET(request: Request) {
   try {
@@ -20,20 +18,22 @@ export async function GET(request: Request) {
     const rawLimit = parseInt(searchParams.get('limit') ?? '50', 10)
     const limit = Number.isFinite(rawLimit) ? Math.min(100, Math.max(1, rawLimit)) : 50
 
-    const projects = await prisma.project.findMany({
-      where: { userId: session.user.id },
-      orderBy: { createdAt: 'desc' },
-      take: limit,
-      select: {
-        id: true,
-        title: true,
-        status: true,
-        duration: true,
-        createdAt: true,
-        _count: { select: { clips: true } },
-        clips: { select: { viralScore: true }, orderBy: { viralScore: 'desc' }, take: 1 },
-      },
-    })
+    const projects = await withDbRetry(() =>
+      prisma.project.findMany({
+        where: { userId: session.user.id },
+        orderBy: { createdAt: 'desc' },
+        take: limit,
+        select: {
+          id: true,
+          title: true,
+          status: true,
+          duration: true,
+          createdAt: true,
+          _count: { select: { clips: true } },
+          clips: { select: { viralScore: true }, orderBy: { viralScore: 'desc' }, take: 1 },
+        },
+      })
+    )
 
     return NextResponse.json({ projects })
   } catch (error) {
@@ -77,14 +77,14 @@ export async function POST(request: Request) {
       }
     }
 
-    const user = await prisma.user.findUnique({
-      where: { id: session.user.id },
-      select: { credits: true, role: true, referredByAffiliateId: true },
-    })
+    const user = await withDbRetry(() =>
+      prisma.user.findUnique({
+        where: { id: session.user.id },
+        select: { credits: true, role: true, referredByAffiliateId: true },
+      })
+    )
     if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 })
 
-    // Run the independent gate checks in parallel (each is a DB round-trip to a
-    // remote database; sequential execution would compound ~1s each).
     const plan = planForRole(user.role)
     const startOfDay = new Date()
     startOfDay.setHours(0, 0, 0, 0)
@@ -94,7 +94,9 @@ export async function POST(request: Request) {
     // Exactly 1 credit per video generation operation (flat per-video pricing model).
     const minCredits = 1
     const todaysCount = plan
-      ? await prisma.project.count({ where: { userId: session.user.id, createdAt: { gte: startOfDay } } })
+      ? await withDbRetry(() =>
+          prisma.project.count({ where: { userId: session.user.id, createdAt: { gte: startOfDay } } })
+        )
       : 0
 
     if (!isAdmin && user.credits < minCredits) {
@@ -120,56 +122,61 @@ export async function POST(request: Request) {
 
     // Atomic credit reservation: hold minCredits upfront so concurrent requests
     // cannot overdraft the balance. Admins bypass credit deduction.
-    const project = await prisma.$transaction(async (tx) => {
-      const u = await tx.user.findUnique({
-        where: { id: session.user.id },
-        select: { credits: true },
-      })
-      if (!isAdmin && (!u || u.credits < minCredits)) {
-        throw new Error('INSUFFICIENT_CREDITS')
-      }
+    const project = await withDbRetry(() =>
+      prisma.$transaction(
+        async (tx) => {
+          const u = await tx.user.findUnique({
+            where: { id: session.user.id },
+            select: { credits: true },
+          })
+          if (!isAdmin && (!u || u.credits < minCredits)) {
+            throw new Error('INSUFFICIENT_CREDITS')
+          }
 
-      if (!isAdmin) {
-        await tx.user.update({
-          where: { id: session.user.id },
-          data: { credits: { decrement: minCredits } },
-        })
+          if (!isAdmin) {
+            await tx.user.update({
+              where: { id: session.user.id },
+              data: { credits: { decrement: minCredits } },
+            })
 
-        await tx.creditTransaction.create({
-          data: {
-            userId: session.user.id,
-            amount: -minCredits,
-            type: 'usage',
-            description: `Credit reservation for "${title.slice(0, 60)}"`,
-            metadata: { minCreditsReserved: minCredits },
-          },
-        })
-      }
+            await tx.creditTransaction.create({
+              data: {
+                userId: session.user.id,
+                amount: -minCredits,
+                type: 'usage',
+                description: `Credit reservation for "${title.slice(0, 60)}"`,
+                metadata: { minCreditsReserved: minCredits },
+              },
+            })
+          }
 
-      const p = await tx.project.create({
-        data: {
-          userId: session.user.id,
-          title,
-          sourceUrl: d.sourceType === 'url' ? sourceUrl : null,
-          sourceFile: d.sourceType === 'file' ? d.fileKey : null,
-          duration: 0, // probed by the worker
-          instructions: d.instructions,
-          clipFrom: parseClipFrom(d.clipFrom),
-          framing: d.framing,
-          language: d.language,
-          captionStyle: d.captionStyle,
-          aspectRatio: d.aspectRatio,
-          status: 'PENDING',
-          creditsUsed: minCredits, // tracks reserved credits
+          const p = await tx.project.create({
+            data: {
+              userId: session.user.id,
+              title,
+              sourceUrl: d.sourceType === 'url' ? sourceUrl : null,
+              sourceFile: d.sourceType === 'file' ? d.fileKey : null,
+              duration: 0, // probed by the worker
+              instructions: d.instructions,
+              clipFrom: parseClipFrom(d.clipFrom),
+              framing: d.framing,
+              language: d.language,
+              captionStyle: d.captionStyle,
+              aspectRatio: d.aspectRatio,
+              status: 'PENDING',
+              creditsUsed: isAdmin ? 0 : minCredits,
+            },
+          })
+
+          await tx.processingJob.create({
+            data: { projectId: p.id, type: 'clip_generation', status: 'queued' },
+          })
+
+          return p
         },
-      })
-
-      await tx.processingJob.create({
-        data: { projectId: p.id, type: 'clip_generation', status: 'queued' },
-      })
-
-      return p
-    })
+        { timeout: 25000, maxWait: 15000 }
+      )
+    )
 
     // Referral funnel tracking: record FIRST_PROJECT milestone
     if (user.referredByAffiliateId) {
@@ -195,7 +202,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Insufficient credits' }, { status: 402 })
     }
     console.error('Project creation error:', error)
-    return NextResponse.json({ error: 'Failed to create project' }, { status: 500 })
+    const msg = error instanceof Error ? error.message : 'Failed to create project'
+    return NextResponse.json({ error: msg }, { status: 500 })
   }
 }
 

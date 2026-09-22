@@ -111,9 +111,7 @@ export function DashboardLayout({ children }: { children: ReactNode }) {
   }
 
   return (
-    <div className="min-h-screen bg-onyx text-pearl">
-      {/* Ambient */}
-      <div className="amb" aria-hidden="true" />
+    <div className="min-h-screen text-pearl">
 
       {/* Mobile top bar */}
       <div className="fixed top-0 left-0 right-0 z-40 flex items-center justify-between border-b border-hair/50 bg-onyx-2/90 px-4 py-3 backdrop-blur-xl lg:hidden">

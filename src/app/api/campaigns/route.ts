@@ -1,5 +1,5 @@
 import { auth } from '@/lib/auth'
-import { prisma } from '@/lib/prisma'
+import { prisma, withDbRetry } from '@/lib/prisma'
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { apiMutationLimiter, enforceRateLimit } from '@/lib/rate-limit'
@@ -29,39 +29,42 @@ export async function GET() {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const dbUser = await prisma.user.findUnique({
-      where: { id: session.user.id },
-      select: { role: true, canCreateCampaigns: true },
+    const { dbUser, campaigns, mySubmissions } = await withDbRetry(async () => {
+      const dbUser = await prisma.user.findUnique({
+        where: { id: session.user.id },
+        select: { role: true, canCreateCampaigns: true },
+      })
+
+      const campaigns = await prisma.campaign.findMany({
+        where: { isActive: true },
+        orderBy: { createdAt: 'desc' },
+        include: {
+          _count: { select: { clips: true, submissions: true } },
+          user: {
+            select: { id: true, name: true, email: true },
+          },
+          submissions: {
+            where: { userId: session.user.id },
+            select: { id: true, postUrl: true, platform: true, views: true, earnings: true, status: true, verified: true },
+          },
+        },
+      })
+
+      const mySubmissions = await prisma.campaignSubmission.findMany({
+        where: { userId: session.user.id },
+        include: {
+          campaign: {
+            select: { id: true, name: true, ratePer1k: true, imageUrl: true, platforms: true },
+          },
+        },
+        orderBy: { createdAt: 'desc' },
+      })
+
+      return { dbUser, campaigns, mySubmissions }
     })
+
     const isAdmin = dbUser?.role === 'ADMIN'
     const canCreate = isAdmin || Boolean(dbUser?.canCreateCampaigns)
-
-    // All registered users can see active campaigns to participate
-    const campaigns = await prisma.campaign.findMany({
-      where: { isActive: true },
-      orderBy: { createdAt: 'desc' },
-      include: {
-        _count: { select: { clips: true, submissions: true } },
-        user: {
-          select: { id: true, name: true, email: true },
-        },
-        submissions: {
-          where: { userId: session.user.id },
-          select: { id: true, postUrl: true, platform: true, views: true, earnings: true, status: true, verified: true },
-        },
-      },
-    })
-
-    // Also fetch all user submissions across campaigns
-    const mySubmissions = await prisma.campaignSubmission.findMany({
-      where: { userId: session.user.id },
-      include: {
-        campaign: {
-          select: { id: true, name: true, ratePer1k: true, imageUrl: true, platforms: true },
-        },
-      },
-      orderBy: { createdAt: 'desc' },
-    })
 
     return NextResponse.json({
       campaigns,
