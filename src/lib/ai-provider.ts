@@ -44,7 +44,7 @@ export async function executeAiChatCompletion(options: AiCompletionOptions): Pro
   let nvidiaKey = process.env.NVIDIA_API_KEY?.trim() || ''
   let groqKey = process.env.GROQ_API_KEY?.trim() || ''
   let openaiKey = process.env.OPENAI_API_KEY?.trim() || ''
-  let nvidiaModel = customNvidiaModel || process.env.NVIDIA_SCORE_MODEL?.trim() || 'meta/llama-3.3-70b-instruct'
+  let nvidiaModel = customNvidiaModel || process.env.NVIDIA_SCORE_MODEL?.trim() || 'deepseek-ai/deepseek-v4.1-flash'
   let groqModel = customGroqModel || process.env.GROQ_SCORE_MODEL?.trim() || 'llama-3.3-70b-versatile'
 
   try {
@@ -88,7 +88,8 @@ export async function executeAiChatCompletion(options: AiCompletionOptions): Pro
 
       if (resp.ok) {
         const data = await resp.json()
-        const content = data.choices?.[0]?.message?.content || ''
+        const msg = data.choices?.[0]?.message
+        const content = msg?.content || msg?.reasoning_content || ''
         const latencyMs = Date.now() - t0
         let parsedJson = undefined
         if (responseFormat === 'json_object') {

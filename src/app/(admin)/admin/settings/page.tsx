@@ -22,7 +22,7 @@ const DEFAULTS: SettingsState = {
   render_parallel: 4,
   stale_job_minutes: 30,
   nvidia_api_key: '',
-  nvidia_score_model: 'meta/llama-3.3-70b-instruct',
+  nvidia_score_model: 'deepseek-ai/deepseek-v4.1-flash',
   groq_score_model: 'allam-2-7b',
   whisper_model: 'whisper-large-v3-turbo',
   groq_api_key: '',

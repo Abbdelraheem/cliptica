@@ -616,7 +616,7 @@ async function llmScoreMoments(candidates, instructions) {
 
   // 1. NVIDIA NIM (PRIMARY - fast 6.5s timeout)
   if (CFG.nvidiaKey) {
-    const nvModel = CFG.nvidiaScoreModel || 'meta/llama-3.3-70b-instruct'
+    const nvModel = CFG.nvidiaScoreModel || 'deepseek-ai/deepseek-v4.1-flash'
     providers.push({
       name: `nvidia-${nvModel}`,
       url: 'https://integrate.api.nvidia.com/v1/chat/completions',
@@ -697,7 +697,8 @@ async function llmScoreMoments(candidates, instructions) {
       })
       if (!res.ok) throw new Error(`${p.name} ${res.status}`)
       const data = await res.json()
-      const parsed = JSON.parse(data.choices[0].message.content)
+      const rawText = data.choices[0].message.content || data.choices[0].message.reasoning_content || '{}'
+      const parsed = JSON.parse(rawText)
       const valid = (parsed.moments ?? [])
         .filter((m) => Number.isInteger(m.index) && candidates[m.index])
         .map((m) => {
