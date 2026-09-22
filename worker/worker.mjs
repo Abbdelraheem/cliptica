@@ -667,9 +667,12 @@ async function llmScoreMoments(candidates, instructions) {
     '- retentionScore: Pacing, storytelling flow, and lack of fluff that keeps viewers watching until the end.\n' +
     '- shareScore: Relatability, quote-worthiness, surprising value, or emotional impact.\n' +
     '- score: Overall weighted viral potential (0-100).\n' +
-    'If the candidate text is in Arabic, write the "title" (3-6 words) and "reason" in Arabic.\n' +
+    'If the candidate text is in Arabic, write the "title" (3-6 words), "titles", "cta", and "reason" in Arabic.\n' +
     'Return strict JSON {"moments":[{"index":<int>,"score":<0-100>,"hookScore":<0-100>,"retentionScore":<0-100>,"shareScore":<0-100>,"title":"<=6 punchy words",' +
+    '"titles":["3-6 words Question hook", "3-6 words Shocking hook", "3-6 words Direct value hook"],' +
     '"hookHeadline":"3-5 words ultra viral headline card to show in first 2 seconds",' +
+    '"hashtags":["#tag1", "#tag2", "#tag3", "#tag4", "#tag5"],' +
+    '"cta":"one short engaging sentence encouraging comments",' +
     '"reason":"one sentence why it performs","emoji":"one fitting emoji"}]}.\n' +
     `Return exactly the ${CFG.clipsPerVideo} strongest moments, best first.`
   if (instructions?.trim()) {
@@ -697,17 +700,31 @@ async function llmScoreMoments(candidates, instructions) {
       const parsed = JSON.parse(data.choices[0].message.content)
       const valid = (parsed.moments ?? [])
         .filter((m) => Number.isInteger(m.index) && candidates[m.index])
-        .map((m) => ({
-          ...candidates[m.index],
-          score: Math.max(0, Math.min(100, Math.round(m.score))),
-          hookScore: Math.max(0, Math.min(100, Math.round(m.hookScore ?? m.score))),
-          retentionScore: Math.max(0, Math.min(100, Math.round(m.retentionScore ?? m.score))),
-          shareScore: Math.max(0, Math.min(100, Math.round(m.shareScore ?? m.score))),
-          title: String(m.title ?? '').slice(0, 80),
-          hookHeadline: String(m.hookHeadline ?? m.title ?? '').slice(0, 80),
-          reason: String(m.reason ?? ''),
-          emoji: String(m.emoji ?? '').slice(0, 4),
-        }))
+        .map((m) => {
+          const mainTitle = String(m.title ?? '').slice(0, 80)
+          const titleOptions = Array.isArray(m.titles) && m.titles.length
+            ? m.titles.map((t) => String(t).slice(0, 80))
+            : [mainTitle]
+          const hashtags = Array.isArray(m.hashtags) && m.hashtags.length
+            ? m.hashtags.map((h) => String(h).slice(0, 30))
+            : ['#Shorts', '#Reels', '#TikTok', '#Viral', '#fyp']
+          const cta = String(m.cta ?? '').slice(0, 120)
+
+          return {
+            ...candidates[m.index],
+            score: Math.max(0, Math.min(100, Math.round(m.score))),
+            hookScore: Math.max(0, Math.min(100, Math.round(m.hookScore ?? m.score))),
+            retentionScore: Math.max(0, Math.min(100, Math.round(m.retentionScore ?? m.score))),
+            shareScore: Math.max(0, Math.min(100, Math.round(m.shareScore ?? m.score))),
+            title: mainTitle,
+            titleOptions,
+            hookHeadline: String(m.hookHeadline ?? m.title ?? '').slice(0, 80),
+            hashtags,
+            cta,
+            reason: String(m.reason ?? ''),
+            emoji: String(m.emoji ?? '').slice(0, 4),
+          }
+        })
       if (valid.length) return valid.slice(0, CFG.clipsPerVideo)
     } catch (e) {
       console.error(`[worker] scoring via ${p.name} failed:`, e.message)
@@ -763,6 +780,20 @@ function heuristicScoreMoments(candidates) {
         if (qPart && qPart.length < 50) title = qPart.trim() + '؟'
       }
 
+      const isAr = arHookCount > 0 || /[\u0600-\u06FF]/.test(text)
+      const cleanT = title.replace(/[?؟]/g, '')
+      const titleOptions = [
+        title,
+        isAr ? `سر ${cleanT}` : `The secret behind ${cleanT}`,
+        isAr ? `أكبر غلطة في ${cleanT}` : `The biggest mistake with ${cleanT}`
+      ]
+      const hashtags = isAr
+        ? ['#اكسبلور', '#ترند', '#ريلز', '#تيك_توك', '#شورتس', '#fyp']
+        : ['#Shorts', '#Reels', '#TikTok', '#Viral', '#fyp', '#Trending']
+      const cta = isAr
+        ? 'شاركنا رأيك في التعليقات: هل تتفق مع هذا الكلام؟'
+        : 'Drop your thoughts in the comments: do you agree?'
+
       return {
         ...c,
         score: overallScore,
@@ -770,6 +801,10 @@ function heuristicScoreMoments(candidates) {
         retentionScore,
         shareScore,
         title: title.slice(0, 60),
+        titleOptions,
+        hookHeadline: (isAr ? `⚡ ${cleanT}` : `🔥 ${cleanT}`).slice(0, 60),
+        hashtags,
+        cta,
         reason:
           hookCount > 0
             ? (arHookCount > 0
@@ -1253,7 +1288,16 @@ async function processJob(job) {
           exportUrl: url,
           thumbnailUrl: thumbUrl,
           captionStyle: captionStyle,
-          captionData: { mode: 'karaoke', emoji: m.emoji ?? '', words: winWords, style: captionStyle },
+          captionData: {
+            mode: 'karaoke',
+            emoji: m.emoji ?? '',
+            words: winWords,
+            style: captionStyle,
+            hookHeadline: m.hookHeadline || m.title,
+            titleOptions: m.titleOptions || [m.title],
+            hashtags: m.hashtags || [],
+            cta: m.cta || '',
+          },
           motionGraphics: { cropMode: files[i].cropMode },
         },
       })

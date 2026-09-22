@@ -1180,126 +1180,149 @@ export default function ProjectDetail({ projectId }: { projectId: string }) {
               Everything you need to publish this clip to TikTok, Instagram Reels, and YouTube Shorts for maximum reach and engagement.
             </p>
 
-            <div className="mt-6 space-y-4">
-              {/* 1. Viral Title */}
-              <div className="rounded-2xl border border-hair/60 bg-black/40 p-4">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-xs font-semibold uppercase tracking-wider text-champagne">
-                    1. High-Impact Hook Title
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      navigator.clipboard.writeText(exportKitClip.title)
-                      setCopiedKitField('title')
-                      setTimeout(() => setCopiedKitField(null), 2000)
-                    }}
-                    className="btn-lux btn-outline !py-1 !px-2.5 !text-[11px] inline-flex items-center gap-1 text-champagne"
-                  >
-                    {copiedKitField === 'title' ? (
-                      <>
-                        <Check className="h-3.5 w-3.5 text-emerald-400" />
-                        <span>Copied</span>
-                      </>
-                    ) : (
-                      <>
-                        <Copy className="h-3.5 w-3.5" />
-                        <span>Copy Title</span>
-                      </>
-                    )}
-                  </button>
-                </div>
-                <p className="text-sm font-medium text-pearl">{exportKitClip.title}</p>
-              </div>
+            {(() => {
+              const capData = (exportKitClip.captionData as Record<string, unknown>) || {}
+              const titles: string[] = Array.isArray(capData.titleOptions) && capData.titleOptions.length
+                ? (capData.titleOptions as string[])
+                : [exportKitClip.title]
+              const hashtags: string[] = Array.isArray(capData.hashtags) && capData.hashtags.length
+                ? (capData.hashtags as string[])
+                : ['#Shorts', '#Reels', '#TikTok', '#Viral', '#Trending', '#VideoOfTheDay', '#fyp', '#explore']
+              const ctaText: string = typeof capData.cta === 'string' && capData.cta
+                ? capData.cta
+                : '💬 شاركنا رأيك في التعليقات — هل تتفق مع هذا الطرح؟\n🔥 تابع الحساب لمزيد من المقاطع اليومية!'
+              const fullDesc = `${exportKitClip.description || exportKitClip.title}\n\n${ctaText}`
 
-              {/* 2. SEO Video Description */}
-              <div className="rounded-2xl border border-hair/60 bg-black/40 p-4">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-xs font-semibold uppercase tracking-wider text-champagne">
-                    2. High-Retention Description & CTA
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const desc = `${exportKitClip.description || exportKitClip.title}\n\n💬 Drop your thoughts in the comments — do you agree?\n🔥 Follow for more high-impact clips daily!`
-                      navigator.clipboard.writeText(desc)
-                      setCopiedKitField('desc')
-                      setTimeout(() => setCopiedKitField(null), 2000)
-                    }}
-                    className="btn-lux btn-outline !py-1 !px-2.5 !text-[11px] inline-flex items-center gap-1 text-champagne"
-                  >
-                    {copiedKitField === 'desc' ? (
-                      <>
-                        <Check className="h-3.5 w-3.5 text-emerald-400" />
-                        <span>Copied</span>
-                      </>
-                    ) : (
-                      <>
-                        <Copy className="h-3.5 w-3.5" />
-                        <span>Copy Description</span>
-                      </>
-                    )}
-                  </button>
-                </div>
-                <p className="text-xs text-mist font-light whitespace-pre-line leading-relaxed">
-                  {exportKitClip.description || exportKitClip.title}
-                  {'\n\n💬 Drop your thoughts in the comments — do you agree?\n🔥 Follow for more high-impact clips daily!'}
-                </p>
-              </div>
+              return (
+                <div className="mt-6 space-y-4">
+                  {/* 1. Viral Title Options */}
+                  <div className="rounded-2xl border border-hair/60 bg-black/40 p-4">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-xs font-semibold uppercase tracking-wider text-champagne flex items-center gap-1.5">
+                        <Sparkles className="h-3.5 w-3.5 text-gold" />
+                        1. High-Impact Hook Titles ({titles.length} AI Variations)
+                      </span>
+                    </div>
+                    <div className="space-y-2">
+                      {titles.map((t, idx) => (
+                        <div key={idx} className="flex items-center justify-between gap-2 rounded-xl bg-white/[0.03] p-2.5 border border-hair-soft hover:border-gold/40 transition-colors">
+                          <span className="text-xs font-medium text-pearl leading-relaxed">
+                            <strong className="text-gold mr-1.5">{idx + 1}.</strong> {t}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              navigator.clipboard.writeText(t)
+                              setCopiedKitField(`title-${idx}`)
+                              setTimeout(() => setCopiedKitField(null), 2000)
+                            }}
+                            className="btn-lux btn-outline !py-1 !px-2 !text-[11px] shrink-0 inline-flex items-center gap-1 text-champagne"
+                          >
+                            {copiedKitField === `title-${idx}` ? (
+                              <>
+                                <Check className="h-3 w-3 text-emerald-400" />
+                                <span>Copied</span>
+                              </>
+                            ) : (
+                              <>
+                                <Copy className="h-3 w-3" />
+                                <span>Copy</span>
+                              </>
+                            )}
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
 
-              {/* 3. Trending Hashtags */}
-              <div className="rounded-2xl border border-hair/60 bg-black/40 p-4">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-xs font-semibold uppercase tracking-wider text-champagne">
-                    3. Trending Hashtags
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const tags = '#Shorts #Reels #TikTok #Viral #Trending #VideoOfTheDay #fyp #explore'
-                      navigator.clipboard.writeText(tags)
-                      setCopiedKitField('tags')
-                      setTimeout(() => setCopiedKitField(null), 2000)
-                    }}
-                    className="btn-lux btn-outline !py-1 !px-2.5 !text-[11px] inline-flex items-center gap-1 text-champagne"
-                  >
-                    {copiedKitField === 'tags' ? (
-                      <>
-                        <Check className="h-3.5 w-3.5 text-emerald-400" />
-                        <span>Copied</span>
-                      </>
-                    ) : (
-                      <>
-                        <Copy className="h-3.5 w-3.5" />
-                        <span>Copy Hashtags</span>
-                      </>
-                    )}
-                  </button>
-                </div>
-                <div className="flex flex-wrap gap-1.5 mt-1">
-                  {['#Shorts', '#Reels', '#TikTok', '#Viral', '#Trending', '#VideoOfTheDay', '#fyp', '#explore'].map((tag) => (
-                    <span key={tag} className="rounded-lg bg-hair/40 px-2 py-0.5 text-xs font-mono text-champagne">
-                      {tag}
-                    </span>
-                  ))}
-                </div>
-              </div>
+                  {/* 2. SEO Video Description & CTA */}
+                  <div className="rounded-2xl border border-hair/60 bg-black/40 p-4">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-xs font-semibold uppercase tracking-wider text-champagne">
+                        2. High-Retention Description & CTA
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          navigator.clipboard.writeText(fullDesc)
+                          setCopiedKitField('desc')
+                          setTimeout(() => setCopiedKitField(null), 2000)
+                        }}
+                        className="btn-lux btn-outline !py-1 !px-2.5 !text-[11px] inline-flex items-center gap-1 text-champagne"
+                      >
+                        {copiedKitField === 'desc' ? (
+                          <>
+                            <Check className="h-3.5 w-3.5 text-emerald-400" />
+                            <span>Copied</span>
+                          </>
+                        ) : (
+                          <>
+                            <Copy className="h-3.5 w-3.5" />
+                            <span>Copy Description</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+                    <p className="text-xs text-mist font-light whitespace-pre-line leading-relaxed bg-white/[0.02] p-3 rounded-xl border border-hair-soft">
+                      {fullDesc}
+                    </p>
+                  </div>
 
-              {/* 4. Best Posting Times */}
-              <div className="rounded-2xl border border-gold/20 bg-gold/5 p-4">
-                <div className="flex items-center gap-2 mb-1 text-gold">
-                  <Clock className="h-4 w-4" />
-                  <span className="text-xs font-semibold uppercase tracking-wider">
-                    Optimal Posting Windows for Maximum Reach:
-                  </span>
+                  {/* 3. Trending & Niche Hashtags */}
+                  <div className="rounded-2xl border border-hair/60 bg-black/40 p-4">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-xs font-semibold uppercase tracking-wider text-champagne">
+                        3. AI Targeted Hashtags
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const tagStr = hashtags.join(' ')
+                          navigator.clipboard.writeText(tagStr)
+                          setCopiedKitField('tags')
+                          setTimeout(() => setCopiedKitField(null), 2000)
+                        }}
+                        className="btn-lux btn-outline !py-1 !px-2.5 !text-[11px] inline-flex items-center gap-1 text-champagne"
+                      >
+                        {copiedKitField === 'tags' ? (
+                          <>
+                            <Check className="h-3.5 w-3.5 text-emerald-400" />
+                            <span>Copied</span>
+                          </>
+                        ) : (
+                          <>
+                            <Copy className="h-3.5 w-3.5" />
+                            <span>Copy All Hashtags</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+                    <div className="flex flex-wrap gap-1.5 mt-2">
+                      {hashtags.map((tag) => (
+                        <span key={tag} className="rounded-lg bg-gold/10 border border-gold/20 px-2 py-0.5 text-xs font-mono text-gold">
+                          {tag}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* 4. Best Posting Times */}
+                  <div className="rounded-2xl border border-gold/20 bg-gold/5 p-4">
+                    <div className="flex items-center gap-2 mb-1 text-gold">
+                      <Clock className="h-4 w-4" />
+                      <span className="text-xs font-semibold uppercase tracking-wider">
+                        Optimal Posting Windows for Maximum Reach:
+                      </span>
+                    </div>
+                    <p className="text-xs text-mist leading-relaxed mt-1">
+                      • <strong>Evening Peak:</strong> Between 06:00 PM and 09:30 PM (Local Audience Time).
+                      <br />
+                      • <strong>Afternoon Window:</strong> Between 01:00 PM and 03:30 PM.
+                    </p>
+                  </div>
                 </div>
-                <p className="text-xs text-mist leading-relaxed mt-1">
-                  • <strong>Evening Peak:</strong> Between 06:00 PM and 09:30 PM (Local Audience Time).
-                  <br />
-                  • <strong>Afternoon Window:</strong> Between 01:00 PM and 03:30 PM.
-                </p>
-              </div>
-            </div>
+              )
+            })()}
 
             {/* Action Buttons */}
             <div className="mt-6 pt-4 border-t border-hair-soft flex flex-wrap items-center justify-between gap-3">
