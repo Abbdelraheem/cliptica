@@ -1,5 +1,6 @@
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { isAdminEmail } from '@/lib/admin'
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 
@@ -37,9 +38,10 @@ export async function GET() {
       return NextResponse.json({ error: 'User not found' }, { status: 404 })
     }
 
-    const isAdmin = user.role === 'ADMIN'
+    const isAdmin = user.role === 'ADMIN' || isAdminEmail(user.email)
     const payload = {
       ...user,
+      role: isAdmin ? 'ADMIN' : user.role,
       credits: isAdmin ? 999999 : user.credits,
       canCreateCampaigns: isAdmin || Boolean(user.canCreateCampaigns),
     }

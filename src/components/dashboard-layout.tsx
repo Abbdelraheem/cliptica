@@ -79,8 +79,9 @@ export function DashboardLayout({ children }: { children: ReactNode }) {
   const creditPercent = Math.min(100, Math.max(0, Math.round((displayCredits / maxCredits) * 100)))
 
   // One-account-per-device enforcement — runs on every dashboard entry.
-  // Catches OAuth (Google/GitHub) accounts that bypassed the form flows.
+  // Catches OAuth (Google/GitHub) accounts that bypassed the form flows (Admins exempt).
   useEffect(() => {
+    if (currentRole === 'ADMIN') return
     if (deviceChecked.current) return
     deviceChecked.current = true
     let cancelled = false
@@ -102,7 +103,7 @@ export function DashboardLayout({ children }: { children: ReactNode }) {
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [currentRole])
 
   const isActive = (href: string) => {
     if (href === '/dashboard') return pathname === '/dashboard'

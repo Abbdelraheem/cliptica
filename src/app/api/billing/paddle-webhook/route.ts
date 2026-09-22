@@ -8,6 +8,7 @@ import {
   getCreditPackFromPaddlePriceId,
 } from '@/lib/paddle'
 import { PLANS } from '@/lib/stripe'
+import { isAdminEmail } from '@/lib/admin'
 import type { EventEntity } from '@paddle/paddle-node-sdk'
 
 const webhookSecret = process.env.PADDLE_NOTIFICATION_WEBHOOK_SECRET || ''
@@ -147,7 +148,9 @@ async function handleSubscriptionUpdated(tx: Tx, subscription: PaddleSubscriptio
   const planKey = getPlanFromPaddlePriceId(priceId)
 
   let role: UserRole = user.role
-  if (subscription.status === 'active' || subscription.status === 'trialing') {
+  if (user.role === 'ADMIN' || isAdminEmail(user.email)) {
+    role = 'ADMIN'
+  } else if (subscription.status === 'active' || subscription.status === 'trialing') {
     if (planKey === 'basic' || planKey === 'clipper') role = 'CLIPPER'
     if (planKey === 'studio') role = 'STUDIO'
   } else if (subscription.status === 'canceled' || subscription.status === 'past_due') {
@@ -188,7 +191,7 @@ async function handleSubscriptionCanceled(tx: Tx, subscription: PaddleSubscripti
     where: { id: user.id },
     data: {
       subscriptionStatus: 'canceled',
-      role: 'FREE',
+      role: user.role === 'ADMIN' || isAdminEmail(user.email) ? 'ADMIN' : 'FREE',
     },
   })
 }

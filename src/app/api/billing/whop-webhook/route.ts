@@ -2,6 +2,7 @@ import { headers } from 'next/headers'
 import { NextResponse } from 'next/server'
 import crypto from 'crypto'
 import { prisma } from '@/lib/prisma'
+import { isAdminEmail } from '@/lib/admin'
 
 interface WhopItem {
   id?: string
@@ -293,11 +294,12 @@ export async function POST(request: Request) {
         data: { whopEventId: eventId },
       })
 
+      const isAdm = user.role === 'ADMIN' || isAdminEmail(user.email)
       await tx.user.update({
         where: { id: user.id },
         data: {
           credits: { increment: addedCredits },
-          ...(targetRole ? { role: targetRole } : {}),
+          ...(targetRole && !isAdm ? { role: targetRole } : {}),
         },
       })
 

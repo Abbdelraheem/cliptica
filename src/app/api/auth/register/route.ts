@@ -2,6 +2,7 @@ import { prisma } from '@/lib/prisma'
 import { NextResponse } from 'next/server'
 import { hash } from 'bcryptjs'
 import { assertDeviceAvailable, bindDevice, DeviceConflictError } from '@/lib/device'
+import { isAdminEmail } from '@/lib/admin'
 import { enforceRequestRateLimit, registerLimiter } from '@/lib/rate-limit'
 import { generateVerificationToken, sendEmail, verificationEmailHtml } from '@/lib/email'
 import { registerSchema } from '@/lib/validation'
@@ -45,36 +46,43 @@ export async function POST(request: Request) {
       }
     }
 
-    const existingUser = await prisma.user.findUnique({ where: { email } })
+    const cleanEmail = email.trim().toLowerCase()
+    const existingUser = await prisma.user.findFirst({
+      where: { email: { equals: cleanEmail, mode: 'insensitive' } },
+    })
     if (existingUser) {
       return NextResponse.json({ error: 'Email already registered' }, { status: 409 })
     }
 
-    // One account per device — hard block before anything is created.
-    try {
-      await assertDeviceAvailable(deviceId, '__new__')
-    } catch (e) {
-      if (e instanceof DeviceConflictError) {
-        return NextResponse.json(
-          {
-            error: 'DEVICE_LIMIT',
-            message: 'This device already has a Clipzila account. One account per device.',
-          },
-          { status: 403 }
-        )
+    const isAdmin = isAdminEmail(cleanEmail)
+
+    // One account per device — hard block before anything is created (Admins exempt).
+    if (!isAdmin) {
+      try {
+        await assertDeviceAvailable(deviceId, '__new__', null, cleanEmail)
+      } catch (e) {
+        if (e instanceof DeviceConflictError) {
+          return NextResponse.json(
+            {
+              error: 'DEVICE_LIMIT',
+              message: 'This device already has a Clipzila account. One account per device.',
+            },
+            { status: 403 }
+          )
+        }
+        throw e
       }
-      throw e
     }
 
     const passwordHash = await hash(password, 12)
 
     const user = await prisma.user.create({
       data: {
-        email,
+        email: cleanEmail,
         passwordHash,
         name,
-        credits: 5,
-        role: 'FREE',
+        credits: isAdmin ? 999999 : 5,
+        role: isAdmin ? 'ADMIN' : 'FREE',
         referredByAffiliateId: affiliateId,
         referredAt: affiliateId ? new Date() : null,
       },

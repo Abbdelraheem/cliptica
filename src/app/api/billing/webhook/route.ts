@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server'
 import type { PrismaClient } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { stripe, PLANS, getPlanFromPriceId } from '@/lib/stripe'
+import { isAdminEmail } from '@/lib/admin'
 import Stripe from 'stripe'
 
 const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET!
@@ -129,7 +130,9 @@ async function handleCheckoutCompleted(tx: Tx, session: Stripe.Checkout.Session)
   // invoice via `invoice.payment_succeeded` — granting here would double the
   // first period, because checkout.session.completed AND the initial invoice
   // both fire on a non-trial signup.
-  const targetRole = planKey === 'studio' ? 'STUDIO' : (planKey === 'free' ? 'FREE' : 'CLIPPER')
+  const existingUser = await tx.user.findUnique({ where: { id: userId }, select: { role: true, email: true } })
+  const isAdm = existingUser?.role === 'ADMIN' || isAdminEmail(existingUser?.email)
+  const targetRole = isAdm ? 'ADMIN' : planKey === 'studio' ? 'STUDIO' : (planKey === 'free' ? 'FREE' : 'CLIPPER')
   await tx.user.update({
     where: { id: userId },
     data: {
@@ -155,13 +158,18 @@ async function handleSubscriptionUpdated(tx: Tx, subscription: Stripe.Subscripti
   // handled by customer.subscription.deleted; these cover the rest.
   const unpaid = ['past_due', 'unpaid', 'incomplete', 'incomplete_expired'].includes(subscription.status)
 
-  const targetRole = unpaid
-    ? 'FREE'
-    : planKey === 'studio'
-      ? 'STUDIO'
-      : planKey === 'free'
-        ? 'FREE'
-        : 'CLIPPER'
+  const existingUser = await tx.user.findUnique({ where: { id: userId }, select: { role: true, email: true } })
+  const isAdm = existingUser?.role === 'ADMIN' || isAdminEmail(existingUser?.email)
+
+  const targetRole = isAdm
+    ? 'ADMIN'
+    : unpaid
+      ? 'FREE'
+      : planKey === 'studio'
+        ? 'STUDIO'
+        : planKey === 'free'
+          ? 'FREE'
+          : 'CLIPPER'
 
   await tx.user.update({
     where: { id: userId },
@@ -178,10 +186,13 @@ async function handleSubscriptionDeleted(tx: Tx, subscription: Stripe.Subscripti
   const userId = subscription.metadata?.userId
   if (!userId) return
 
+  const existingUser = await tx.user.findUnique({ where: { id: userId }, select: { role: true, email: true } })
+  const isAdm = existingUser?.role === 'ADMIN' || isAdminEmail(existingUser?.email)
+
   await tx.user.update({
     where: { id: userId },
     data: {
-      role: 'FREE',
+      role: isAdm ? 'ADMIN' : 'FREE',
       stripeSubscriptionId: null,
       stripePriceId: null,
       subscriptionStatus: 'canceled',

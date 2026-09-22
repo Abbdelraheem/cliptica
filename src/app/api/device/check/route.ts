@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { assertDeviceAvailable, bindDevice } from '@/lib/device'
+import { isAdminEmail } from '@/lib/admin'
 import { enforceRequestRateLimit, apiMutationLimiter } from '@/lib/rate-limit'
 
 const bodySchema = z.object({
@@ -24,10 +25,20 @@ export async function POST(request: Request) {
 
     // Mode 1 — login form: check the device against the account being opened.
     if (email) {
-      const user = await prisma.user.findUnique({ where: { email } })
-      if (!user || user.role === 'ADMIN') return NextResponse.json({ status: 'ok', bound: false })
+      const cleanEmail = email.trim().toLowerCase()
+      if (isAdminEmail(cleanEmail)) {
+        return NextResponse.json({ status: 'ok', bound: false })
+      }
+
+      const user = await prisma.user.findFirst({
+        where: { email: { equals: cleanEmail, mode: 'insensitive' } },
+        select: { id: true, role: true, email: true },
+      })
+      if (!user || user.role === 'ADMIN' || isAdminEmail(user.email)) {
+        return NextResponse.json({ status: 'ok', bound: false })
+      }
       try {
-        await assertDeviceAvailable(deviceId, user.id, user.role)
+        await assertDeviceAvailable(deviceId, user.id, user.role, user.email)
       } catch {
         return NextResponse.json(
           {
@@ -45,12 +56,12 @@ export async function POST(request: Request) {
     if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
-    if (session.user.role === 'ADMIN') {
+    if (session.user.role === 'ADMIN' || isAdminEmail(session.user.email)) {
       return NextResponse.json({ status: 'ok', bound: false })
     }
 
     try {
-      await assertDeviceAvailable(deviceId, session.user.id, session.user.role)
+      await assertDeviceAvailable(deviceId, session.user.id, session.user.role, session.user.email)
     } catch {
       return NextResponse.json(
         {
@@ -61,7 +72,13 @@ export async function POST(request: Request) {
       )
     }
 
-    await bindDevice(deviceId, session.user.id, request.headers.get('user-agent'))
+    await bindDevice(
+      deviceId,
+      session.user.id,
+      request.headers.get('user-agent'),
+      session.user.role,
+      session.user.email
+    )
     return NextResponse.json({ status: 'ok', bound: true })
   } catch (error) {
     console.error('device/check error:', error)

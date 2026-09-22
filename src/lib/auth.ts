@@ -7,6 +7,7 @@ import { prisma } from '@/lib/prisma'
 import { compare } from 'bcryptjs'
 import { z } from 'zod'
 import { assertDeviceAvailable, bindDevice } from '@/lib/device'
+import { isAdminEmail } from '@/lib/admin'
 import { enforceRateLimit, loginEmailLimiter, loginIpLimiter, getClientIp } from '@/lib/rate-limit'
 
 /** Convenience helper so API routes can `await auth()` */
@@ -44,10 +45,12 @@ export const authOptions: NextAuthOptions = {
       // account ourselves on first sign-in. Credentials logins already
       // resolved a database user inside authorize().
       if (!user.email) return false
+      const cleanEmail = user.email.trim().toLowerCase()
+      const isAdm = isAdminEmail(cleanEmail)
 
-      const existing = await prisma.user.findUnique({
-        where: { email: user.email.toLowerCase() },
-        select: { id: true, emailVerified: true, passwordHash: true },
+      const existing = await prisma.user.findFirst({
+        where: { email: { equals: cleanEmail, mode: 'insensitive' } },
+        select: { id: true, emailVerified: true, passwordHash: true, role: true },
       })
 
       if (!existing) {
@@ -72,12 +75,12 @@ export const authOptions: NextAuthOptions = {
 
         const created = await prisma.user.create({
           data: {
-            email: user.email.toLowerCase(),
+            email: cleanEmail,
             name: user.name ?? null,
             avatar: user.image ?? null,
             emailVerified: new Date(),
-            credits: 5,
-            role: 'FREE',
+            credits: isAdm ? 999999 : 5,
+            role: isAdm ? 'ADMIN' : 'FREE',
             referredByAffiliateId: affiliateId,
             referredAt: affiliateId ? new Date() : null,
           },
@@ -85,7 +88,7 @@ export const authOptions: NextAuthOptions = {
         await prisma.creditTransaction.create({
           data: {
             userId: created.id,
-            amount: 5,
+            amount: isAdm ? 999999 : 5,
             type: 'bonus',
             description: 'Starting credits for new account',
           },
@@ -120,38 +123,48 @@ export const authOptions: NextAuthOptions = {
         return true
       }
 
+      // Self-heal: ensure admin role
+      if (isAdm && existing.role !== 'ADMIN') {
+        await prisma.user.update({
+          where: { id: existing.id },
+          data: { role: 'ADMIN' },
+        }).catch(() => {})
+      }
+
       // An unverified credentials account cannot be entered through OAuth —
-      // that would silently bypass the email-verification gate.
-      if (existing.passwordHash && !existing.emailVerified) return false
+      // that would silently bypass the email-verification gate (admins exempt).
+      if (!isAdm && existing.passwordHash && !existing.emailVerified) return false
 
       return true
     },
     async jwt({ token, user, trigger, session }) {
       if (user?.email) {
-        // Always resolve identity from OUR database (covers both credentials
-        // and OAuth, whose profile ids are provider-specific, not ours).
-        const dbUser = await prisma.user.findUnique({
-          where: { email: user.email.toLowerCase() },
+        const cleanEmail = user.email.trim().toLowerCase()
+        const isAdm = isAdminEmail(cleanEmail)
+        const dbUser = await prisma.user.findFirst({
+          where: { email: { equals: cleanEmail, mode: 'insensitive' } },
           select: { id: true, role: true, credits: true, name: true, canCreateCampaigns: true },
         })
         if (dbUser) {
+          const role = isAdm ? 'ADMIN' : dbUser.role
           token.id = dbUser.id
-          token.role = dbUser.role
-          token.credits = dbUser.role === 'ADMIN' ? 999999 : dbUser.credits
+          token.role = role
+          token.credits = role === 'ADMIN' ? 999999 : dbUser.credits
           token.name = dbUser.name ?? user.name ?? token.name
-          token.canCreateCampaigns = dbUser.role === 'ADMIN' || Boolean(dbUser.canCreateCampaigns)
+          token.canCreateCampaigns = role === 'ADMIN' || Boolean(dbUser.canCreateCampaigns)
         }
-      } else if (token.id && (!token.role || token.role === 'ADMIN')) {
+      } else if (token.id && (!token.role || token.role === 'ADMIN' || isAdminEmail(token.email as string))) {
         // Refresh role and credits periodically for active sessions
         try {
           const fresh = await prisma.user.findUnique({
             where: { id: token.id as string },
-            select: { role: true, credits: true, canCreateCampaigns: true },
+            select: { role: true, credits: true, canCreateCampaigns: true, email: true },
           })
           if (fresh) {
-            token.role = fresh.role
-            token.credits = fresh.role === 'ADMIN' ? 999999 : fresh.credits
-            token.canCreateCampaigns = fresh.role === 'ADMIN' || Boolean(fresh.canCreateCampaigns)
+            const isAdm = fresh.role === 'ADMIN' || isAdminEmail(fresh.email)
+            token.role = isAdm ? 'ADMIN' : fresh.role
+            token.credits = isAdm ? 999999 : fresh.credits
+            token.canCreateCampaigns = isAdm || Boolean(fresh.canCreateCampaigns)
           }
         } catch {}
       }
@@ -197,13 +210,18 @@ export const authOptions: NextAuthOptions = {
         if (!validated.success) return null
 
         const { email, password, deviceId } = validated.data
+        const cleanEmail = email.trim().toLowerCase()
+        const isAdm = isAdminEmail(cleanEmail)
+
         const ip = getClientIp(request)
         const limited =
           (await enforceRateLimit(loginIpLimiter, `login-ip:${ip}`)) ??
-          (await enforceRateLimit(loginEmailLimiter, `login-email:${email.toLowerCase()}`))
+          (await enforceRateLimit(loginEmailLimiter, `login-email:${cleanEmail}`))
         if (limited) return null
 
-        const user = await prisma.user.findUnique({ where: { email } })
+        const user = await prisma.user.findFirst({
+          where: { email: { equals: cleanEmail, mode: 'insensitive' } },
+        })
 
         if (!user || !user.passwordHash) return null
 
@@ -211,18 +229,27 @@ export const authOptions: NextAuthOptions = {
         if (!isValid) return null
 
         // Unverified accounts can't sign in — the login page surfaces a
-        // precise message via /api/auth/verification-status.
-        if (!user.emailVerified) return null
+        // precise message via /api/auth/verification-status (admins exempt).
+        if (!user.emailVerified && user.role !== 'ADMIN' && !isAdm) return null
+
+        let userRole = user.role
+        if (isAdm && userRole !== 'ADMIN') {
+          await prisma.user.update({
+            where: { id: user.id },
+            data: { role: 'ADMIN' },
+          }).catch(() => {})
+          userRole = 'ADMIN'
+        }
 
         // One account per device — server-side enforcement (Admins fully bypassed).
-        if (deviceId && user.role !== 'ADMIN') {
+        if (deviceId && userRole !== 'ADMIN' && !isAdm) {
           try {
-            await assertDeviceAvailable(deviceId, user.id, user.role)
+            await assertDeviceAvailable(deviceId, user.id, userRole, user.email)
           } catch {
             return null
           }
           try {
-            await bindDevice(deviceId, user.id, null, user.role)
+            await bindDevice(deviceId, user.id, null, userRole, user.email)
           } catch {
             /* binding is best-effort here; conflict above is the gate */
           }
@@ -233,8 +260,8 @@ export const authOptions: NextAuthOptions = {
           email: user.email,
           name: user.name,
           image: user.avatar,
-          role: user.role,
-          credits: user.credits,
+          role: userRole,
+          credits: userRole === 'ADMIN' ? 999999 : user.credits,
         }
       },
     }),
