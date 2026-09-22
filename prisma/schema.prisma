@@ -41,6 +41,13 @@ enum PayoutStatus {
   PAID
 }
 
+enum SubmissionStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  PAID
+}
+
 enum SocialPlatform {
   TIKTOK
   YOUTUBE
@@ -75,6 +82,7 @@ model User {
   projects                Project[]
   clips                   Clip[]
   campaigns               Campaign[]
+  campaignSubmissions     CampaignSubmission[]
   payouts                 Payout[]
   postingDays             PostingDay[]
   apiKeys                 ApiKey[]
@@ -243,24 +251,57 @@ model Clip {
 }
 
 model Campaign {
-  id        String       @id @default(cuid())
-  userId    String
-  name      String
-  type      CampaignType
-  platform  String? // "tiktok", "instagram", "youtube"
-  ratePer1k Decimal      @db.Decimal(10, 2)
-  flatFee   Decimal?     @db.Decimal(10, 2)
-  budget    Decimal?     @db.Decimal(10, 2)
-  spent     Decimal      @default(0) @db.Decimal(10, 2)
-  deadline  DateTime?
-  isActive  Boolean      @default(true)
-  createdAt DateTime     @default(now())
-  updatedAt DateTime     @updatedAt
+  id          String               @id @default(cuid())
+  userId      String
+  name        String
+  type        CampaignType         @default(BRAND_DEAL)
+  platform    String? // "tiktok", "instagram", "youtube"
+  platforms   Json? // ["TIKTOK", "INSTAGRAM", "YOUTUBE"]
+  imageUrl    String?
+  description String?              @db.Text
+  rules       String?              @db.Text
+  sourceUrls  Json? // ["https://youtube.com/watch?v=...", "https://drive.google.com/..."]
+  ratePer1k   Decimal              @db.Decimal(10, 2)
+  flatFee     Decimal?             @db.Decimal(10, 2)
+  minPayout   Decimal?             @default(10.00) @db.Decimal(10, 2)
+  maxPayout   Decimal?             @db.Decimal(10, 2)
+  minViews    Int?                 @default(1000)
+  budget      Decimal?             @db.Decimal(10, 2)
+  spent       Decimal              @default(0) @db.Decimal(10, 2)
+  deadline    DateTime?
+  isActive    Boolean              @default(true)
+  createdAt   DateTime             @default(now())
+  updatedAt   DateTime             @updatedAt
 
-  user    User           @relation(fields: [userId], references: [id], onDelete: Cascade)
-  clips   CampaignClip[]
-  payouts Payout[]
+  user        User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  clips       CampaignClip[]
+  payouts     Payout[]
+  submissions CampaignSubmission[]
 
+  @@index([userId])
+}
+
+model CampaignSubmission {
+  id                String           @id @default(cuid())
+  campaignId        String
+  userId            String
+  postUrl           String
+  platform          String // "TIKTOK", "INSTAGRAM", "YOUTUBE"
+  views             Int              @default(0)
+  likes             Int              @default(0)
+  comments          Int              @default(0)
+  earnings          Decimal          @default(0) @db.Decimal(10, 2)
+  status            SubmissionStatus @default(PENDING)
+  verified          Boolean          @default(false)
+  verificationNotes String?          @db.Text
+  lastCheckedAt     DateTime?
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+
+  campaign Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([campaignId])
   @@index([userId])
 }
 

@@ -79,6 +79,8 @@ const CFG = {
   r2Key: process.env.R2_ACCESS_KEY_ID,
   r2Secret: process.env.R2_SECRET_ACCESS_KEY,
 
+  nvidiaKey: process.env.NVIDIA_API_KEY,
+  nvidiaScoreModel: process.env.NVIDIA_SCORE_MODEL ?? 'meta/llama-3.3-70b-instruct',
   groqKey: process.env.GROQ_API_KEY,
   openaiKey: process.env.OPENAI_API_KEY,
   whisperModel: process.env.WHISPER_MODEL ?? 'base',
@@ -119,6 +121,8 @@ const SETTING_PARSE = {
   clip_target_seconds: (v) => Math.max(5, Number(v) || 45),
   render_parallel: (v) => Math.max(1, Math.min(8, Number(v) || 4)),
   stale_job_minutes: (v) => Math.max(1, Number(v) || 30),
+  nvidia_api_key: (v) => String(v || '').trim(),
+  nvidia_score_model: (v) => String(v || '').trim(),
   groq_api_key: (v) => String(v || '').trim(),
   openai_api_key: (v) => String(v || '').trim(),
   whisper_model: (v) => String(v || '').trim(),
@@ -158,6 +162,8 @@ async function syncConfigInto() {
   CFG.clipMaxLength = c.clip_max_seconds ?? 90
   CFG.clipLength = c.clip_target_seconds ?? 45
   CFG.renderParallel = c.render_parallel
+  CFG.nvidiaKey = c.nvidia_api_key || process.env.NVIDIA_API_KEY || CFG.nvidiaKey
+  CFG.nvidiaScoreModel = c.nvidia_score_model || process.env.NVIDIA_SCORE_MODEL || 'meta/llama-3.3-70b-instruct'
   CFG.groqKey = c.groq_api_key || process.env.GROQ_API_KEY || CFG.groqKey
   CFG.openaiKey = c.openai_api_key || process.env.OPENAI_API_KEY || CFG.openaiKey
   CFG.whisperModel = c.whisper_model || process.env.WHISPER_MODEL || CFG.whisperModel
@@ -607,15 +613,50 @@ function generateCandidateMoments(transcript, duration, from = 0, minDur = 15, m
 
 async function llmScoreMoments(candidates, instructions) {
   const providers = []
+
+  // 1. NVIDIA NIM (PRIMARY - fast 6.5s timeout)
+  if (CFG.nvidiaKey) {
+    const nvModel = CFG.nvidiaScoreModel || 'meta/llama-3.3-70b-instruct'
+    providers.push({
+      name: `nvidia-${nvModel}`,
+      url: 'https://integrate.api.nvidia.com/v1/chat/completions',
+      key: CFG.nvidiaKey,
+      model: nvModel,
+      timeoutMs: 6500,
+    })
+  }
+
+  // 2. GROQ (FAST FALLBACK)
   if (CFG.groqKey) {
     const primaryModel = CFG.groqScoreModel || process.env.GROQ_SCORE_MODEL || 'allam-2-7b'
-    providers.push({ name: `groq-${primaryModel}`, url: 'https://api.groq.com/openai/v1/chat/completions', key: CFG.groqKey, model: primaryModel })
+    providers.push({
+      name: `groq-${primaryModel}`,
+      url: 'https://api.groq.com/openai/v1/chat/completions',
+      key: CFG.groqKey,
+      model: primaryModel,
+      timeoutMs: 25000,
+    })
     if (primaryModel !== 'qwen/qwen3.8-27b') {
-      providers.push({ name: 'groq-qwen3.8-27b', url: 'https://api.groq.com/openai/v1/chat/completions', key: CFG.groqKey, model: 'qwen/qwen3.8-27b' })
+      providers.push({
+        name: 'groq-qwen3.8-27b',
+        url: 'https://api.groq.com/openai/v1/chat/completions',
+        key: CFG.groqKey,
+        model: 'qwen/qwen3.8-27b',
+        timeoutMs: 25000,
+      })
     }
   }
-  if (CFG.openaiKey)
-    providers.push({ name: 'openai', url: 'https://api.openai.com/v1/chat/completions', key: CFG.openaiKey, model: 'gpt-4o-mini' })
+
+  // 3. OpenAI (Tertiary Fallback)
+  if (CFG.openaiKey) {
+    providers.push({
+      name: 'openai',
+      url: 'https://api.openai.com/v1/chat/completions',
+      key: CFG.openaiKey,
+      model: 'gpt-4o-mini',
+      timeoutMs: 30000,
+    })
+  }
 
   let system =
     'You are a master viral video editor for TikTok, Instagram Reels, and YouTube Shorts.\n' +
@@ -640,7 +681,7 @@ async function llmScoreMoments(candidates, instructions) {
       const res = await fetch(p.url, {
         method: 'POST',
         headers: { Authorization: `Bearer ${p.key}`, 'Content-Type': 'application/json' },
-        signal: AbortSignal.timeout(45_000),
+        signal: AbortSignal.timeout(p.timeoutMs || 25_000),
         body: JSON.stringify({
           model: p.model,
           response_format: { type: 'json_object' },

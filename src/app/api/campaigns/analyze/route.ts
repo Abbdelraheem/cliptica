@@ -2,6 +2,7 @@ import { auth } from '@/lib/auth'
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { assertPublicHttpUrl } from '@/lib/ssrf'
+import { executeAiChatCompletion } from '@/lib/ai-provider'
 
 const requestSchema = z.object({
   url: z.string().url(),
@@ -113,7 +114,6 @@ export async function POST(req: Request) {
       .trim()
       .slice(0, 4500)
 
-    const groqKey = process.env.GROQ_API_KEY
     const rawAssets = Array.from(assetMap.values())
 
     const campaignAnalysis = {
@@ -132,75 +132,61 @@ export async function POST(req: Request) {
       campaignHook: '',
     }
 
-    if (groqKey) {
-      try {
-        const assetsPrompt = rawAssets
-          .map((a, i) => `[Asset ${i + 1}] Type: ${a.type} | URL: ${a.url} | Label: ${a.label}`)
-          .join('\n')
+    try {
+      const assetsPrompt = rawAssets
+        .map((a, i) => `[Asset ${i + 1}] Type: ${a.type} | URL: ${a.url} | Label: ${a.label}`)
+        .join('\n')
 
-        const promptSystem =
-          'You are a clipping campaign director and viral media strategist for TikTok, YouTube Shorts, and Instagram Reels. ' +
-          'Analyze the provided web page text and detected media assets of a clipping bounty/campaign (from platforms like Whop, ContentReward, etc.). ' +
-          'Understand the core objectives, rules, and footage to formulate an integrated viral clip strategy. ' +
-          'Output a valid JSON object with: ' +
-          'title (string), payout (string or null), guidelines (string array), requiredHashtags (string array), ' +
-          'recommendedInstructions (string: instructions for the video cutter/scoring AI ensuring all campaign criteria and hooks are satisfied), ' +
-          'campaignHook (string: opening viral title hook text under 6 words), ' +
-          'recommendedCaptionStyle (string: one of ["hormozi", "neon", "luxury", "beast", "bold"]), ' +
-          'recommendedAssetUrl (string: the exact URL from the detected assets list that is the best primary footage to use for the clip), ' +
-          'aiRationale (string: 1 clear sentence explaining why this specific asset was chosen to build the complete campaign video).'
+      const promptSystem =
+        'You are a clipping campaign director and viral media strategist for TikTok, YouTube Shorts, and Instagram Reels. ' +
+        'Analyze the provided web page text and detected media assets of a clipping bounty/campaign (from platforms like Whop, ContentReward, etc.). ' +
+        'Understand the core objectives, rules, and footage to formulate an integrated viral clip strategy. ' +
+        'Output a valid JSON object with: ' +
+        'title (string), payout (string or null), guidelines (string array), requiredHashtags (string array), ' +
+        'recommendedInstructions (string: instructions for the video cutter/scoring AI ensuring all campaign criteria and hooks are satisfied), ' +
+        'campaignHook (string: opening viral title hook text under 6 words), ' +
+        'recommendedCaptionStyle (string: one of ["hormozi", "neon", "luxury", "beast", "bold"]), ' +
+        'recommendedAssetUrl (string: the exact URL from the detected assets list that is the best primary footage to use for the clip), ' +
+        'aiRationale (string: 1 clear sentence explaining why this specific asset was chosen to build the complete campaign video).'
 
-        const groqRes = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-          method: 'POST',
-          headers: {
-            Authorization: `Bearer ${groqKey}`,
-            'Content-Type': 'application/json',
+      const aiRes = await executeAiChatCompletion({
+        responseFormat: 'json_object',
+        temperature: 0.2,
+        messages: [
+          { role: 'system', content: promptSystem },
+          {
+            role: 'user',
+            content: `Campaign URL: ${campaignUrl}\n\nPage Text:\n${cleanText}\n\nDetected Media Assets:\n${assetsPrompt || 'None detected'}`,
           },
-          signal: AbortSignal.timeout(15000),
-          body: JSON.stringify({
-            model: 'llama-3.3-70b-versatile',
-            response_format: { type: 'json_object' },
-            temperature: 0.2,
-            messages: [
-              { role: 'system', content: promptSystem },
-              {
-                role: 'user',
-                content: `Campaign URL: ${campaignUrl}\n\nPage Text:\n${cleanText}\n\nDetected Media Assets:\n${assetsPrompt || 'None detected'}`,
-              },
-            ],
-          }),
-        })
+        ],
+      })
 
-        if (groqRes.ok) {
-          const groqData = await groqRes.json()
-          const parsed = JSON.parse(groqData.choices?.[0]?.message?.content || '{}')
-          if (parsed.title) campaignAnalysis.title = parsed.title
-          if (parsed.payout) campaignAnalysis.payout = parsed.payout
-          if (Array.isArray(parsed.guidelines) && parsed.guidelines.length) {
-            campaignAnalysis.guidelines = parsed.guidelines
-          }
-          if (Array.isArray(parsed.requiredHashtags)) {
-            campaignAnalysis.requiredHashtags = parsed.requiredHashtags
-          }
-          if (parsed.recommendedInstructions) {
-            campaignAnalysis.recommendedInstructions = parsed.recommendedInstructions
-          }
-          if (parsed.campaignHook) {
-            campaignAnalysis.campaignHook = parsed.campaignHook
-          }
-          if (parsed.recommendedCaptionStyle) {
-            campaignAnalysis.recommendedCaptionStyle = parsed.recommendedCaptionStyle
-          }
-          if (parsed.recommendedAssetUrl && rawAssets.some((a) => a.url === parsed.recommendedAssetUrl)) {
-            campaignAnalysis.recommendedAssetUrl = parsed.recommendedAssetUrl
-          }
-          if (parsed.aiRationale) {
-            campaignAnalysis.aiRationale = parsed.aiRationale
-          }
-        }
-      } catch (groqErr) {
-        console.warn('Groq campaign analysis fallback:', groqErr)
+      const parsed = (aiRes.parsedJson || {}) as Record<string, unknown>
+      if (typeof parsed.title === 'string' && parsed.title) campaignAnalysis.title = parsed.title
+      if (typeof parsed.payout === 'string' && parsed.payout) campaignAnalysis.payout = parsed.payout
+      if (Array.isArray(parsed.guidelines) && parsed.guidelines.length) {
+        campaignAnalysis.guidelines = parsed.guidelines.map(String)
       }
+      if (Array.isArray(parsed.requiredHashtags)) {
+        campaignAnalysis.requiredHashtags = parsed.requiredHashtags.map(String)
+      }
+      if (typeof parsed.recommendedInstructions === 'string' && parsed.recommendedInstructions) {
+        campaignAnalysis.recommendedInstructions = parsed.recommendedInstructions
+      }
+      if (typeof parsed.campaignHook === 'string' && parsed.campaignHook) {
+        campaignAnalysis.campaignHook = parsed.campaignHook
+      }
+      if (typeof parsed.recommendedCaptionStyle === 'string' && parsed.recommendedCaptionStyle) {
+        campaignAnalysis.recommendedCaptionStyle = parsed.recommendedCaptionStyle
+      }
+      if (typeof parsed.recommendedAssetUrl === 'string' && rawAssets.some((a) => a.url === parsed.recommendedAssetUrl)) {
+        campaignAnalysis.recommendedAssetUrl = parsed.recommendedAssetUrl
+      }
+      if (typeof parsed.aiRationale === 'string' && parsed.aiRationale) {
+        campaignAnalysis.aiRationale = parsed.aiRationale
+      }
+    } catch (aiErr) {
+      console.warn('AI campaign analysis fallback:', aiErr)
     }
 
     // Determine the primary asset

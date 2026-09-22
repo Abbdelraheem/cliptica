@@ -21,6 +21,8 @@ const DEFAULTS: SettingsState = {
   clip_target_seconds: 45,
   render_parallel: 4,
   stale_job_minutes: 30,
+  nvidia_api_key: '',
+  nvidia_score_model: 'meta/llama-3.3-70b-instruct',
   groq_score_model: 'allam-2-7b',
   whisper_model: 'whisper-large-v3-turbo',
   groq_api_key: '',
@@ -35,7 +37,7 @@ export default function AdminSettingsPage() {
   const [settings, setSettings] = useState<SettingsState | null>(null)
   const [dirty, setDirty] = useState(false)
   const [testingAi, setTestingAi] = useState(false)
-  const [aiResult, setAiResult] = useState<{ success?: boolean; latencyMs?: number; error?: string } | null>(null)
+  const [aiResult, setAiResult] = useState<{ success?: boolean; latencyMs?: number; error?: string; provider?: string; testedProvider?: string } | null>(null)
 
   useEffect(() => {
     fetch('/api/admin/settings')
@@ -67,21 +69,23 @@ export default function AdminSettingsPage() {
     onError: () => toast.error('Could not save settings'),
   })
 
-  const testAi = async () => {
+  const testAi = async (provider: 'nvidia' | 'groq' = 'nvidia') => {
     setTestingAi(true)
     setAiResult(null)
     try {
+      const key = provider === 'nvidia' ? settings?.nvidia_api_key : settings?.groq_api_key
+      const model = provider === 'nvidia' ? settings?.nvidia_score_model : settings?.groq_score_model
       const res = await fetch('/api/admin/ai-test', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ key: settings?.groq_api_key || undefined }),
+        body: JSON.stringify({ provider, key: key || undefined, model: model || undefined }),
       })
       const data = await res.json()
-      setAiResult(data)
+      setAiResult({ ...data, testedProvider: provider })
       if (data.success) {
-        toast.success(`Groq AI operational! Latency: ${data.latencyMs}ms (${data.modelsCount ?? data.models?.length ?? 0} models available)`)
+        toast.success(`${provider === 'nvidia' ? 'NVIDIA NIM' : 'Groq'} operational! Latency: ${data.latencyMs}ms`)
       } else {
-        toast.error(`Groq AI check failed: ${data.error || 'Authentication error'}`)
+        toast.error(`${provider.toUpperCase()} failed: ${data.error || 'Check failed'}`)
       }
     } catch {
       toast.error('Network error reaching AI test endpoint')
@@ -117,7 +121,7 @@ export default function AdminSettingsPage() {
           <p className="text-xs uppercase tracking-[0.3em] text-champagne">Platform Command Center</p>
           <h1 className="display-md mt-2">Engine & System Settings</h1>
           <p className="mt-1 text-xs text-mist font-light">
-            Granular control over AI models, dynamic moment bounds, worker scaling, and credit limits.
+            Granular control over AI models, NVIDIA NIM & Groq failover, worker scaling, and campaign boundaries.
           </p>
         </div>
         <div className="flex gap-3">
@@ -144,33 +148,86 @@ export default function AdminSettingsPage() {
               <Cpu className="h-5 w-5 text-gold" />
               <div>
                 <h2 className="font-display text-lg font-semibold">AI Intelligence Engine</h2>
-                <p className="text-xs text-mist font-light">Models used for word transcription and viral hook evaluation</p>
+                <p className="text-xs text-mist font-light">NVIDIA NIM Primary with Groq Instant Fast-Failover</p>
               </div>
             </div>
-            <button
-              type="button"
-              onClick={testAi}
-              disabled={testingAi}
-              className="btn-lux btn-outline flex items-center gap-2 !py-1.5 !px-3 text-xs"
-            >
-              {testingAi ? <Loader2 className="h-3.5 w-3.5 animate-spin text-gold" /> : <Play className="h-3.5 w-3.5 text-gold" />}
-              <span>Test AI Connection</span>
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => testAi('nvidia')}
+                disabled={testingAi}
+                className="btn-lux btn-gold flex items-center gap-1.5 !py-1.5 !px-3 text-xs"
+              >
+                {testingAi ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Play className="h-3.5 w-3.5" />}
+                <span>Test NVIDIA (1st)</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => testAi('groq')}
+                disabled={testingAi}
+                className="btn-lux btn-outline flex items-center gap-1.5 !py-1.5 !px-3 text-xs"
+              >
+                {testingAi ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Play className="h-3.5 w-3.5" />}
+                <span>Test Groq (2nd)</span>
+              </button>
+            </div>
           </div>
 
           {aiResult && (
             <div className={`mt-4 rounded-xl p-3 text-xs border ${aiResult.success ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300' : 'bg-red-500/10 border-red-500/30 text-red-300'}`}>
               <div className="flex items-center gap-2 font-medium">
                 {aiResult.success ? <CheckCircle2 className="h-4 w-4 text-emerald-400" /> : <AlertTriangle className="h-4 w-4 text-red-400" />}
-                <span>{aiResult.success ? `Groq API is verified and active (Response time: ${aiResult.latencyMs}ms)` : `Connection failed: ${aiResult.error}`}</span>
+                <span>{aiResult.success ? `${aiResult.provider?.toUpperCase()} is verified and active (Response time: ${aiResult.latencyMs}ms)` : `Connection failed: ${aiResult.error}`}</span>
               </div>
             </div>
           )}
 
           <div className="mt-5 grid gap-4 sm:grid-cols-2">
+            <div className="rounded-xl border border-gold/40 bg-gold/5 p-4">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-semibold uppercase tracking-wider text-gold">NVIDIA NIM API Key (1st Priority)</label>
+                <span className="rounded bg-gold/20 px-1.5 py-0.5 text-[10px] font-bold text-gold">Primary</span>
+              </div>
+              <p className="text-[11px] text-mist-2 mt-0.5">Primary engine for viral moment evaluation</p>
+              <input
+                type="password"
+                value={String(settings.nvidia_api_key || '')}
+                onChange={(e) => setValue('nvidia_api_key', e.target.value)}
+                placeholder="nvapi-..."
+                className="input-lux mt-2 font-mono text-xs w-full"
+              />
+            </div>
+
+            <div className="rounded-xl border border-gold/40 bg-gold/5 p-4">
+              <label className="text-xs font-semibold uppercase tracking-wider text-gold">NVIDIA Model Identifier</label>
+              <p className="text-[11px] text-mist-2 mt-0.5">Any NVIDIA NIM model (default: meta/llama-3.3-70b-instruct)</p>
+              <input
+                type="text"
+                value={String(settings.nvidia_score_model || 'meta/llama-3.3-70b-instruct')}
+                onChange={(e) => setValue('nvidia_score_model', e.target.value)}
+                placeholder="meta/llama-3.3-70b-instruct"
+                className="input-lux mt-2 font-mono text-xs w-full"
+              />
+            </div>
+
+            <div className="rounded-xl border border-hair/40 bg-surface/40 p-4">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-semibold uppercase tracking-wider text-mist">Groq API Key (Fallback)</label>
+                <span className="rounded bg-surface px-1.5 py-0.5 text-[10px] text-mist">Instant Fallback</span>
+              </div>
+              <p className="text-[11px] text-mist-2 mt-0.5">Instant failover if NVIDIA is slow, rate-limited, or unavailable</p>
+              <input
+                type="password"
+                value={String(settings.groq_api_key || '')}
+                onChange={(e) => setValue('groq_api_key', e.target.value)}
+                placeholder="gsk_..."
+                className="input-lux mt-2 font-mono text-xs w-full"
+              />
+            </div>
+
             <div className="rounded-xl border border-hair/40 bg-surface/40 p-4">
               <label className="text-xs font-semibold uppercase tracking-wider text-mist">Groq AI Scoring Model</label>
-              <p className="text-[11px] text-mist-2 mt-0.5">Primary model for evaluating viral hooks & storytelling</p>
+              <p className="text-[11px] text-mist-2 mt-0.5">Model used when falling back to Groq</p>
               <select
                 value={String(settings.groq_score_model || 'allam-2-7b')}
                 onChange={(e) => setValue('groq_score_model', e.target.value)}
@@ -197,20 +254,8 @@ export default function AdminSettingsPage() {
             </div>
 
             <div className="rounded-xl border border-hair/40 bg-surface/40 p-4">
-              <label className="text-xs font-semibold uppercase tracking-wider text-mist">Groq API Key Override</label>
-              <p className="text-[11px] text-mist-2 mt-0.5">Leave empty to use system environment default</p>
-              <input
-                type="password"
-                value={String(settings.groq_api_key || '')}
-                onChange={(e) => setValue('groq_api_key', e.target.value)}
-                placeholder="gsk_..."
-                className="input-lux mt-2 font-mono text-xs w-full"
-              />
-            </div>
-
-            <div className="rounded-xl border border-hair/40 bg-surface/40 p-4">
               <label className="text-xs font-semibold uppercase tracking-wider text-mist">OpenAI Fallback Key</label>
-              <p className="text-[11px] text-mist-2 mt-0.5">Secondary fallback for candidate scoring if Groq is offline</p>
+              <p className="text-[11px] text-mist-2 mt-0.5">Tertiary fallback for candidate scoring if Groq is offline</p>
               <input
                 type="password"
                 value={String(settings.openai_api_key || '')}
