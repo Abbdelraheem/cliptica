@@ -1,9 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-const { create, userUpdate, userFindFirst, creditTransactionCreate, constructEvent, subscriptionRetrieve } = vi.hoisted(() => ({
+const { create, userUpdate, userFindFirst, userFindUnique, creditTransactionCreate, constructEvent, subscriptionRetrieve } = vi.hoisted(() => ({
   create: vi.fn(),
   userUpdate: vi.fn(),
   userFindFirst: vi.fn(),
+  userFindUnique: vi.fn(),
   creditTransactionCreate: vi.fn(),
   constructEvent: vi.fn(),
   subscriptionRetrieve: vi.fn(),
@@ -12,7 +13,7 @@ const { create, userUpdate, userFindFirst, creditTransactionCreate, constructEve
 vi.mock('@/lib/prisma', () => {
   const tx = {
     processedWebhookEvent: { create },
-    user: { update: userUpdate, findFirst: userFindFirst },
+    user: { update: userUpdate, findFirst: userFindFirst, findUnique: userFindUnique },
     creditTransaction: { create: creditTransactionCreate },
   }
   return {
@@ -88,12 +89,14 @@ describe('Stripe webhook idempotency (atomic insert-first transaction)', () => {
     create.mockReset()
     userUpdate.mockReset()
     userFindFirst.mockReset()
+    userFindUnique.mockReset()
     creditTransactionCreate.mockReset()
     constructEvent.mockReset()
     subscriptionRetrieve.mockReset()
     create.mockResolvedValue({})
     userUpdate.mockResolvedValue({})
     userFindFirst.mockResolvedValue({ id: 'u1' })
+    userFindUnique.mockResolvedValue({ id: 'u1', role: 'FREE', email: 'u1@example.com' })
     creditTransactionCreate.mockResolvedValue({})
     subscriptionRetrieve.mockResolvedValue({
       id: 'sub_1',

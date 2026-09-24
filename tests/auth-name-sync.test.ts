@@ -3,6 +3,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 const mockPrisma = vi.hoisted(() => ({
   user: {
     findUnique: vi.fn(),
+    findFirst: vi.fn(),
     create: vi.fn(),
   },
   creditTransaction: {
@@ -22,12 +23,14 @@ describe('NextAuth Name Persistence & Sync', () => {
   })
 
   it('jwt callback: populates token.name from database user on initial sign-in', async () => {
-    mockPrisma.user.findUnique.mockResolvedValue({
+    const mockUserData = {
       id: 'usr_abc',
       role: 'FREE',
       credits: 50,
       name: 'Dr. Abdelraheem',
-    })
+    }
+    mockPrisma.user.findUnique.mockResolvedValue(mockUserData)
+    mockPrisma.user.findFirst.mockResolvedValue(mockUserData)
 
     const jwtCallback = authOptions.callbacks?.jwt
     expect(jwtCallback).toBeDefined()
