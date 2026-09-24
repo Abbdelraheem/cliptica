@@ -1085,3 +1085,29 @@ Executed `scripts/test-render-styles.mjs` rendering 1080x1920 video with burned-
 - Compressed `public/images/bg-terrain.jpg` (709,041 bytes / 709 KB) using FFmpeg libwebp at 75% quality.
 - Output: `public/images/bg-terrain.webp` (87,392 bytes / 85.3 KB), achieving an **87.7% reduction** (well under the 150 KB target).
 - Updated backdrop CSS in `src/app/globals.css` from `/images/bg-terrain.jpg` to `/images/bg-terrain.webp`.
+
+### 4. AI Model Resilience: Strongest-First Fallback Chain
+- **NVIDIA NIM Catalog Research**:
+  Queried live API endpoint (`GET https://integrate.api.nvidia.com/v1/models`). Confirmed real model IDs:
+  - Frontier Reasoning & Text:
+    * `deepseek-ai/deepseek-v4.1-flash` (552B MoE, 1M context) — primary scoring model.
+    * `nvidia/llama-3.1-nemotron-ultra-253b-v1` (253B reasoning).
+    * `nvidia/nemotron-3-ultra-550b-a55b` (550B MoE).
+    * `nvidia/llama-3.1-nemotron-70b-instruct`.
+    * `meta/llama-3.2-90b-vision-instruct`.
+  - Omni/Audio Model:
+    * `nvidia/nemotron-3-nano-omni-30b-a3b-reasoning`.
+- **Acoustic Cues vs Raw Audio Upload (Item 9)**:
+  * Investigated feasibility of sending raw audio to `nemotron-3-nano-omni`. For 40 candidate moments across a 15–60 min video, uploading separate base64 audio chunks would consume tens of megabytes per job, dramatically inflating API latency and risking payload size rejections.
+  * Solution: Integrated acoustic pacing metrics derived from Whisper word-level timestamps (`durationSec`, `speechRateWpm`, `acousticCadence`: rapid/high-energy, conversational, or slow/deliberate) directly into each candidate payload sent to the LLM.
+- **Ordered Fallback Chain**:
+  * Tier 1: NVIDIA NIM (`deepseek-ai/deepseek-v4.1-flash`) with configurable timeout `AI_SCORING_TIMEOUT_MS` (default 15s).
+  * Tier 2: Groq (`llama-3.3-70b-versatile` or `allam-2-7b`, with `qwen/qwen3.8-27b` fallback) (15s timeout).
+  * Tier 3: OpenAI (`gpt-4o-mini`) (15s timeout).
+  * Tier 4: Heuristic Scorer (`heuristicScoreMoments`) as infallible safety net.
+- **Structured Logging**:
+  * Emits tier-labeled latency logs: `[worker] scored via <provider> in <latency>ms [<tier>] | fallback chain: <attempts>`.
+  * Logs immediate failover on timeouts or HTTP errors: `[worker] tier <provider> failed after <latency>ms (timeout) — switching immediately to next tier...`.
+- **Unit Verification**:
+  * Added `tests/ai-fallback-chain.test.ts` testing Tier 1 timeout failover to Groq, and dual timeout failover to OpenAI.
+  * Verified: 2/2 tests passed in `ai-fallback-chain.test.ts`, all 28 test files in repo pass (309/309 tests).

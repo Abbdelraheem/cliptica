@@ -80,7 +80,8 @@ const CFG = {
   r2Secret: process.env.R2_SECRET_ACCESS_KEY,
 
   nvidiaKey: process.env.NVIDIA_API_KEY,
-  nvidiaScoreModel: process.env.NVIDIA_SCORE_MODEL ?? 'meta/llama-3.3-70b-instruct',
+  nvidiaScoreModel: process.env.NVIDIA_SCORE_MODEL ?? 'deepseek-ai/deepseek-v4.1-flash',
+  scoringTimeoutMs: Number(process.env.AI_SCORING_TIMEOUT_MS ?? 15_000),
   groqKey: process.env.GROQ_API_KEY,
   openaiKey: process.env.OPENAI_API_KEY,
   whisperModel: process.env.WHISPER_MODEL ?? 'base',
@@ -163,7 +164,8 @@ async function syncConfigInto() {
   CFG.clipLength = c.clip_target_seconds ?? 45
   CFG.renderParallel = c.render_parallel
   CFG.nvidiaKey = c.nvidia_api_key || process.env.NVIDIA_API_KEY || CFG.nvidiaKey
-  CFG.nvidiaScoreModel = c.nvidia_score_model || process.env.NVIDIA_SCORE_MODEL || 'meta/llama-3.3-70b-instruct'
+  CFG.nvidiaScoreModel = c.nvidia_score_model || process.env.NVIDIA_SCORE_MODEL || 'deepseek-ai/deepseek-v4.1-flash'
+  CFG.scoringTimeoutMs = Number(c.ai_scoring_timeout_ms || process.env.AI_SCORING_TIMEOUT_MS || CFG.scoringTimeoutMs || 15_000)
   CFG.groqKey = c.groq_api_key || process.env.GROQ_API_KEY || CFG.groqKey
   CFG.openaiKey = c.openai_api_key || process.env.OPENAI_API_KEY || CFG.openaiKey
   CFG.whisperModel = c.whisper_model || process.env.WHISPER_MODEL || CFG.whisperModel
@@ -216,6 +218,11 @@ function ytdlpArgs(extra) {
 
 async function download(url, dir) {
   await assertPublicHttpUrl(url)
+
+  // Guard against non-video Whop dashboard links
+  if (/whop\.com|apps\.whop\.com/i.test(url) && !/\.(mp4|mov|webm|mkv)/i.test(url)) {
+    throw new Error('Whop dashboard pages cannot be downloaded directly. Please select a video asset (MP4, Google Drive, or YouTube) from the campaign.')
+  }
 
   // Fast direct fetch for direct CDN / video files (ContentRewards, S3, direct MP4s)
   const isDirectVideo =
@@ -613,36 +620,40 @@ function generateCandidateMoments(transcript, duration, from = 0, minDur = 15, m
 
 async function llmScoreMoments(candidates, instructions) {
   const providers = []
+  const timeoutMs = CFG.scoringTimeoutMs || 15_000
 
-  // 1. NVIDIA NIM (PRIMARY - fast 6.5s timeout)
+  // 1. NVIDIA NIM (PRIMARY FRONTIER MODEL - Strongest Reasoning)
   if (CFG.nvidiaKey) {
     const nvModel = CFG.nvidiaScoreModel || 'deepseek-ai/deepseek-v4.1-flash'
     providers.push({
+      tier: 'tier-1 nvidia',
       name: `nvidia-${nvModel}`,
       url: 'https://integrate.api.nvidia.com/v1/chat/completions',
       key: CFG.nvidiaKey,
       model: nvModel,
-      timeoutMs: 6500,
+      timeoutMs,
     })
   }
 
-  // 2. GROQ (FAST FALLBACK)
+  // 2. GROQ (FAST HIGH-THROUGHPUT FALLBACK)
   if (CFG.groqKey) {
-    const primaryModel = CFG.groqScoreModel || process.env.GROQ_SCORE_MODEL || 'allam-2-7b'
+    const primaryModel = CFG.groqScoreModel || process.env.GROQ_SCORE_MODEL || 'llama-3.3-70b-versatile'
     providers.push({
+      tier: 'fallback-1 groq',
       name: `groq-${primaryModel}`,
       url: 'https://api.groq.com/openai/v1/chat/completions',
       key: CFG.groqKey,
       model: primaryModel,
-      timeoutMs: 25000,
+      timeoutMs,
     })
     if (primaryModel !== 'qwen/qwen3.8-27b') {
       providers.push({
+        tier: 'fallback-1.5 groq-qwen',
         name: 'groq-qwen3.8-27b',
         url: 'https://api.groq.com/openai/v1/chat/completions',
         key: CFG.groqKey,
         model: 'qwen/qwen3.8-27b',
-        timeoutMs: 25000,
+        timeoutMs,
       })
     }
   }
@@ -650,11 +661,12 @@ async function llmScoreMoments(candidates, instructions) {
   // 3. OpenAI (Tertiary Fallback)
   if (CFG.openaiKey) {
     providers.push({
-      name: 'openai',
+      tier: 'fallback-2 openai',
+      name: 'openai-gpt-4o-mini',
       url: 'https://api.openai.com/v1/chat/completions',
       key: CFG.openaiKey,
       model: 'gpt-4o-mini',
-      timeoutMs: 30000,
+      timeoutMs,
     })
   }
 
@@ -679,23 +691,38 @@ async function llmScoreMoments(candidates, instructions) {
     system += ` The uploader added these instructions — follow them strictly when picking and ranking: "${instructions.trim().slice(0, 500)}"`
   }
 
+  const candidatePayload = candidates.map((c, i) => {
+    const dur = Math.max(1, c.end - c.start)
+    const words = (c.text || '').split(/\s+/).filter(Boolean).length
+    const wpm = Math.round((words / dur) * 60)
+    return {
+      index: i,
+      durationSec: dur,
+      speechRateWpm: wpm,
+      acousticCadence: wpm > 155 ? 'fast/high-energy' : wpm < 105 ? 'slow/deliberate' : 'conversational',
+      text: c.text.slice(0, 700),
+    }
+  })
+
+  const attempts = []
   for (const p of providers) {
+    const t0 = Date.now()
     try {
       const res = await fetch(p.url, {
         method: 'POST',
         headers: { Authorization: `Bearer ${p.key}`, 'Content-Type': 'application/json' },
-        signal: AbortSignal.timeout(p.timeoutMs || 25_000),
+        signal: AbortSignal.timeout(p.timeoutMs || 15_000),
         body: JSON.stringify({
           model: p.model,
           response_format: { type: 'json_object' },
           temperature: 0.3,
           messages: [
             { role: 'system', content: system },
-            { role: 'user', content: JSON.stringify(candidates.map((c, i) => ({ index: i, text: c.text.slice(0, 700) }))) },
+            { role: 'user', content: JSON.stringify(candidatePayload) },
           ],
         }),
       })
-      if (!res.ok) throw new Error(`${p.name} ${res.status}`)
+      if (!res.ok) throw new Error(`${p.name} HTTP ${res.status}`)
       const data = await res.json()
       const rawText = data.choices[0].message.content || data.choices[0].message.reasoning_content || '{}'
       const parsed = JSON.parse(rawText)
@@ -726,10 +753,23 @@ async function llmScoreMoments(candidates, instructions) {
             emoji: String(m.emoji ?? '').slice(0, 4),
           }
         })
-      if (valid.length) return valid.slice(0, CFG.clipsPerVideo)
+      if (valid.length) {
+        const latency = Date.now() - t0
+        const fallbackNote = attempts.length > 0 ? ` | fallback chain: ${attempts.join(' -> ')}` : ''
+        console.log(`[worker] scored via ${p.name} in ${latency}ms [${p.tier}]${fallbackNote}`)
+        return valid.slice(0, CFG.clipsPerVideo)
+      }
+      throw new Error('Empty or invalid moments array returned')
     } catch (e) {
-      console.error(`[worker] scoring via ${p.name} failed:`, e.message)
+      const latency = Date.now() - t0
+      const isTimeout = e.name === 'TimeoutError' || e.message.toLowerCase().includes('timeout')
+      const reason = isTimeout ? 'timeout' : e.message
+      attempts.push(`${p.name} (${reason})`)
+      console.warn(`[worker] tier ${p.name} failed after ${latency}ms (${reason}) — switching immediately to next tier...`)
     }
+  }
+  if (attempts.length) {
+    console.warn(`[worker] all LLM tiers failed (${attempts.join(' -> ')}) — falling back to heuristic scoring`)
   }
   return null
 }
@@ -824,7 +864,10 @@ async function scoreMoments(transcript, duration, from = 0, instructions = null)
   const maxDur = CFG.clipMaxLength ?? 90
   const candidates = generateCandidateMoments(transcript, duration, from, minDur, maxDur)
   if (!candidates.length) return []
-  return (await llmScoreMoments(candidates, instructions)) ?? heuristicScoreMoments(candidates)
+  const llmResult = await llmScoreMoments(candidates, instructions)
+  if (llmResult && llmResult.length) return llmResult
+  console.log('[worker] scored via heuristic (fallback safety net)')
+  return heuristicScoreMoments(candidates)
 }
 
 /* ---------- premium vision ---------- */
@@ -897,7 +940,7 @@ async function renderClip(src, moment, dir, idx, transcript, mode = 'smart', cap
     )
   }
 
-  // framing filters (cliptica-style modes)
+  // framing filters (clipzila-style modes)
   const centerCrop = `crop='min(iw,ih*${W}/${H})':'min(ih,iw*${H}/${W})'`
   const faceCrop = cmdPath
     ? `sendcmd=f='${cmdPath.replace(/\\/g, '/').replace(/:/g, '\\:')}',crop=${cropW}:${cropH}:x:y`

@@ -37,7 +37,7 @@ export async function executeAiChatCompletion(options: AiCompletionOptions): Pro
     maxTokens = 2048,
     customNvidiaModel,
     customGroqModel,
-    timeoutMs = 6000,
+    timeoutMs = Number(process.env.AI_SCORING_TIMEOUT_MS || 15_000),
   } = options
 
   // 1. Fetch configured keys from DB Settings with process.env fallbacks
