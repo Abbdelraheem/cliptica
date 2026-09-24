@@ -68,6 +68,15 @@ export async function POST(request: Request) {
       if (!url) {
         return NextResponse.json({ error: 'Please enter a valid video link (e.g. YouTube URL)' }, { status: 400 })
       }
+      if (/whop\.com|apps\.whop\.com/i.test(url) && !/\.(mp4|mov|webm|mkv)/i.test(url)) {
+        return NextResponse.json(
+          {
+            error:
+              'Whop campaign pages are not direct video streams. Please select a video asset from the campaign, provide a YouTube/video link, or upload the video directly.',
+          },
+          { status: 400 }
+        )
+      }
       sourceUrl = url
     }
     // Security: uploads may only reference the user's own R2 prefix.

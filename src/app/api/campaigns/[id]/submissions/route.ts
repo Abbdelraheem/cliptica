@@ -81,7 +81,7 @@ export async function POST(
 
     if (platform === 'UNKNOWN') {
       return NextResponse.json(
-        { error: 'الرابط غير مدعوم. يرجى استخدام رابط فيديو منشور على TikTok أو Instagram Reels أو YouTube Shorts.' },
+        { error: 'Unsupported link. Please submit a valid video post from TikTok, Instagram Reels, or YouTube Shorts.' },
         { status: 400 }
       )
     }
@@ -91,7 +91,7 @@ export async function POST(
       where: { campaignId, postUrl: cleanUrl },
     })
     if (existing) {
-      return NextResponse.json({ error: 'تم تقديم هذا الرابط لهذه الحملة مسبقاً.' }, { status: 409 })
+      return NextResponse.json({ error: 'This video link has already been submitted to this campaign.' }, { status: 409 })
     }
 
     // Create submission record
@@ -114,7 +114,7 @@ export async function POST(
     return NextResponse.json({
       success: true,
       submission: verified ?? submission,
-      message: 'تم تسجيل مشاركتك في الحملة بنجاح، ويتم رصد المشاهدات تلقائياً.',
+      message: 'Video submission recorded successfully. Views are now being tracked automatically.',
     })
   } catch (error) {
     console.error('Submission creation error:', error)

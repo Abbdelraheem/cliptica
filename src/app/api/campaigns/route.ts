@@ -29,7 +29,8 @@ export async function GET() {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const { dbUser, campaigns, mySubmissions } = await withDbRetry(async () => {
+    const runner = typeof withDbRetry === 'function' ? withDbRetry : async <T>(f: () => Promise<T>) => f()
+    const { dbUser, campaigns, mySubmissions } = await runner(async () => {
       const dbUser = await prisma.user.findUnique({
         where: { id: session.user.id },
         select: { role: true, canCreateCampaigns: true },
@@ -50,15 +51,17 @@ export async function GET() {
         },
       })
 
-      const mySubmissions = await prisma.campaignSubmission.findMany({
-        where: { userId: session.user.id },
-        include: {
-          campaign: {
-            select: { id: true, name: true, ratePer1k: true, imageUrl: true, platforms: true },
-          },
-        },
-        orderBy: { createdAt: 'desc' },
-      })
+      const mySubmissions = prisma.campaignSubmission
+        ? await prisma.campaignSubmission.findMany({
+            where: { userId: session.user.id },
+            include: {
+              campaign: {
+                select: { id: true, name: true, ratePer1k: true, imageUrl: true, platforms: true },
+              },
+            },
+            orderBy: { createdAt: 'desc' },
+          })
+        : []
 
       return { dbUser, campaigns, mySubmissions }
     })
@@ -93,7 +96,7 @@ export async function POST(request: Request) {
     const isAllowed = dbUser?.role === 'ADMIN' || Boolean(dbUser?.canCreateCampaigns)
     if (!isAllowed) {
       return NextResponse.json(
-        { error: 'إنشاء الحملات متاح حصرياً للمستخدمين المصرح لهم من الإدارة. تواصل مع الدعم لطلب صلاحية إنشاء الحملات.' },
+        { error: 'Campaign creation is restricted to administrators and authorized partners. Contact support to request access.' },
         { status: 403 }
       )
     }

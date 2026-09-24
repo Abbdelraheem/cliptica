@@ -42,7 +42,7 @@ export async function POST(
     return NextResponse.json({
       success: true,
       submission: refreshed,
-      message: 'تم تحديث عدد المشاهدات والتحقق من الشروط بنجاح.',
+      message: 'Views updated and requirements verified successfully.',
     })
   } catch (error) {
     console.error('Submission refresh error:', error)
