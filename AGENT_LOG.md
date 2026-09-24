@@ -1136,3 +1136,23 @@ Executed `scripts/test-render-styles.mjs` rendering 1080x1920 video with burned-
   * Created unit test `tests/clip-download.test.ts` (6/6 tests passing).
   * Updated `tests/pricing-model.test.ts` (6/6 tests passing) and `PRICING_MODEL.md`.
   * All 29 test files passed (316/316 tests), TypeScript `tsc --noEmit` clean with 0 errors.
+
+### 6. Site Speed & Client JS Bundle Reduction (Part 4)
+- **Marketing Page RSC Architecture**:
+  * Converted `src/app/(marketing)/page.tsx` from `'use client'` monolith (804 lines of HTML/JS sent to client) to a pure React Server Component (RSC).
+  * Extracted interactive client islands into isolated components:
+    - `src/components/marketing/count-up.tsx` (`'use client'`)
+    - `src/components/marketing/paste-bar.tsx` (`'use client'`)
+    - `src/components/marketing/faq-accordion.tsx` (`'use client'`)
+  * Replaced `<img>` with optimized Next.js `<Image fill ... />` in `ClipCard`.
+- **Static Asset Cache-Control Headers (`next.config.ts`)**:
+  * Replaced broad regex with explicit matching rules:
+    - `/images/:path*`: `Cache-Control: public, max-age=31536000, immutable`
+    - `/brand/:path*`: `Cache-Control: public, max-age=31536000, immutable`
+    - `/marketing/:path*`: `Cache-Control: public, max-age=31536000, immutable`
+    - `/icons/:path*`: `Cache-Control: public, max-age=31536000, immutable`
+    - `/_next/static/:path*`: `Cache-Control: public, max-age=31536000, immutable`
+- **Measured Before/After Evidence**:
+  * **Marketing Route `/` Bundle Size**: Reduced from **10.0 kB** down to **2.43 kB** (**-75.7% reduction** in page route bundle size).
+  * **Total First Load JS on `/`**: Reduced from **126 kB** down to **119 kB** (**-7 kB** total client footprint).
+  * **Build Compilation Time**: Reduced from **31.0s** to **15.0s** (**> 50% faster build compilation**).

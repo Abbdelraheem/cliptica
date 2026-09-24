@@ -1,8 +1,5 @@
-'use client'
-
-import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import Image from 'next/image'
 import {
   Play,
   Flame,
@@ -14,7 +11,6 @@ import {
   Sparkles,
   ArrowRight,
   Check,
-  ChevronDown,
   Clock,
   Youtube,
   Wand2,
@@ -25,113 +21,9 @@ import {
 } from 'lucide-react'
 import { MarketingLayout } from '@/components/marketing-layout'
 import { buildSoftwareApplicationSchema, buildOrganizationSchema, buildWebSiteSchema } from '@/lib/seo/schema'
-
-/* ---------------- shared bits ---------------- */
-
-function CountUp({
-  end,
-  decimals = 0,
-  prefix = '',
-  suffix = '',
-  duration = 1700,
-}: {
-  end: number
-  decimals?: number
-  prefix?: string
-  suffix?: string
-  duration?: number
-}) {
-  const ref = useRef<HTMLSpanElement>(null)
-  const [val, setVal] = useState(0)
-
-  useEffect(() => {
-    const el = ref.current
-    if (!el) return
-    let raf = 0
-    const io = new IntersectionObserver(
-      ([e]) => {
-        if (!e.isIntersecting) return
-        io.disconnect()
-        const t0 = performance.now()
-        const tick = (t: number) => {
-          const p = Math.min(1, (t - t0) / duration)
-          setVal(end * (1 - Math.pow(1 - p, 3)))
-          if (p < 1) raf = requestAnimationFrame(tick)
-        }
-        raf = requestAnimationFrame(tick)
-      },
-      { threshold: 0.4 }
-    )
-    io.observe(el)
-    return () => {
-      io.disconnect()
-      cancelAnimationFrame(raf)
-    }
-  }, [end, duration])
-
-  return (
-    <span ref={ref}>
-      {prefix}
-      {val.toLocaleString('en-US', {
-        maximumFractionDigits: decimals,
-        minimumFractionDigits: decimals,
-      })}
-      {suffix}
-    </span>
-  )
-}
-
-const DEMO_URLS = [
-  'youtube.com/watch?v=podcast-ep-42',
-  'youtube.com/watch?v=lex-fridman-interview',
-  'youtube.com/watch?v=huberman-lab-highlights',
-]
-
-function PasteBar() {
-  const router = useRouter()
-  const [url, setUrl] = useState('')
-  const [isFocused, setIsFocused] = useState(false)
-  const [urlIdx, setUrlIdx] = useState(0)
-
-  useEffect(() => {
-    if (isFocused || url) return
-    const id = setInterval(() => {
-      setUrlIdx((i) => (i + 1) % DEMO_URLS.length)
-    }, 3200)
-    return () => clearInterval(id)
-  }, [isFocused, url])
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
-    const target = url.trim() || `https://${DEMO_URLS[urlIdx]}`
-    router.push(`/register?videoUrl=${encodeURIComponent(target)}`)
-  }
-
-  return (
-    <form
-      onSubmit={handleSubmit}
-      className="input-lux flex items-center gap-3 !rounded-2xl !py-1.5 pl-4 pr-1.5 shadow-2xl transition-all focus-within:!border-gold/50"
-    >
-      <Youtube className="h-5 w-5 shrink-0 text-[#FF0000]" />
-      <input
-        type="text"
-        value={url}
-        onChange={(e) => setUrl(e.target.value)}
-        onFocus={() => setIsFocused(true)}
-        onBlur={() => setIsFocused(false)}
-        placeholder={`https://${DEMO_URLS[urlIdx]}`}
-        className="min-w-0 flex-1 bg-transparent font-mono text-xs text-pearl placeholder:text-mist-2 focus:outline-none sm:text-sm"
-      />
-      <button
-        type="submit"
-        className="btn-lux btn-primary shrink-0 !rounded-xl !px-5 !py-2.5 !text-sm cursor-pointer"
-      >
-        Get Clips
-        <ArrowRight className="h-4 w-4" />
-      </button>
-    </form>
-  )
-}
+import { CountUp } from '@/components/marketing/count-up'
+import { PasteBar } from '@/components/marketing/paste-bar'
+import { FaqAccordion } from '@/components/marketing/faq-accordion'
 
 function ScoreBadge({ score }: { score: number }) {
   const tone =
@@ -175,9 +67,11 @@ function ClipCard({
     >
       <div className="relative mb-3 aspect-[9/14] overflow-hidden rounded-xl border border-hair bg-gradient-to-b from-[#141414] to-[#0b0b0b]">
         {imageSrc && (
-          <img
+          <Image
             src={imageSrc}
             alt={title}
+            fill
+            sizes="(max-width: 640px) 58vw, 320px"
             className="absolute inset-0 h-full w-full object-cover opacity-75 transition-transform duration-500 group-hover:scale-105"
             loading="lazy"
           />
@@ -682,70 +576,12 @@ function Pricing() {
   )
 }
 
-const FAQS: [string, string][] = [
-  [
-    'How long does a video take to process?',
-    'Roughly 4 minutes per hour of source video on our standard queue — a 1-hour podcast is usually done in under 5 minutes. Creator and Studio plans render on a priority queue.',
-  ],
-  [
-    'What sources can I use?',
-    'Paste any public YouTube link, or upload your own files (MP4, MOV, MKV). You must own the rights to the footage you process.',
-  ],
-  [
-    'How accurate are the Viral Scores?',
-    'Scores blend hook strength, pacing, emotion, and payoff signals measured across millions of short-form videos. They are a prioritization tool — the reasons tell you why each moment was picked so you can make the final call fast.',
-  ],
-  [
-    'Can I edit the clips after generation?',
-    'Yes — adjust trim points, swap caption style, or regenerate a single clip without re-processing the whole video.',
-  ],
-  [
-    'What do credits get spent on?',
-    'Credits are consumed per final video clip generated when a project runs. Failed renders are automatically refunded to your balance.',
-  ],
-  [
-    'Do you support languages other than English?',
-    'Transcription and captions currently work best in English, with early support for Spanish, Arabic, French, and German.',
-  ],
-]
-
 function Faq() {
-  const [open, setOpen] = useState<number | null>(0)
   return (
     <section id="faq" className="mx-auto max-w-3xl scroll-mt-28 px-5 pt-20 sm:px-6 sm:pt-28">
       <p className="eyebrow rv">FAQ</p>
       <h2 className="display-md mt-4 rv">Questions, answered</h2>
-      <div className="mt-12 space-y-3">
-        {FAQS.map(([q, a], i) => (
-          <div
-            key={q}
-            className={`glass-card overflow-hidden rounded-2xl transition-all duration-300 rv ${
-              open === i ? '!border-champagne/30' : ''
-            }`}
-          >
-            <button
-              onClick={() => setOpen(open === i ? null : i)}
-              className="flex w-full items-center justify-between gap-4 p-5 text-left"
-              aria-expanded={open === i}
-            >
-              <span className="font-display text-sm font-bold text-pearl sm:text-base">{q}</span>
-              <ChevronDown
-                className={`h-4 w-4 shrink-0 text-champagne transition-transform duration-300 ${
-                  open === i ? 'rotate-180' : ''
-                }`}
-              />
-            </button>
-            <div
-              className="grid transition-all duration-300"
-              style={{ gridTemplateRows: open === i ? '1fr' : '0fr' }}
-            >
-              <div className="overflow-hidden">
-                <p className="px-5 pb-5 text-sm leading-relaxed text-mist">{a}</p>
-              </div>
-            </div>
-          </div>
-        ))}
-      </div>
+      <FaqAccordion />
     </section>
   )
 }
