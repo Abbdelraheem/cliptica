@@ -21,27 +21,27 @@ const inter = Inter({
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXTAUTH_URL || 'https://clipzila.com'),
   title: {
-    default: 'Clipzila — One video in. A week of clips out.',
-    template: '%s | Clipzila',
+    default: 'CLIPZILA — One video in. A week of clips out.',
+    template: '%s | CLIPZILA',
   },
   description:
     'Paste a YouTube link and get ready-to-post vertical clips. AI finds the viral moments, crops with face-tracking, burns word-perfect captions, and scores every clip.',
   keywords: ['ai clipping', 'video to shorts', 'youtube clips', 'viral moments', 'auto captions', '9:16 crop', 'short form video'],
-  authors: [{ name: 'Clipzila' }],
-  creator: 'Clipzila',
-  publisher: 'Clipzila',
+  authors: [{ name: 'CLIPZILA' }],
+  creator: 'CLIPZILA',
+  publisher: 'CLIPZILA',
   robots: 'index, follow',
   openGraph: {
     type: 'website',
     locale: 'en_US',
     url: 'https://clipzila.com',
-    siteName: 'Clipzila',
-    title: 'Clipzila — One video in. A week of clips out.',
+    siteName: 'CLIPZILA',
+    title: 'CLIPZILA — One video in. A week of clips out.',
     description: 'AI that finds the viral moments in your videos and turns them into ready-to-post shorts.',
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'Clipzila — One video in. A week of clips out.',
+    title: 'CLIPZILA — One video in. A week of clips out.',
     description: 'AI clipping engine for creators.',
   },
   icons: {
@@ -80,7 +80,7 @@ export default function RootLayout({
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
       </head>
-      <body className="grain min-h-full bg-onyx text-pearl antialiased">
+      <body className="grain min-h-full text-pearl antialiased">
         <div className="amb" aria-hidden="true" />
         <TopLoader />
         <Providers>

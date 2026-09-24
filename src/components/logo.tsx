@@ -4,7 +4,7 @@ export function ClipzilaMark({ size = 28, className = '' }: { size?: number; cla
   return (
     <Image
       src="/brand/logo.png"
-      alt="Clipzila"
+      alt="CLIPZILA"
       width={size}
       height={size}
       priority

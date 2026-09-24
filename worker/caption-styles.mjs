@@ -1,5 +1,5 @@
 /**
- * Presets and ASS subtitle generation for Cliptica.
+ * Presets and ASS subtitle generation for CLIPZILA.
  * Supports 15 distinct visual presets with real font, positioning,
  * color, animation, and layout differences across Kinetic, Editorial,
  * and Creative categories.

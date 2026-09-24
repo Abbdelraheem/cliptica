@@ -41,8 +41,7 @@ export function MarketingLayout({
   }, [])
 
   return (
-    <div className="relative min-h-screen bg-onyx text-pearl">
-      <div className="amb" aria-hidden="true" />
+    <div className="relative min-h-screen text-pearl">
 
       {/* Floating nav */}
       <header className="fixed inset-x-0 top-0 z-50 flex justify-center px-4 pt-4">

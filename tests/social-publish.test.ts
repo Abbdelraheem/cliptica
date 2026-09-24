@@ -239,7 +239,7 @@ describe('Social Publishing & Security Integration Suite', () => {
 
       const result = await publishToYouTube('mock_yt_access_token', {
         title: 'Insane AI Productivity Tip',
-        description: 'Watch until the end for the tool reveal.\n\n#Shorts #Cliptica',
+        description: 'Watch until the end for the tool reveal.\n\n#Shorts #CLIPZILA',
         videoUrl: 'https://r2.cliptica.com/clips/clip-2.mp4',
         privacy: 'public',
       })
