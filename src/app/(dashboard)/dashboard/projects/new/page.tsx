@@ -338,12 +338,15 @@ export default function NewProjectPage() {
     primaryAsset?: { type: string; url: string; label: string; isRecommended?: boolean } | null
     aiRationale?: string
     assets: Array<{ type: string; url: string; label: string; isRecommended?: boolean }>
+    isHub?: boolean
+    hubMessage?: string | null
   } | null>(null)
   const [selectedAsset, setSelectedAsset] = useState<string | null>(null)
   const [showAssetCustomizer, setShowAssetCustomizer] = useState(false)
 
-  async function handleAnalyzeCampaign() {
-    const clean = campaignUrl.trim()
+  async function handleAnalyzeCampaign(overrideUrl?: string) {
+    const raw = typeof overrideUrl === 'string' ? overrideUrl : campaignUrl
+    const clean = raw.trim()
     if (!clean) return setError('Please enter a Whop or ContentReward campaign URL.')
     setError('')
     setAnalyzingCampaign(true)
@@ -369,6 +372,9 @@ export default function NewProjectPage() {
       if (chosen) {
         setSelectedAsset(chosen)
         setUrl(chosen)
+      } else {
+        setSelectedAsset(null)
+        setUrl('')
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not analyze campaign URL')
@@ -420,12 +426,23 @@ export default function NewProjectPage() {
     if (tab === 'link') {
       const s = cleanUrlString(url)
       if (!s) return 'Paste a video link.'
+      if (/whop\.com|apps\.whop\.com/i.test(s)) {
+        return 'Whop links belong in the Campaign tab. Switch to the Campaign tab to analyze and clip.'
+      }
       const normalised = normaliseVideoUrl(s)
       if (!normalised) return 'Paste a valid video link (e.g. YouTube URL).'
     }
     if (tab === 'campaign') {
-      const targetUrl = selectedAsset || url || campaignUrl.trim()
-      if (!targetUrl) return 'Paste a Whop or ContentReward campaign URL.'
+      if (!campaignUrl.trim() && !selectedAsset && !url) {
+        return 'Paste a Whop or ContentReward campaign URL.'
+      }
+      const targetUrl = selectedAsset || url
+      if (targetUrl && /whop\.com|apps\.whop\.com/i.test(targetUrl)) {
+        if (campaignData?.isHub) {
+          return 'هذا الرابط لمجموعة حملات (Hub). يرجى فتح الحملة المطلوبة ولصق رابطها أو اختيار فيديو من المادة الخام.'
+        }
+        return 'Please inspect the campaign and select a valid video asset (MP4, Google Drive, or YouTube) to start clipping.'
+      }
     }
     if (clipFrom && !/^\d{1,2}:\d{2}(:\d{2})?$/.test(clipFrom)) return 'Start time format: mm:ss'
     return null
@@ -465,9 +482,14 @@ export default function NewProjectPage() {
       } finally {
         setAnalyzingCampaign(false)
       }
-      if (!targetUrl) {
-        targetUrl = campaignUrl.trim()
+    }
+
+    if (tab === 'campaign' && (!targetUrl || /whop\.com|apps\.whop\.com/i.test(targetUrl))) {
+      setSubmitting(false)
+      if (campaignData?.isHub) {
+        return setError(campaignData.hubMessage || 'يرجى اختيار فيديو أو إدخال رابط حملة محددة من مساحة العمل لبدء القص.')
       }
+      return setError('Whop dashboard links cannot be clipped directly. Please select a video asset (MP4, Google Drive, or YouTube) from the campaign.')
     }
 
     try {
@@ -513,7 +535,7 @@ export default function NewProjectPage() {
         Uploads are instant and never blocked. Links work for YouTube — files always win when you have them.
       </p>
 
-      <form onSubmit={handleSubmit} className="mt-8 space-y-6 rounded-3xl border border-hair bg-gradient-to-b from-pearl/[0.05] to-pearl/[0.01] p-8 backdrop-blur-xl">
+      <form onSubmit={handleSubmit} className="mt-8 space-y-6 rounded-3xl border border-hair bg-gradient-to-b from-pearl/[0.05] to-pearl/[0.01] p-4 sm:p-8 backdrop-blur-xl">
 
         {/* Tabs */}
         <div className="flex gap-1 rounded-xl border border-hair/60 bg-black/30 p-1">
@@ -526,12 +548,19 @@ export default function NewProjectPage() {
               key={t.id}
               type="button"
               onClick={() => { setTab(t.id); setError('') }}
-              className={`flex flex-1 items-center justify-center gap-2 rounded-lg px-3 py-2.5 text-xs sm:text-sm transition-all ${
+              className={`flex flex-1 items-center justify-center gap-1.5 sm:gap-2 rounded-lg px-2 sm:px-3 py-2 sm:py-2.5 text-xs sm:text-sm transition-all ${
                 tab === t.id ? 'bg-champagne/15 font-semibold text-gold' : 'text-mist hover:text-pearl'
               }`}
             >
-              <t.icon className="h-4 w-4" />
-              {t.label}
+              <t.icon className="h-4 w-4 shrink-0" />
+              {t.id === 'campaign' ? (
+                <>
+                  <span className="sm:hidden">Campaign</span>
+                  <span className="hidden sm:inline">{t.label}</span>
+                </>
+              ) : (
+                <span>{t.label}</span>
+              )}
             </button>
           ))}
         </div>
@@ -593,6 +622,7 @@ export default function NewProjectPage() {
                 if (/whop\.com|contentreward/i.test(val)) {
                   setCampaignUrl(val)
                   setTab('campaign')
+                  handleAnalyzeCampaign(val)
                 }
               }}
               placeholder="https://www.youtube.com/watch?v=…"
@@ -624,14 +654,27 @@ export default function NewProjectPage() {
                 <input
                   type="url"
                   value={campaignUrl}
-                  onChange={(e) => setCampaignUrl(e.target.value)}
+                  onChange={(e) => {
+                    const val = e.target.value
+                    setCampaignUrl(val)
+                    if (/whop\.com|contentreward/i.test(val) && val.trim().length > 25) {
+                      handleAnalyzeCampaign(val)
+                    }
+                  }}
+                  onPaste={(e) => {
+                    const pasted = e.clipboardData.getData('text')
+                    if (pasted && /whop\.com|contentreward/i.test(pasted)) {
+                      setCampaignUrl(pasted)
+                      handleAnalyzeCampaign(pasted)
+                    }
+                  }}
                   placeholder="Paste Whop, ContentReward, or clipping campaign URL…"
                   className="input-lux !pl-11"
                 />
               </div>
               <button
                 type="button"
-                onClick={handleAnalyzeCampaign}
+                onClick={() => handleAnalyzeCampaign()}
                 disabled={analyzingCampaign || !campaignUrl.trim()}
                 className="btn-lux btn-gold !py-2.5 !px-5 shrink-0 disabled:opacity-50 flex items-center gap-2"
               >
@@ -666,53 +709,71 @@ export default function NewProjectPage() {
                   )}
                 </div>
 
-                {/* AI Selected Primary Footage Card */}
-                <div className="rounded-xl border border-gold/40 bg-gradient-to-r from-gold/[0.12] via-gold/[0.05] to-transparent p-4">
-                  <div className="flex items-center justify-between gap-2 mb-2">
-                    <span className="inline-flex items-center gap-1.5 rounded-full bg-gold/20 px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wider text-champagne border border-gold/30">
-                      <Sparkles className="h-3 w-3" />
-                      AI Auto-Selected Best Footage
-                    </span>
-                    {campaignData.assets.length > 1 && (
-                      <button
-                        type="button"
-                        onClick={() => setShowAssetCustomizer(!showAssetCustomizer)}
-                        className="text-[11px] text-mist hover:text-champagne flex items-center gap-1 underline underline-offset-4"
-                      >
-                        {showAssetCustomizer ? 'Hide alternatives' : `Switch footage (${campaignData.assets.length} detected)`}
-                        {showAssetCustomizer ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
-                      </button>
-                    )}
+                {/* Campaign Hub notification if no direct video asset */}
+                {campaignData.isHub && !selectedAsset && (
+                  <div className="rounded-xl border border-amber-500/40 bg-amber-500/10 p-4 text-xs text-amber-200 space-y-2">
+                    <div className="flex items-center gap-2 font-semibold text-amber-300">
+                      <Sparkles className="h-4 w-4" />
+                      <span>مجموعة حملات (Campaign Hub)</span>
+                    </div>
+                    <p className="leading-relaxed">
+                      {campaignData.hubMessage ||
+                        'تم التعرف على مساحة الحملات بنجاح. لبدء القص التلقائي، افتح الحملة المطلوبة وانسخ رابطها أو ضع رابط Google Drive / الفيديو المباشر.'}
+                    </p>
                   </div>
+                )}
 
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="min-w-0 flex-1">
-                      <p className="text-xs font-semibold text-pearl truncate">
-                        {campaignData.primaryAsset?.label || 'Primary Campaign Footage'}
-                      </p>
-                      <p className="text-[11px] text-mist truncate mt-0.5 font-mono">
-                        {url || selectedAsset}
-                      </p>
-                      {campaignData.aiRationale && (
-                        <p className="text-[11px] text-champagne/90 mt-1.5 flex items-center gap-1.5">
-                          <Check className="h-3 w-3 text-gold shrink-0" />
-                          <span>{campaignData.aiRationale}</span>
-                        </p>
+                {/* AI Selected Primary Footage Card (if asset exists) */}
+                {selectedAsset && (
+                  <div className="rounded-xl border border-gold/40 bg-gradient-to-r from-gold/[0.12] via-gold/[0.05] to-transparent p-4">
+                    <div className="flex items-center justify-between gap-2 mb-2">
+                      <span className="inline-flex items-center gap-1.5 rounded-full bg-gold/20 px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wider text-champagne border border-gold/30">
+                        <Sparkles className="h-3 w-3" />
+                        AI Auto-Selected Best Footage
+                      </span>
+                      {campaignData.assets.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={() => setShowAssetCustomizer(!showAssetCustomizer)}
+                          className="text-[11px] text-mist hover:text-champagne flex items-center gap-1 underline underline-offset-4"
+                        >
+                          {showAssetCustomizer
+                            ? 'Hide alternatives'
+                            : `Switch footage (${campaignData.assets.length} detected)`}
+                          {showAssetCustomizer ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+                        </button>
                       )}
                     </div>
-                    {url && (
-                      <a
-                        href={url}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="p-2 rounded-lg bg-black/40 border border-hair text-mist hover:text-pearl shrink-0"
-                        title="Preview footage"
-                      >
-                        <ExternalLink className="h-4 w-4" />
-                      </a>
-                    )}
+
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="min-w-0 flex-1">
+                        <p className="text-xs font-semibold text-pearl truncate">
+                          {campaignData.primaryAsset?.label || 'Primary Campaign Footage'}
+                        </p>
+                        <p className="text-[11px] text-mist truncate mt-0.5 font-mono">
+                          {url || selectedAsset}
+                        </p>
+                        {campaignData.aiRationale && (
+                          <p className="text-[11px] text-champagne/90 mt-1.5 flex items-center gap-1.5">
+                            <Check className="h-3 w-3 text-gold shrink-0" />
+                            <span>{campaignData.aiRationale}</span>
+                          </p>
+                        )}
+                      </div>
+                      {url && (
+                        <a
+                          href={url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="p-2 rounded-lg bg-black/40 border border-hair text-mist hover:text-pearl shrink-0"
+                          title="Preview footage"
+                        >
+                          <ExternalLink className="h-4 w-4" />
+                        </a>
+                      )}
+                    </div>
                   </div>
-                </div>
+                )}
 
                 {/* Alternative Assets Accordion */}
                 {showAssetCustomizer && campaignData.assets.length > 0 && (
@@ -849,21 +910,23 @@ export default function NewProjectPage() {
             <p className="text-sm font-light text-mist">Target Aspect Ratio</p>
             <span className="font-mono text-xs text-champagne">3 Formats Available</span>
           </div>
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 sm:gap-3">
             {ASPECT_RATIOS.map((ar) => (
               <button
                 key={ar.id}
                 type="button"
                 onClick={() => setAspectRatio(ar.id)}
-                className={`flex flex-col items-center rounded-xl border p-3.5 text-center transition-all ${
+                className={`flex sm:flex-col items-center sm:text-center text-left gap-3 sm:gap-0 rounded-xl border p-3 sm:p-3.5 transition-all ${
                   aspectRatio === ar.id
                     ? 'border-champagne/70 bg-champagne/10 shadow-[0_0_15px_rgba(212,175,55,0.12)]'
                     : 'border-hair/60 bg-black/25 hover:border-hair hover:bg-black/40'
                 }`}
               >
-                <span className="mb-1.5 text-xl">{ar.icon}</span>
-                <p className={`text-xs font-semibold ${aspectRatio === ar.id ? 'text-pearl' : 'text-mist'}`}>{ar.name}</p>
-                <p className="mt-1 text-[11px] leading-snug text-mist-2">{ar.desc}</p>
+                <span className="sm:mb-1.5 text-xl shrink-0">{ar.icon}</span>
+                <div>
+                  <p className={`text-xs font-semibold ${aspectRatio === ar.id ? 'text-pearl' : 'text-mist'}`}>{ar.name}</p>
+                  <p className="sm:mt-1 text-[11px] leading-snug text-mist-2">{ar.desc}</p>
+                </div>
               </button>
             ))}
           </div>

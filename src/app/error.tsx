@@ -17,8 +17,7 @@ export default function GlobalError({
   }, [error])
 
   return (
-    <div className="relative flex min-h-screen flex-col items-center justify-center bg-onyx px-6 text-center text-pearl">
-      <div className="amb" aria-hidden="true" />
+    <div className="relative flex min-h-screen flex-col items-center justify-center px-4 py-8 sm:px-6 text-center text-pearl">
 
       <div className="relative z-[2] max-w-md">
         <p className="text-xs uppercase tracking-[0.3em] text-champagne">Something broke</p>

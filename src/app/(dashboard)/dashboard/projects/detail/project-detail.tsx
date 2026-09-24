@@ -230,7 +230,7 @@ export default function ProjectDetail({ projectId }: { projectId: string }) {
     setPublishingClip(c)
     setPublishTitle(c.title || 'Viral Clip')
     const hook = c.description || c.title || ''
-    setPublishDesc(`${hook}\n\n#Shorts #Reels #Viral #Clipzila`)
+    setPublishDesc(`${hook}\n\n#Shorts #Reels #Viral #Cliptica`)
     setPublishPrivacy('public')
     setPublishError(null)
     setPublishSuccess(null)
@@ -1061,16 +1061,16 @@ export default function ProjectDetail({ projectId }: { projectId: string }) {
 
       {/* Publish to Social Media Modal */}
       {publishingClip && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-md">
-          <div className="relative w-full max-w-lg rounded-3xl border border-hair bg-[#141419] p-6 shadow-2xl">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-3 sm:p-4 backdrop-blur-md">
+          <div className="relative w-full max-w-lg rounded-3xl border border-hair bg-[#141419] p-4 sm:p-6 shadow-2xl">
             <div className="flex items-center justify-between border-b border-hair-soft pb-4">
-              <div className="flex items-center gap-2">
-                <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-champagne/10 text-champagne">
+              <div className="flex items-center gap-2 min-w-0">
+                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-champagne/10 text-champagne">
                   <Send className="h-4 w-4" />
                 </span>
-                <div>
-                  <h3 className="flex items-center gap-2 font-display text-lg font-semibold text-pearl">
-                    Publish to Social Media
+                <div className="min-w-0">
+                  <h3 className="flex flex-wrap items-center gap-2 font-display text-base sm:text-lg font-semibold text-pearl">
+                    <span>Publish to Social Media</span>
                     <span className="rounded-full border border-gold/40 bg-gold/10 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-champagne">
                       Coming Soon
                     </span>
@@ -1252,11 +1252,11 @@ export default function ProjectDetail({ projectId }: { projectId: string }) {
 
       {/* Viral Social Export Kit Modal */}
       {exportKitClip && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-in fade-in duration-200">
-          <div className="relative w-full max-w-2xl rounded-3xl border border-gold/30 bg-onyx-2 p-6 md:p-8 shadow-2xl overflow-y-auto max-h-[90vh]">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-3 sm:p-4 animate-in fade-in duration-200">
+          <div className="relative w-full max-w-2xl rounded-3xl border border-gold/30 bg-onyx-2 p-4 sm:p-8 shadow-2xl overflow-y-auto max-h-[90vh]">
             <button
               onClick={() => setExportKitClip(null)}
-              className="absolute right-5 top-5 rounded-full p-2 text-mist hover:bg-white/10 hover:text-white"
+              className="absolute right-4 sm:right-5 top-4 sm:top-5 rounded-full p-2 text-mist hover:bg-white/10 hover:text-white"
             >
               <X className="h-5 w-5" />
             </button>

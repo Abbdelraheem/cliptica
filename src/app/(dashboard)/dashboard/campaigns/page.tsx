@@ -76,9 +76,9 @@ type UserSubmission = {
 }
 
 const TYPE_LABEL: Record<Campaign['type'], string> = {
-  WHOP_CONTENT_REWARDS: 'مكافآت محتوى (Whop / Rewards)',
-  BRAND_DEAL: 'صفقة إعلانية تجارية (Brand Deal)',
-  OWN_CHANNEL: 'قناة وفريق عمل خاص (Own Channel)',
+  WHOP_CONTENT_REWARDS: 'Content Rewards (Whop / Rewards)',
+  BRAND_DEAL: 'Commercial Brand Deal',
+  OWN_CHANNEL: 'Own Channel & Team',
 }
 
 function num(v: string | number | null | undefined): number {
@@ -123,12 +123,12 @@ export default function CampaignsPage() {
       })
       const data = await res.json().catch(() => ({}))
       if (!res.ok) {
-        throw new Error(data.error ?? 'فشل تقديم الفيديو')
+        throw new Error(data.error ?? 'Failed to submit video')
       }
       return data
     },
     onSuccess: (data) => {
-      toast.success(data.message || 'تم تقديم الفيديو بنجاح!')
+      toast.success(data.message || 'Video submitted successfully!')
       setParticipatingCampaign(null)
       setSubmitUrl('')
       queryClient.invalidateQueries({ queryKey: ['campaigns'] })
@@ -148,12 +148,12 @@ export default function CampaignsPage() {
       })
       const data = await res.json().catch(() => ({}))
       if (!res.ok) {
-        throw new Error(data.error ?? 'فشل تحديث المشاهدات')
+        throw new Error(data.error ?? 'Failed to refresh views')
       }
       return data
     },
     onSuccess: (data) => {
-      toast.success(data.message || 'تم تحديث المشاهدات بنجاح!')
+      toast.success(data.message || 'Views refreshed successfully!')
       queryClient.invalidateQueries({ queryKey: ['campaigns'] })
     },
     onError: (err: Error) => {
@@ -183,18 +183,18 @@ export default function CampaignsPage() {
       const res = await fetch('/api/campaigns', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(input),
+        body: JSON.stringify({ input }),
       })
       const data = await res.json().catch(() => ({}))
       if (!res.ok) {
-        throw new Error(data.error ?? 'فشل إنشاء الحملة')
+        throw new Error(data.error ?? 'Failed to create campaign')
       }
       return data
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['campaigns'] })
       setCreating(false)
-      toast.success('تم إنشاء الحملة بنجاح')
+      toast.success('Campaign created successfully!')
     },
     onError: (e: Error) => toast.error(e.message),
   })
@@ -215,9 +215,9 @@ export default function CampaignsPage() {
             </span>
             <p className="text-xs uppercase tracking-[0.3em] text-champagne font-semibold">Bounties & Creator Rewards</p>
           </div>
-          <h1 className="display-md mt-2 text-3xl font-extrabold text-pearl">حملات مكافآت وصناع المحتوى</h1>
+          <h1 className="display-md mt-2 text-3xl font-extrabold text-pearl">Creator Rewards & Bounties</h1>
           <p className="mt-1 text-sm font-light text-mist">
-            شارك في حملات مكافآت المشاهدات، استغل الفيديوهات الخام لإنتاج مقاطع فايرال، واكسب مقابل كل 1,000 مشاهدة.
+            Participate in view-based reward campaigns, clip raw footage into viral videos, and earn for every 1,000 views.
           </p>
         </div>
 
@@ -233,7 +233,7 @@ export default function CampaignsPage() {
             className="btn-lux btn-gold !py-2.5 !px-5 text-sm font-bold flex items-center gap-2 shadow-lg shadow-gold/10"
           >
             <Plus className="h-4 w-4" />
-            إنشاء حملة جديدة
+            Create New Campaign
           </button>
         </div>
       </div>
@@ -249,7 +249,7 @@ export default function CampaignsPage() {
           }`}
         >
           <Film className="h-4 w-4" />
-          تصفح الحملات المتاحة للمشاركة ({campaigns.length})
+          Explore Active Campaigns ({campaigns.length})
         </button>
 
         <button
@@ -261,7 +261,7 @@ export default function CampaignsPage() {
           }`}
         >
           <Coins className="h-4 w-4" />
-          مشاركاتي وتتبع الأرباح ({mySubmissions.length})
+          My Submissions & Earnings ({mySubmissions.length})
         </button>
       </div>
 
@@ -274,11 +274,11 @@ export default function CampaignsPage() {
               <div className="space-y-1.5">
                 <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-champagne">
                   <Sparkles className="h-3.5 w-3.5" />
-                  كيف تكسب من الحملات؟
+                  How to Earn from Campaigns
                 </div>
-                <h3 className="text-lg font-bold text-pearl">1. حمّل المواد المصدرية → 2. فصّل مقاطعك بـ Cliptica AI → 3. انشر وقدّم رابطك</h3>
+                <h3 className="text-lg font-bold text-pearl">1. Grab Raw Footage → 2. Clip with Cliptica AI → 3. Post & Submit Your Link</h3>
                 <p className="text-xs text-mist leading-relaxed max-w-3xl">
-                  تصفح الحملات أدناه، افتح روابط الفيديوهات الخام لقص أقوى اللحظات، انشر الفيديو على تيك توك، ريلز، أو شورتس مع الشروط المطلوبة، ثم ضع رابط الفيديو لتحتسب مشاهداتك وأرباحك تلقائياً!
+                  Browse available campaigns below, access raw source footage to clip high-hook moments, post to TikTok, Reels, or Shorts adhering to rules, then submit your link to automatically track views and earn rewards!
                 </p>
               </div>
             </div>
@@ -287,13 +287,13 @@ export default function CampaignsPage() {
           {campaignsQuery.isLoading ? (
             <div className="flex items-center justify-center gap-3 py-24 text-mist">
               <Loader2 className="h-6 w-6 animate-spin text-gold" />
-              <span className="text-sm font-light">جاري جلب الحملات المتاحة...</span>
+              <span className="text-sm font-light">Loading available campaigns...</span>
             </div>
           ) : campaigns.length === 0 ? (
             <div className="rounded-2xl border border-dashed border-hair/50 p-12 text-center">
               <Megaphone className="mx-auto h-12 w-12 text-mist/40" />
-              <p className="mt-3 text-base font-medium text-pearl">لا توجد حملات نشطة حالياً</p>
-              <p className="mt-1 text-sm text-mist">تواصل مع الإدارة أو راجع الصفحة لاحقاً للمشاركة في أحدث الحملات ومكافآت المحتوى.</p>
+              <p className="mt-3 text-base font-medium text-pearl">No active campaigns right now</p>
+              <p className="mt-1 text-sm text-mist">Contact support or check back soon to participate in upcoming creator reward campaigns.</p>
             </div>
           ) : (
             <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
@@ -323,10 +323,10 @@ export default function CampaignsPage() {
                         )}
                         <div className="absolute top-3 left-3 flex items-center gap-1.5 rounded-full bg-onyx/80 px-2.5 py-1 text-[11px] font-semibold backdrop-blur-md border border-hair">
                           <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
-                          <span className="text-emerald-300">نشطة</span>
+                          <span className="text-emerald-300">Active</span>
                         </div>
                         <div className="absolute top-3 right-3 rounded-full bg-gold/20 px-2.5 py-1 text-[11px] font-bold text-gold backdrop-blur-md border border-gold/30">
-                          ${rate.toFixed(2)} / 1K مشاهدة
+                          ${rate.toFixed(2)} / 1K views
                         </div>
                       </div>
 
@@ -355,22 +355,22 @@ export default function CampaignsPage() {
                         {/* Metrics grid */}
                         <div className="grid grid-cols-2 gap-2 rounded-xl bg-onyx/50 p-3 text-xs border border-hair/40">
                           <div>
-                            <span className="text-mist text-[11px]">الميزانية الكلية:</span>
-                            <p className="font-semibold text-pearl mt-0.5">{budget > 0 ? `$${budget.toLocaleString()}` : 'مفتوحة'}</p>
+                            <span className="text-mist text-[11px]">Total Budget:</span>
+                            <p className="font-semibold text-pearl mt-0.5">{budget > 0 ? `$${budget.toLocaleString()}` : 'Unlimited'}</p>
                           </div>
                           <div>
-                            <span className="text-mist text-[11px]">الحد الأدنى للمشاهدات:</span>
-                            <p className="font-semibold text-pearl mt-0.5">{(c.minViews ?? 1000).toLocaleString()} مشاهدة</p>
+                            <span className="text-mist text-[11px]">Minimum Views:</span>
+                            <p className="font-semibold text-pearl mt-0.5">{(c.minViews ?? 1000).toLocaleString()} views</p>
                           </div>
                           {c.maxPayout ? (
                             <div>
-                              <span className="text-mist text-[11px]">الحد الأقصى للمكافأة:</span>
+                              <span className="text-mist text-[11px]">Max Reward:</span>
                               <p className="font-semibold text-gold mt-0.5">${num(c.maxPayout).toLocaleString()}</p>
                             </div>
                           ) : null}
                           <div>
-                            <span className="text-mist text-[11px]">المشاركات:</span>
-                            <p className="font-semibold text-pearl mt-0.5">{c._count.submissions} فيديو</p>
+                            <span className="text-mist text-[11px]">Submissions:</span>
+                            <p className="font-semibold text-pearl mt-0.5">{c._count.submissions} clips</p>
                           </div>
                         </div>
 
@@ -379,7 +379,7 @@ export default function CampaignsPage() {
                           <div className="space-y-1.5">
                             <span className="text-[11px] font-semibold text-champagne flex items-center gap-1">
                               <Film className="h-3 w-3" />
-                              الفيديوهات الخام (المواد المصدرية):
+                              Raw Source Footage:
                             </span>
                             <div className="flex flex-wrap gap-1.5">
                               {c.sourceUrls.map((url, idx) => (
@@ -391,7 +391,7 @@ export default function CampaignsPage() {
                                   className="inline-flex items-center gap-1 rounded-md bg-hair/20 px-2 py-1 text-[11px] text-pearl hover:bg-gold/20 hover:text-gold transition-colors border border-hair/50"
                                 >
                                   <ExternalLink className="h-3 w-3" />
-                                  رابط الفيديو {idx + 1}
+                                  Source Video {idx + 1}
                                 </a>
                               ))}
                             </div>
@@ -401,7 +401,7 @@ export default function CampaignsPage() {
                         {/* Rules snippet */}
                         {c.rules && (
                           <div className="rounded-lg bg-onyx/60 p-2.5 text-[11px] text-mist border border-hair/40">
-                            <span className="font-semibold text-pearl block mb-0.5">شروط الحملة:</span>
+                            <span className="font-semibold text-pearl block mb-0.5">Campaign Rules:</span>
                             <p className="line-clamp-2 leading-relaxed">{c.rules}</p>
                           </div>
                         )}
@@ -415,7 +415,7 @@ export default function CampaignsPage() {
                         className="btn-lux btn-gold w-full flex items-center justify-center gap-2 py-2.5 text-sm font-bold shadow-md shadow-gold/10"
                       >
                         <Share2 className="h-4 w-4" />
-                        شارك وقدم رابط الفيديو
+                        Participate & Submit Video
                       </button>
                     </div>
                   </article>
@@ -433,7 +433,7 @@ export default function CampaignsPage() {
           <div className="grid gap-4 sm:grid-cols-3">
             <div className="glass-card rounded-2xl border border-hair bg-onyx-2 p-5">
               <div className="flex items-center justify-between">
-                <span className="text-xs text-mist font-medium">إجمالي الأرباح المستحقة</span>
+                <span className="text-xs text-mist font-medium">Total Pending Earnings</span>
                 <span className="icon-gem !mb-0 !h-8 !w-8 !rounded-lg text-gold">
                   <DollarSign className="h-4 w-4" />
                 </span>
@@ -441,12 +441,12 @@ export default function CampaignsPage() {
               <p className="mt-3 font-display text-2xl font-bold text-gold">
                 ${totalUserEarnings.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </p>
-              <p className="mt-1 text-[11px] text-mist">تُحسب بناءً على المشاهدات المحققة في المنصات</p>
+              <p className="mt-1 text-[11px] text-mist">Calculated based on verified platform views</p>
             </div>
 
             <div className="glass-card rounded-2xl border border-hair bg-onyx-2 p-5">
               <div className="flex items-center justify-between">
-                <span className="text-xs text-mist font-medium">إجمالي المشاهدات المسجلة</span>
+                <span className="text-xs text-mist font-medium">Total Tracked Views</span>
                 <span className="icon-gem !mb-0 !h-8 !w-8 !rounded-lg text-pearl">
                   <Eye className="h-4 w-4" />
                 </span>
@@ -454,12 +454,12 @@ export default function CampaignsPage() {
               <p className="mt-3 font-display text-2xl font-bold text-pearl">
                 {totalUserViews.toLocaleString()}
               </p>
-              <p className="mt-1 text-[11px] text-mist">عبر TikTok و Instagram Reels و YouTube</p>
+              <p className="mt-1 text-[11px] text-mist">Across TikTok, Instagram Reels & YouTube</p>
             </div>
 
             <div className="glass-card rounded-2xl border border-hair bg-onyx-2 p-5">
               <div className="flex items-center justify-between">
-                <span className="text-xs text-mist font-medium">الفيديوهات المشاركة والمعتمدة</span>
+                <span className="text-xs text-mist font-medium">Approved Submissions</span>
                 <span className="icon-gem !mb-0 !h-8 !w-8 !rounded-lg text-emerald-400">
                   <CheckCircle2 className="h-4 w-4" />
                 </span>
@@ -467,7 +467,7 @@ export default function CampaignsPage() {
               <p className="mt-3 font-display text-2xl font-bold text-emerald-300">
                 {verifiedSubmissionsCount} <span className="text-sm font-normal text-mist">/ {mySubmissions.length}</span>
               </p>
-              <p className="mt-1 text-[11px] text-mist">فيديوهات مؤهلة لاستحقاق السحب</p>
+              <p className="mt-1 text-[11px] text-mist">Videos qualified for payout withdrawal</p>
             </div>
           </div>
 
@@ -475,22 +475,22 @@ export default function CampaignsPage() {
           {mySubmissions.length === 0 ? (
             <div className="rounded-2xl border border-dashed border-hair/50 p-12 text-center">
               <Coins className="mx-auto h-12 w-12 text-mist/40" />
-              <p className="mt-3 text-base font-medium text-pearl">لم تشارك بأي فيديو بعد</p>
+              <p className="mt-3 text-base font-medium text-pearl">No submissions yet</p>
               <p className="mt-1 text-sm text-mist">
-                انتقل إلى تبويب &quot;تصفح الحملات المتاحة&quot;، اختر حملة وقدم رابط الفيديو الخاص بك لبدء جني الأرباح!
+                Switch to the &quot;Explore Active Campaigns&quot; tab, choose a campaign, and submit your published video URL to start earning!
               </p>
               <button
                 onClick={() => setActiveTab('explore')}
                 className="btn-lux btn-gold mt-5 text-sm font-bold inline-flex items-center gap-2"
               >
                 <Film className="h-4 w-4" />
-                تصفح الحملات الآن
+                Explore Campaigns Now
               </button>
             </div>
           ) : (
             <div className="overflow-hidden rounded-2xl border border-hair bg-onyx-2">
               <div className="border-b border-hair px-6 py-4">
-                <h3 className="text-base font-bold text-pearl">قائمة الفيديوهات المقدمة ومتابعة المشاهدات</h3>
+                <h3 className="text-base font-bold text-pearl">Submitted Videos & View Tracking</h3>
               </div>
               <div className="divide-y divide-hair/40">
                 {mySubmissions.map((sub) => {
@@ -503,19 +503,19 @@ export default function CampaignsPage() {
                             {sub.platform}
                           </span>
                           <span className="text-xs font-semibold text-pearl">
-                            حملة: {sub.campaign?.name ?? 'حملة غير معروفة'}
+                            Campaign: {sub.campaign?.name ?? 'Unknown Campaign'}
                           </span>
                           {sub.status === 'APPROVED' ? (
                             <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-medium text-emerald-400 border border-emerald-500/20">
-                              <CheckCircle2 className="h-3 w-3" /> معتمد ومطابق للشروط
+                              <CheckCircle2 className="h-3 w-3" /> Approved & Verified
                             </span>
                           ) : sub.status === 'REJECTED' ? (
                             <span className="inline-flex items-center gap-1 rounded-full bg-red-500/10 px-2 py-0.5 text-[10px] font-medium text-red-400 border border-red-500/20">
-                              <XCircle className="h-3 w-3" /> غير معتمد
+                              <XCircle className="h-3 w-3" /> Rejected
                             </span>
                           ) : (
                             <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/10 px-2 py-0.5 text-[10px] font-medium text-amber-400 border border-amber-500/20">
-                              <Clock className="h-3 w-3" /> جاري الرصد
+                              <Clock className="h-3 w-3" /> Tracking Views
                             </span>
                           )}
                         </div>
@@ -537,7 +537,7 @@ export default function CampaignsPage() {
 
                       <div className="flex items-center gap-6 justify-between md:justify-end">
                         <div className="text-left md:text-right">
-                          <span className="text-[11px] text-mist block">المشاهدات</span>
+                          <span className="text-[11px] text-mist block">Views</span>
                           <span className="text-base font-bold text-pearl flex items-center gap-1">
                             <Eye className="h-3.5 w-3.5 text-gold" />
                             {sub.views.toLocaleString()}
@@ -545,7 +545,7 @@ export default function CampaignsPage() {
                         </div>
 
                         <div className="text-left md:text-right">
-                          <span className="text-[11px] text-mist block">الأرباح المحققة</span>
+                          <span className="text-[11px] text-mist block">Earnings</span>
                           <span className="text-base font-bold text-gold">
                             ${num(sub.earnings).toFixed(2)}
                           </span>
@@ -559,7 +559,7 @@ export default function CampaignsPage() {
                             })
                           }
                           disabled={isRefreshing}
-                          title="تحديث عدد المشاهدات والتحقق فوراً"
+                          title="Refresh view count and verify status"
                           className="btn-lux btn-ghost !p-2 text-mist hover:text-gold hover:border-gold/40 disabled:opacity-50"
                         >
                           <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin text-gold' : ''}`} />
@@ -583,21 +583,21 @@ export default function CampaignsPage() {
           onClick={() => setParticipatingCampaign(null)}
         >
           <div
-            className="w-full max-w-lg rounded-3xl border border-hair bg-onyx-2 p-7 shadow-2xl space-y-5"
+            className="w-full max-w-lg rounded-3xl border border-hair bg-onyx-2 p-4 sm:p-7 shadow-2xl space-y-5"
             onClick={(e) => e.stopPropagation()}
           >
             <div>
-              <p className="text-xs uppercase tracking-[0.3em] text-champagne font-semibold">تقديم مشاركة</p>
-              <h2 className="display-md mt-1 text-2xl font-bold text-pearl">المشاركة في {participatingCampaign.name}</h2>
+              <p className="text-xs uppercase tracking-[0.3em] text-champagne font-semibold">Submit Entry</p>
+              <h2 className="display-md mt-1 text-2xl font-bold text-pearl">Participate in {participatingCampaign.name}</h2>
               <p className="mt-1 text-xs text-mist">
-                أدخل رابط الفيديو الذي قمت بنشره على تيك توك، ريلز، أو يوتيوب شورتس ليتم تتبعه وحساب أرباحك فوراً.
+                Enter your published video link from TikTok, Reels, or YouTube Shorts to automatically track views and calculate earnings.
               </p>
             </div>
 
             {/* Campaign Rules Recap */}
             {participatingCampaign.rules && (
               <div className="rounded-xl bg-onyx-3/80 p-3 text-xs text-mist border border-hair/50 space-y-1">
-                <span className="font-semibold text-pearl block">شروط الحملة للموافقة على الأرباح:</span>
+                <span className="font-semibold text-pearl block">Campaign Requirements for Approval:</span>
                 <p className="text-[11px] leading-relaxed">{participatingCampaign.rules}</p>
               </div>
             )}
@@ -615,12 +615,12 @@ export default function CampaignsPage() {
             >
               <div>
                 <label className="text-xs font-semibold text-pearl block mb-1.5">
-                  رابط الفيديو المنشور (TikTok / Reels / Shorts):
+                  Published Video URL (TikTok / Reels / Shorts):
                 </label>
                 <input
                   required
                   type="url"
-                  placeholder="https://www.tiktok.com/@user/video/... أو Instagram Reel أو Shorts"
+                  placeholder="https://www.tiktok.com/@creator/video/... or Instagram Reel / Shorts URL"
                   value={submitUrl}
                   onChange={(e) => setSubmitUrl(e.target.value)}
                   className="input-lux w-full text-sm"
@@ -630,7 +630,7 @@ export default function CampaignsPage() {
               <div className="rounded-lg bg-onyx/60 p-3 text-[11px] text-mist flex items-start gap-2 border border-hair/40">
                 <Info className="h-4 w-4 text-champagne flex-shrink-0 mt-0.5" />
                 <span>
-                  يقوم محرك Cliptica بالتأكد من عدد المشاهدات وتفاعل الفيديو تلقائياً وبشكل دوري، وإضافة الأرباح فور تحقق شروط الحملة.
+                  The Cliptica engine periodically and automatically verifies video views and engagement, crediting earnings once campaign requirements are verified.
                 </span>
               </div>
 
@@ -642,10 +642,10 @@ export default function CampaignsPage() {
                 >
                   {submitVideoMutation.isPending ? (
                     <>
-                      <Loader2 className="h-4 w-4 animate-spin" /> جاري الفحص والتسجيل...
+                      <Loader2 className="h-4 w-4 animate-spin" /> Verifying & Submitting...
                     </>
                   ) : (
-                    'تأكيد والمشاركة في الحملة'
+                    'Confirm & Submit Video'
                   )}
                 </button>
                 <button
@@ -653,7 +653,7 @@ export default function CampaignsPage() {
                   onClick={() => setParticipatingCampaign(null)}
                   className="btn-lux btn-ghost py-3 px-5 text-sm"
                 >
-                  إلغاء
+                  Cancel
                 </button>
               </div>
             </form>
@@ -676,12 +676,12 @@ export default function CampaignsPage() {
             <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-gold/15 border border-gold/30 text-gold mb-4">
               <Lock className="h-7 w-7" />
             </div>
-            <p className="text-xs uppercase tracking-[0.3em] text-champagne font-semibold">صلاحية محددة</p>
-            <h2 className="display-md mt-2 text-2xl font-bold text-pearl">إنشاء الحملات يتطلب إذن الإدارة</h2>
+            <p className="text-xs uppercase tracking-[0.3em] text-champagne font-semibold">Restricted Permission</p>
+            <h2 className="display-md mt-2 text-2xl font-bold text-pearl">Campaign Creation Requires Admin Access</h2>
             <p className="mt-3 text-sm font-light text-mist leading-relaxed">
-              إنشاء وإطلاق حملات جديدة ومكافآت المحتوى متاح حصرياً للحسابات التي يمنحها الأدمن الصلاحية من لوحة التحكم.
+              Creating and launching new reward campaigns is currently restricted to accounts granted permission by the administrator.
               <br className="my-2" />
-              إذا كنت صانع محتوى أو كليبر، يمكنك فوراً المشاركة في الحملات المتاحة وتقديم فيديوهاتك لتحقيق الأرباح!
+              As a creator or clipper, you can immediately explore active campaigns and submit your videos to start earning rewards!
             </p>
 
             <div className="mt-6 space-y-2">
@@ -693,14 +693,14 @@ export default function CampaignsPage() {
                 }}
                 className="btn-lux btn-gold w-full py-3 text-sm font-bold"
               >
-                تصفح الحملات والمكافآت
+                Explore Active Campaigns
               </button>
               <button
                 type="button"
                 onClick={() => setShowPermissionModal(false)}
                 className="btn-lux btn-ghost w-full py-2.5 text-xs text-mist"
               >
-                إغلاق
+                Close
               </button>
             </div>
           </div>
@@ -716,13 +716,13 @@ export default function CampaignsPage() {
           onClick={() => setCreating(false)}
         >
           <div
-            className="w-full max-w-2xl rounded-3xl border border-hair bg-onyx-2 p-8 shadow-2xl my-auto"
+            className="w-full max-w-2xl rounded-3xl border border-hair bg-onyx-2 p-5 sm:p-8 shadow-2xl my-auto"
             onClick={(e) => e.stopPropagation()}
           >
-            <p className="text-xs uppercase tracking-[0.3em] text-champagne font-semibold">حملة جديدة</p>
-            <h2 className="display-md mt-1 text-2xl font-bold text-pearl">إطلاق حملة مكافآت وصناع محتوى</h2>
+            <p className="text-xs uppercase tracking-[0.3em] text-champagne font-semibold">New Campaign</p>
+            <h2 className="display-md mt-1 text-2xl font-bold text-pearl">Launch Creator Rewards Campaign</h2>
             <p className="mt-1 text-xs text-mist">
-              حدد الشروط، العائد لكل 1,000 مشاهدة، روابط المواد المصدرية، والمنصات المستهدفة لصناع المحتوى.
+              Define reward rate per 1,000 views, raw source footage links, rules, and target platforms for creators.
             </p>
 
             <form
@@ -759,53 +759,53 @@ export default function CampaignsPage() {
             >
               <div className="grid gap-4 sm:grid-cols-2">
                 <div>
-                  <label className="text-xs font-semibold text-pearl block mb-1">اسم الحملة *</label>
-                  <input required name="name" maxLength={120} placeholder="مثال: تحدي بودكاست الرواد 2026" className="input-lux w-full" />
+                  <label className="text-xs font-semibold text-pearl block mb-1">Campaign Name *</label>
+                  <input required name="name" maxLength={120} placeholder="e.g. Founders Podcast Challenge 2026" className="input-lux w-full" />
                 </div>
                 <div>
-                  <label className="text-xs font-semibold text-pearl block mb-1">نوع الحملة</label>
+                  <label className="text-xs font-semibold text-pearl block mb-1">Campaign Type</label>
                   <select name="type" className="input-lux w-full" defaultValue="WHOP_CONTENT_REWARDS">
-                    <option value="WHOP_CONTENT_REWARDS">مكافآت محتوى (Whop / Rewards)</option>
-                    <option value="BRAND_DEAL">صفقة إعلانية تجارية (Brand Deal)</option>
-                    <option value="OWN_CHANNEL">قناة خاصة (Own Channel)</option>
+                    <option value="WHOP_CONTENT_REWARDS">Content Rewards (Whop / Rewards)</option>
+                    <option value="BRAND_DEAL">Commercial Brand Deal</option>
+                    <option value="OWN_CHANNEL">Own Channel & Team</option>
                   </select>
                 </div>
               </div>
 
               <div>
-                <label className="text-xs font-semibold text-pearl block mb-1">رابط صورة الغلاف (Banner / Cover Image URL)</label>
+                <label className="text-xs font-semibold text-pearl block mb-1">Cover / Banner Image URL</label>
                 <input name="imageUrl" type="url" placeholder="https://..." className="input-lux w-full text-xs" />
               </div>
 
               <div className="grid gap-4 sm:grid-cols-3">
                 <div>
-                  <label className="text-xs font-semibold text-pearl block mb-1">العائد لكل 1,000 مشاهدة ($) *</label>
+                  <label className="text-xs font-semibold text-pearl block mb-1">Rate per 1,000 Views ($) *</label>
                   <input required name="ratePer1k" type="number" min="0.1" step="0.01" defaultValue="2.5" className="input-lux w-full" />
                 </div>
                 <div>
-                  <label className="text-xs font-semibold text-pearl block mb-1">الميزانية الإجمالية للحملة ($)</label>
-                  <input name="budget" type="number" min="10" step="10" placeholder="مثلاً: 2000" className="input-lux w-full" />
+                  <label className="text-xs font-semibold text-pearl block mb-1">Total Campaign Budget ($)</label>
+                  <input name="budget" type="number" min="10" step="10" placeholder="e.g. 2000" className="input-lux w-full" />
                 </div>
                 <div>
-                  <label className="text-xs font-semibold text-pearl block mb-1">الحد الأدنى للمشاهدات</label>
+                  <label className="text-xs font-semibold text-pearl block mb-1">Minimum Views Required</label>
                   <input name="minViews" type="number" min="100" defaultValue="1000" className="input-lux w-full" />
                 </div>
               </div>
 
               <div className="grid gap-4 sm:grid-cols-2">
                 <div>
-                  <label className="text-xs font-semibold text-pearl block mb-1">الحد الأدنى للسحب ($)</label>
+                  <label className="text-xs font-semibold text-pearl block mb-1">Minimum Payout ($)</label>
                   <input name="minPayout" type="number" min="1" defaultValue="10" className="input-lux w-full" />
                 </div>
                 <div>
-                  <label className="text-xs font-semibold text-pearl block mb-1">الحد الأقصى للمكافأة لكل صانع ($)</label>
-                  <input name="maxPayout" type="number" min="10" placeholder="مثلاً: 500" className="input-lux w-full" />
+                  <label className="text-xs font-semibold text-pearl block mb-1">Max Reward per Creator ($)</label>
+                  <input name="maxPayout" type="number" min="10" placeholder="e.g. 500" className="input-lux w-full" />
                 </div>
               </div>
 
               {/* Target Platforms */}
               <div>
-                <label className="text-xs font-semibold text-pearl block mb-1.5">المنصات المستهدفة:</label>
+                <label className="text-xs font-semibold text-pearl block mb-1.5">Target Platforms:</label>
                 <div className="flex flex-wrap items-center gap-4">
                   <label className="flex items-center gap-2 text-xs text-pearl cursor-pointer">
                     <input type="checkbox" name="platform_tiktok" defaultChecked className="rounded border-hair bg-onyx text-gold" />
@@ -825,34 +825,34 @@ export default function CampaignsPage() {
               {/* Source URLs */}
               <div>
                 <label className="text-xs font-semibold text-pearl block mb-1">
-                  روابط الفيديوهات المصدرية الخام (YouTube / Drive / Dropbox)
+                  Raw Source Footage URLs (YouTube / Google Drive / Dropbox)
                 </label>
                 <textarea
                   name="sourceUrls"
                   rows={2}
-                  placeholder="ضع رابط كل فيديو خام في سطر منفصل..."
+                  placeholder="Paste each raw footage video link on a new line..."
                   className="input-lux w-full text-xs font-mono"
                 />
               </div>
 
               {/* Rules & Requirements */}
               <div>
-                <label className="text-xs font-semibold text-pearl block mb-1">شروط الحملة والهاشتاجات المطلوبة</label>
+                <label className="text-xs font-semibold text-pearl block mb-1">Campaign Rules & Required Hashtags</label>
                 <textarea
                   name="rules"
                   rows={2}
-                  placeholder="مثال: يجب وضع هاشتاج #Cliptica ومنشن الحساب، وألا يقل طول المقطع عن 30 ثانية..."
+                  placeholder="e.g. Must include hashtag #CLIPTICA and tag account, clip minimum 30s..."
                   className="input-lux w-full text-xs"
                 />
               </div>
 
               {/* Description */}
               <div>
-                <label className="text-xs font-semibold text-pearl block mb-1">وصف الحملة وإرشادات المونتاج</label>
+                <label className="text-xs font-semibold text-pearl block mb-1">Campaign Description & Editing Guidelines</label>
                 <textarea
                   name="description"
                   rows={2}
-                  placeholder="نبذة عن الحملة، نصائح لاختيار اللقطات القوية والمحتوى المطلوب..."
+                  placeholder="Campaign brief, guidelines for viral moments and high-performing clips..."
                   className="input-lux w-full text-xs"
                 />
               </div>
@@ -865,10 +865,10 @@ export default function CampaignsPage() {
                 >
                   {createCampaign.isPending ? (
                     <>
-                      <Loader2 className="h-4 w-4 animate-spin" /> جاري الإنشاء...
+                      <Loader2 className="h-4 w-4 animate-spin" /> Creating Campaign...
                     </>
                   ) : (
-                    'إطلاق الحملة الآن'
+                    'Launch Campaign Now'
                   )}
                 </button>
                 <button
@@ -876,7 +876,7 @@ export default function CampaignsPage() {
                   onClick={() => setCreating(false)}
                   className="btn-lux btn-ghost py-3 px-5 text-sm"
                 >
-                  إلغاء
+                  Cancel
                 </button>
               </div>
             </form>

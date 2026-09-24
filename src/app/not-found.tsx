@@ -3,11 +3,10 @@ import { Wordmark } from '@/components/logo'
 
 export default function NotFound() {
   return (
-    <div className="relative flex min-h-screen flex-col items-center justify-center bg-onyx px-6 text-center text-pearl">
-      <div className="amb" aria-hidden="true" />
+    <div className="relative flex min-h-screen flex-col items-center justify-center px-4 py-8 sm:px-6 text-center text-pearl">
 
       <div className="relative z-[2]">
-        <Link href="/" className="mb-10 inline-flex" aria-label="Clipzila home">
+        <Link href="/" className="mb-10 inline-flex" aria-label="Cliptica home">
           <Wordmark size={30} />
         </Link>
 

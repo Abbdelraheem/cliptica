@@ -470,7 +470,7 @@ export default function SettingsPage() {
       <h1 className="display-md mt-2.5">Settings</h1>
 
       {/* Profile */}
-      <section className="mt-10 rounded-3xl border border-hair bg-gradient-to-b from-pearl/[0.05] to-pearl/[0.01] p-8 backdrop-blur-xl">
+      <section className="mt-10 rounded-3xl border border-hair bg-gradient-to-b from-pearl/[0.05] to-pearl/[0.01] p-5 sm:p-8 backdrop-blur-xl">
         <h2 className="font-display text-2xl font-semibold">Profile</h2>
         <form onSubmit={handleProfile} className="mt-6 space-y-5">
           <div>
@@ -507,7 +507,7 @@ export default function SettingsPage() {
       </section>
 
       {/* Security & Change Password */}
-      <section className="mt-8 rounded-3xl border border-hair bg-gradient-to-b from-pearl/[0.05] to-pearl/[0.01] p-8 backdrop-blur-xl">
+      <section className="mt-8 rounded-3xl border border-hair bg-gradient-to-b from-pearl/[0.05] to-pearl/[0.01] p-5 sm:p-8 backdrop-blur-xl">
         <div className="flex items-center gap-2.5">
           <Lock className="h-5 w-5 text-champagne" />
           <h2 className="font-display text-2xl font-semibold">Change Password</h2>
@@ -575,7 +575,7 @@ export default function SettingsPage() {
       </section>
 
       {/* API Key Management */}
-      <section className="mt-8 rounded-3xl border border-hair bg-gradient-to-b from-pearl/[0.05] to-pearl/[0.01] p-8 backdrop-blur-xl">
+      <section className="mt-8 rounded-3xl border border-hair bg-gradient-to-b from-pearl/[0.05] to-pearl/[0.01] p-5 sm:p-8 backdrop-blur-xl">
         <div className="flex items-center gap-2.5">
           <KeyRound className="h-5 w-5 text-champagne" />
           <h2 className="font-display text-2xl font-semibold">API Keys</h2>
@@ -669,7 +669,7 @@ export default function SettingsPage() {
       </section>
 
       {/* Active Sessions */}
-      <section className="mt-8 rounded-3xl border border-hair bg-gradient-to-b from-pearl/[0.05] to-pearl/[0.01] p-8 backdrop-blur-xl">
+      <section className="mt-8 rounded-3xl border border-hair bg-gradient-to-b from-pearl/[0.05] to-pearl/[0.01] p-5 sm:p-8 backdrop-blur-xl">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2.5">
             <Laptop className="h-5 w-5 text-champagne" />
@@ -732,7 +732,7 @@ export default function SettingsPage() {
       </section>
 
       {/* Notification Preferences */}
-      <section className="mt-8 rounded-3xl border border-hair bg-gradient-to-b from-pearl/[0.05] to-pearl/[0.01] p-8 backdrop-blur-xl">
+      <section className="mt-8 rounded-3xl border border-hair bg-gradient-to-b from-pearl/[0.05] to-pearl/[0.01] p-5 sm:p-8 backdrop-blur-xl">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2.5">
             <Bell className="h-5 w-5 text-champagne" />
@@ -791,7 +791,7 @@ export default function SettingsPage() {
       </section>
 
       {/* Social Accounts & Direct Publishing */}
-      <section className="mt-8 rounded-3xl border border-hair bg-onyx/40 p-8 backdrop-blur-xl">
+      <section className="mt-8 rounded-3xl border border-hair bg-onyx/40 p-5 sm:p-8 backdrop-blur-xl">
         <div className="flex items-center justify-between">
           <div>
             <h2 className="flex items-center gap-2.5 font-display text-2xl font-semibold">
@@ -929,7 +929,7 @@ export default function SettingsPage() {
 
       {/* Clipping Campaigns & Bounties (Restricted to Admin and Authorized Partners) */}
       {canManageCampaigns && (
-        <section className="mt-8 rounded-3xl border border-hair bg-gradient-to-b from-pearl/[0.05] to-pearl/[0.01] p-8 backdrop-blur-xl">
+        <section className="mt-8 rounded-3xl border border-hair bg-gradient-to-b from-pearl/[0.05] to-pearl/[0.01] p-5 sm:p-8 backdrop-blur-xl">
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div className="flex items-center gap-2.5">
               <Megaphone className="h-5 w-5 text-gold" />
@@ -960,11 +960,11 @@ export default function SettingsPage() {
           </div>
 
           {loadingCampaigns ? (
-            <div className="flex items-center justify-center p-8 text-sm text-mist">
+            <div className="flex items-center justify-center p-6 sm:p-8 text-sm text-mist">
               <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Loading campaigns...
             </div>
           ) : campaignsList.length === 0 ? (
-            <div className="mt-6 rounded-2xl border border-dashed border-hair/60 bg-onyx/40 p-8 text-center">
+            <div className="mt-6 rounded-2xl border border-dashed border-hair/60 bg-onyx/40 p-5 sm:p-8 text-center">
               <p className="text-sm font-light text-mist">
                 No clipping campaigns configured yet. Add your first campaign to start clipping and tracking rewards.
               </p>
@@ -1065,13 +1065,13 @@ export default function SettingsPage() {
       {/* New Campaign Modal */}
       {canManageCampaigns && showNewCampaignModal && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-onyx/80 px-6 backdrop-blur-sm"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-onyx/80 p-3 sm:px-6 backdrop-blur-sm"
           role="dialog"
           aria-modal="true"
           onClick={() => setShowNewCampaignModal(false)}
         >
           <div
-            className="w-full max-w-lg rounded-3xl border border-hair bg-onyx-2 p-7 shadow-2xl"
+            className="w-full max-w-lg rounded-3xl border border-hair bg-onyx-2 p-4 sm:p-7 shadow-2xl"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between border-b border-hair/40 pb-4">
@@ -1108,7 +1108,7 @@ export default function SettingsPage() {
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="text-xs font-medium uppercase tracking-wider text-mist">Type</label>
                   <select
@@ -1137,7 +1137,7 @@ export default function SettingsPage() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="text-xs font-medium uppercase tracking-wider text-mist">Rate per 1,000 Views ($) *</label>
                   <input
@@ -1166,7 +1166,7 @@ export default function SettingsPage() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="text-xs font-medium uppercase tracking-wider text-mist">Flat Fee / Base Pay ($)</label>
                   <input
@@ -1219,13 +1219,13 @@ export default function SettingsPage() {
       )}
 
       {/* Danger zone */}
-      <section className="mt-8 rounded-3xl border border-red-400/25 bg-red-400/[0.04] p-8">
+      <section className="mt-8 rounded-3xl border border-red-400/25 bg-red-400/[0.04] p-5 sm:p-8">
         <h2 className="font-display text-2xl font-semibold text-red-300">Danger zone</h2>
         <p className="mt-2 text-sm font-light text-mist">
           Deleting your account removes all projects, clips and ledger history. This cannot be undone.
         </p>
         <a
-          href={`mailto:support@clipzila.com?subject=${encodeURIComponent('Account deletion request')}&body=${encodeURIComponent(`Please delete my account (${session?.user?.email ?? ''}).`)}`}
+          href={`mailto:support@cliptica.com?subject=${encodeURIComponent('Account deletion request')}&body=${encodeURIComponent(`Please delete my account (${session?.user?.email ?? ''}).`)}`}
           className="btn-lux mt-6 inline-flex border border-red-400/40 !bg-transparent text-red-300 hover:!bg-red-400/10"
         >
           Request account deletion

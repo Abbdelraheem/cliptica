@@ -1156,3 +1156,50 @@ Executed `scripts/test-render-styles.mjs` rendering 1080x1920 video with burned-
   * **Marketing Route `/` Bundle Size**: Reduced from **10.0 kB** down to **2.43 kB** (**-75.7% reduction** in page route bundle size).
   * **Total First Load JS on `/`**: Reduced from **126 kB** down to **119 kB** (**-7 kB** total client footprint).
   * **Build Compilation Time**: Reduced from **31.0s** to **15.0s** (**> 50% faster build compilation**).
+
+### 7. Comprehensive Mobile & Responsive Overhaul at 375px Viewport (Part 5)
+- **Problem & Root Causes**:
+  * Rigid paddings (`p-8`, `p-9`) combined with container padding (`px-6`) consumed over 32% of available screen width on a 375px screen (leaving as little as 255px inner width for forms).
+  * 3-tab creation headers with long strings (`Campaign (Whop / ContentReward)`) squeezed siblings into unreadable chips.
+  * Aspect ratio picker in rigid `grid-cols-3` caused cramped ~70px cards with clipped text.
+  * Referral link boxes and Auto-Pilot channel cards without `min-w-0` overflowed horizontally at 375px.
+  * Paddle checkout modal header with verbose 280px SSL string pushed the close (`X`) button off-screen.
+  * 6-button cram in project detail forced buttons under 35px width; native `alert()` dialogs locked mobile browser UI threads.
+  * Residual "Clipzila" references lingered in auth layouts, dashboard empty states, and modal copy.
+- **Implemented Fixes**:
+  * **Auth Flow (`login`, `register`, `forgot-password`, `reset-password`, `verify-email`)**:
+    - Outer containers updated to `px-4 py-8 sm:px-6`.
+    - Card paddings updated to `p-5 sm:p-9` (recovering 28px of horizontal form space).
+    - SessionStorage key updated to `cliptica_pending_video_url`.
+    - Accessible home link labels updated to `aria-label="Cliptica home"`.
+    - All metadata titles and descriptions updated to Cliptica.
+  * **Project Creation Atelier (`projects/new/page.tsx`)**:
+    - Form card padding updated from `p-8` to `p-4 sm:p-8`.
+    - Tab 3 label converted to responsive text: `<span className="sm:hidden">Campaign</span><span className="hidden sm:inline">Campaign (Whop / ContentReward)</span>`.
+    - Aspect Ratio picker converted to `grid grid-cols-1 sm:grid-cols-3 gap-2.5 sm:gap-3` with comfortable horizontal row cards on mobile.
+  * **Billing, Plans & Paddle Checkout Modal (`billing/page.tsx`)**:
+    - Balance card and credit packs containers updated to `!p-5 sm:!p-8`.
+    - Referral card updated to `!p-4 sm:!p-6`; URL input wrapped in `flex flex-col sm:flex-row sm:items-center gap-2` with `min-w-0 truncate` and `shrink-0` copy button.
+    - Paddle modal header updated with `min-w-0`, responsive SSL badge `<span className="hidden sm:inline">Encrypted 256-Bit SSL · Merchant of Record: Paddle</span><span className="sm:hidden">Paddle Secure</span>`, modal padding `p-2 sm:p-6`, and `max-h-[95vh]`. Guaranteed visible Close (`X`) button.
+    - Support email updated to `support@cliptica.com`.
+  * **Project Detail & Workspace (`project-detail.tsx`)**:
+    - Replaced 6-button single row with structured two-tier hierarchy: Primary Actions (Download HD with real-time on-demand progress `HD 45%` + Viral Social Kit) and Secondary Actions (Editor, Publish, Share, Discard) with >= 38-40px touch targets.
+    - Replaced 100% of native `alert()` calls with non-blocking Sonner toasts.
+    - Direct Publish and Viral Social Kit modals updated to `p-4 sm:p-6` / `p-4 sm:p-8` with flex-wrapping headers.
+    - Updated export hashtag to `#Cliptica`.
+  * **Settings & Auto-Pilot Hub (`settings/page.tsx`, `autopilot/page.tsx`)**:
+    - All 8 settings sections (`Profile`, `Change Password`, `API Keys`, `Active Sessions`, `Notifications`, `Campaigns`, `Danger Zone`) updated from `p-8` to `p-5 sm:p-8`.
+    - Campaign creation modal updated to `p-4 sm:p-7` with `grid-cols-1 sm:grid-cols-2`.
+    - Auto-Pilot upgrade banner updated to `p-5 sm:p-8` with responsive CTA button `!px-4 sm:!px-8 text-xs sm:text-sm`.
+    - Channel items updated to `p-4 sm:p-5` with truncated channel URLs.
+  * **Global Shell (`error.tsx`, `not-found.tsx`, `dashboard/page.tsx`, `projects/page.tsx`, `earnings/page.tsx`, `campaigns/page.tsx`)**:
+    - Error and 404 pages updated to `px-4 py-8 sm:px-6` and `Cliptica home`.
+    - Empty state copy updated from "let Clipzila find" to "let Cliptica find".
+    - Payout CSV export filename updated to `cliptica-payouts-YYYY-MM-DD.csv`.
+    - Campaigns hero, submit modal, and rules placeholder updated to Cliptica / `#CLIPTICA`.
+  * **Documentation**:
+    - Created comprehensive `MOBILE_AUDIT_REPORT.md` documenting every 375px issue, before/after behavior, touch target audit matrix, and verification commands.
+- **Verification**:
+  * `npm run typecheck` (`tsc --noEmit`): Clean (0 errors).
+  * `npm test` (`vitest run`): 29/29 test files passed (316/316 tests).
+  * `npm run build`: Clean production build across all 51+ routes.

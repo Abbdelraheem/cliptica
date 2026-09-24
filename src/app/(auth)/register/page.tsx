@@ -30,7 +30,7 @@ export default function RegisterPage() {
     if (vUrl) {
       setPendingVideo(vUrl)
       try {
-        sessionStorage.setItem('clipzila_pending_video_url', vUrl)
+        sessionStorage.setItem('cliptica_pending_video_url', vUrl)
       } catch {}
     }
   }, [])
@@ -56,7 +56,7 @@ export default function RegisterPage() {
         const data = await res.json().catch(() => null)
         setError(
           data?.error === 'DEVICE_LIMIT'
-            ? (data?.message ?? 'This device already has a Clipzila account. One account per device.')
+            ? (data?.message ?? 'This device already has a Cliptica account. One account per device.')
             : (data?.error === 'Email already registered'
                 ? 'This email is already registered.'
                 : (data?.error ?? 'Something went wrong. Try again.'))
@@ -74,8 +74,7 @@ export default function RegisterPage() {
   }
 
   return (
-    <div className="relative flex min-h-screen items-center justify-center bg-onyx px-6 py-16 text-pearl">
-      <div className="amb" aria-hidden="true" />
+    <div className="relative flex min-h-screen items-center justify-center px-4 py-8 sm:px-6 sm:py-16 text-pearl">
 
       <div className="relative z-[2] grid w-full max-w-4xl gap-10 md:grid-cols-[1fr_1.1fr] md:items-center">
         {/* Left pitch */}
@@ -99,8 +98,8 @@ export default function RegisterPage() {
         </div>
 
         {/* Form card */}
-        <div className="rounded-3xl border border-hair bg-gradient-to-b from-pearl/[0.05] to-pearl/[0.01] p-9 backdrop-blur-xl">
-          <Link href="/" className="mb-8 flex justify-center md:hidden" aria-label="Clipzila home">
+        <div className="rounded-3xl border border-hair bg-gradient-to-b from-pearl/[0.05] to-pearl/[0.01] p-5 sm:p-9 backdrop-blur-xl">
+          <Link href="/" className="mb-8 flex justify-center md:hidden" aria-label="Cliptica home">
             <Wordmark size={26} />
           </Link>
 

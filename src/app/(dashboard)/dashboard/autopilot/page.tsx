@@ -165,7 +165,7 @@ export default function AutoPilotPage() {
 
       {/* Studio Tier Locked Banner if not Studio or Admin */}
       {effectiveRole !== null && !isStudioOrAdmin ? (
-        <div className="mt-8 rounded-3xl border border-gold/40 bg-gradient-to-b from-onyx-2 via-black/80 to-onyx-2 p-8 shadow-[0_0_50px_rgba(212,175,55,0.12)] text-center relative overflow-hidden">
+        <div className="mt-8 rounded-3xl border border-gold/40 bg-gradient-to-b from-onyx-2 via-black/80 to-onyx-2 p-5 sm:p-8 shadow-[0_0_50px_rgba(212,175,55,0.12)] text-center relative overflow-hidden">
           <div className="absolute -right-12 -top-12 h-40 w-40 rounded-full bg-gold/10 blur-3xl pointer-events-none" />
           <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-gold/15 border border-gold/30 text-gold mb-4 shadow-lg">
             <Lock className="h-6 w-6 text-gold" />
@@ -180,7 +180,7 @@ export default function AutoPilotPage() {
           <div className="mt-6 flex justify-center">
             <Link
               href="/dashboard/billing"
-              className="btn-lux btn-gold !py-3 !px-8 text-sm font-bold inline-flex items-center gap-2 shadow-[0_0_25px_rgba(212,175,55,0.3)] hover:scale-105 transition-transform"
+              className="btn-lux btn-gold !py-3 !px-4 sm:!px-8 text-xs sm:text-sm font-bold inline-flex items-center gap-2 shadow-[0_0_25px_rgba(212,175,55,0.3)] hover:scale-105 transition-transform"
             >
               <Sparkles className="h-4 w-4" />
               <span>Upgrade Account to Studio ($59/mo)</span>
@@ -189,7 +189,7 @@ export default function AutoPilotPage() {
         </div>
       ) : (
         /* Add New Channel Form */
-        <div className="mt-8 rounded-3xl border border-hair/60 bg-onyx-2 p-6 md:p-8 shadow-xl">
+        <div className="mt-8 rounded-3xl border border-hair/60 bg-onyx-2 p-4 sm:p-8 shadow-xl">
           <div className="flex items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-red-500/10 text-red-400 border border-red-500/20">
               <Youtube className="h-5 w-5" />
@@ -322,9 +322,9 @@ export default function AutoPilotPage() {
             {channels.map((ch) => (
               <div
                 key={ch.id}
-                className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-hair/50 bg-onyx-2 p-5 transition-all hover:border-gold/30"
+                className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-hair/50 bg-onyx-2 p-4 sm:p-5 transition-all hover:border-gold/30"
               >
-                <div className="flex items-center gap-3.5">
+                <div className="flex items-center gap-3.5 min-w-0 flex-1">
                   <div className={`relative flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border ${
                     ch.isActive ? 'bg-gold/10 text-gold border-gold/20' : 'bg-onyx-3 text-mist/60 border-hair/40'
                   }`}>
@@ -333,17 +333,17 @@ export default function AutoPilotPage() {
                       ch.isActive ? 'bg-emerald-500' : 'bg-amber-500/80'
                     }`} />
                   </div>
-                  <div>
+                  <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
-                      <h3 className="font-display text-sm font-semibold text-pearl">
+                      <h3 className="font-display text-sm font-semibold text-pearl truncate">
                         {ch.channelTitle || 'YouTube Channel'}
                       </h3>
                       {ch.isActive ? (
-                        <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-bold text-emerald-400 border border-emerald-500/20">
+                        <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-bold text-emerald-400 border border-emerald-500/20 shrink-0">
                           Active
                         </span>
                       ) : (
-                        <span className="rounded-full bg-amber-500/10 px-2 py-0.5 text-[10px] font-bold text-amber-400 border border-amber-500/20">
+                        <span className="rounded-full bg-amber-500/10 px-2 py-0.5 text-[10px] font-bold text-amber-400 border border-amber-500/20 shrink-0">
                           Paused
                         </span>
                       )}
@@ -352,10 +352,10 @@ export default function AutoPilotPage() {
                       href={ch.channelUrl}
                       target="_blank"
                       rel="noreferrer"
-                      className="mt-0.5 inline-flex items-center gap-1 text-xs font-mono text-mist hover:text-white"
+                      className="mt-0.5 inline-flex items-center gap-1 text-xs font-mono text-mist hover:text-white max-w-full"
                     >
-                      <span>{ch.channelUrl}</span>
-                      <ExternalLink className="h-3 w-3" />
+                      <span className="truncate">{ch.channelUrl}</span>
+                      <ExternalLink className="h-3 w-3 shrink-0" />
                     </a>
                   </div>
                 </div>

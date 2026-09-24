@@ -145,15 +145,14 @@ function VerifyEmailInner() {
 
 export default function VerifyEmailPage() {
   return (
-    <div className="relative flex min-h-screen items-center justify-center bg-onyx px-6 text-pearl">
-      <div className="amb" aria-hidden="true" />
+    <div className="relative flex min-h-screen items-center justify-center px-4 py-8 sm:px-6 text-pearl">
 
       <div className="relative z-[2] w-full max-w-md">
-        <Link href="/" className="mb-10 flex justify-center" aria-label="Clipzila home">
+        <Link href="/" className="mb-10 flex justify-center" aria-label="Cliptica home">
           <Wordmark size={30} />
         </Link>
 
-        <div className="rounded-3xl border border-hair bg-gradient-to-b from-pearl/[0.05] to-pearl/[0.01] p-9 backdrop-blur-xl">
+        <div className="rounded-3xl border border-hair bg-gradient-to-b from-pearl/[0.05] to-pearl/[0.01] p-5 sm:p-9 backdrop-blur-xl">
           <Suspense fallback={<div className="h-40" />}>
             <VerifyEmailInner />
           </Suspense>

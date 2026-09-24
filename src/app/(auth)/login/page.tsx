@@ -40,7 +40,7 @@ export default function LoginPage() {
       })
       if (check.status === 403) {
         const data = await check.json().catch(() => null)
-        setError(data?.message ?? 'This device already has another Clipzila account.')
+        setError(data?.message ?? 'This device already has another Cliptica account.')
         return
       }
 
@@ -83,15 +83,14 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="relative flex min-h-screen items-center justify-center bg-onyx px-6 text-pearl">
-      <div className="amb" aria-hidden="true" />
+    <div className="relative flex min-h-screen items-center justify-center px-4 py-8 sm:px-6 text-pearl">
 
       <div className="relative z-[2] w-full max-w-md">
-        <Link href="/" className="mb-10 flex justify-center" aria-label="Clipzila home">
+        <Link href="/" className="mb-10 flex justify-center" aria-label="Cliptica home">
           <Wordmark size={30} />
         </Link>
 
-        <div className="rounded-3xl border border-hair bg-gradient-to-b from-pearl/[0.05] to-pearl/[0.01] p-9 backdrop-blur-xl">
+        <div className="rounded-3xl border border-hair bg-gradient-to-b from-pearl/[0.05] to-pearl/[0.01] p-5 sm:p-9 backdrop-blur-xl">
           <p className="text-xs uppercase tracking-[0.3em] text-champagne">Welcome back</p>
           <h1 className="display-md mt-3">Welcome back, creator</h1>
 
@@ -156,7 +155,7 @@ export default function LoginPage() {
           </div>
 
           <p className="mt-7 text-center text-sm font-light text-mist">
-            New to Clipzila?{' '}
+            New to Cliptica?{' '}
             <Link href="/register" className="text-gold underline underline-offset-4 hover:text-champagne">
               Create an account
             </Link>

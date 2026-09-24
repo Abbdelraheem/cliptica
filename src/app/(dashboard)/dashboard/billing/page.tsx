@@ -383,7 +383,7 @@ export default function BillingPage() {
       )}
 
       {/* Credits balance */}
-      <div className="glass-card mt-8 flex flex-wrap items-center justify-between gap-6 !p-8">
+      <div className="glass-card mt-8 flex flex-wrap items-center justify-between gap-6 !p-5 sm:!p-8">
         <div>
           <p className="text-sm font-light text-mist">Credits Remaining</p>
           <p className="stat-value mt-1">{displayCredits}</p>
@@ -423,10 +423,10 @@ export default function BillingPage() {
 
       {/* Referral Card */}
       {referral && (
-        <div className="glass-card mt-6 border-gold/30 bg-gradient-to-r from-gold/10 via-surface to-surface !p-6">
+        <div className="glass-card mt-6 border-gold/30 bg-gradient-to-r from-gold/10 via-surface to-surface !p-4 sm:!p-6">
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gold/20 text-gold">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gold/20 text-gold">
                 <Gift className="h-5 w-5" />
               </div>
               <div>
@@ -449,12 +449,12 @@ export default function BillingPage() {
             </div>
           </div>
 
-          <div className="mt-4 flex items-center gap-2 rounded-xl border border-hair/60 bg-onyx-2 p-2">
+          <div className="mt-4 flex flex-col sm:flex-row sm:items-center gap-2 rounded-xl border border-hair/60 bg-onyx-2 p-2">
             <input
               type="text"
               readOnly
               value={referral.referralUrl}
-              className="flex-1 bg-transparent px-2 font-mono text-xs text-mist-2 focus:outline-none"
+              className="flex-1 min-w-0 bg-transparent px-2 font-mono text-xs text-mist-2 focus:outline-none truncate"
             />
             <button
               onClick={() => {
@@ -462,7 +462,7 @@ export default function BillingPage() {
                 setCopiedRef(true)
                 setTimeout(() => setCopiedRef(false), 2000)
               }}
-              className="btn-lux btn-gold flex items-center gap-1.5 !px-3 !py-1.5 text-xs font-semibold"
+              className="btn-lux btn-gold flex items-center justify-center gap-1.5 !px-3 !py-2 sm:!py-1.5 text-xs font-semibold shrink-0"
             >
               {copiedRef ? (
                 <>
@@ -561,7 +561,7 @@ export default function BillingPage() {
       </div>
 
       {/* Pay As You Go Credit Packs */}
-      <div className="mt-16 rounded-3xl border border-hair/50 bg-onyx-2 p-8 shadow-2xl">
+      <div className="mt-16 rounded-3xl border border-hair/50 bg-onyx-2 p-5 sm:p-8 shadow-2xl">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
             <div className="flex items-center gap-2 text-xs uppercase tracking-[0.24em] text-gold">
@@ -619,7 +619,7 @@ export default function BillingPage() {
 
       <p className="mt-10 text-center text-sm font-light text-mist">
         Need invoice history or a custom tier?{' '}
-        <a href="mailto:support@clipzila.com" className="text-gold underline underline-offset-4">
+        <a href="mailto:support@cliptica.com" className="text-gold underline underline-offset-4">
           Contact support
         </a>
       </p>
@@ -628,23 +628,26 @@ export default function BillingPage() {
       {/* LUXURY EMBEDDED INLINE CHECKOUT MODAL */}
       {/* ========================================================================= */}
       {activeCheckout && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-onyx/85 backdrop-blur-xl animate-in fade-in duration-200">
-          <div className="relative flex flex-col w-full max-w-5xl max-h-[92vh] overflow-hidden rounded-3xl border border-hair/80 bg-onyx-2 shadow-2xl shadow-black/90">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-6 bg-onyx/85 backdrop-blur-xl animate-in fade-in duration-200">
+          <div className="relative flex flex-col w-full max-w-5xl max-h-[95vh] sm:max-h-[92vh] overflow-hidden rounded-2xl sm:rounded-3xl border border-hair/80 bg-onyx-2 shadow-2xl shadow-black/90">
             {/* Top Bar */}
-            <div className="flex items-center justify-between border-b border-hair/50 px-6 py-4 bg-surface/30">
-              <div className="flex items-center gap-3">
-                <Wordmark size={24} />
-                <div className="h-4 w-px bg-hair/60" />
-                <div className="flex items-center gap-1.5 text-xs text-mist">
-                  <Lock className="h-3.5 w-3.5 text-emerald-400" />
-                  <span>Encrypted 256-Bit SSL · Merchant of Record: Paddle</span>
+            <div className="flex items-center justify-between border-b border-hair/50 px-4 sm:px-6 py-3 sm:py-4 bg-surface/30">
+              <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+                <Wordmark size={22} />
+                <div className="h-4 w-px bg-hair/60 shrink-0" />
+                <div className="flex items-center gap-1.5 text-xs text-mist truncate">
+                  <Lock className="h-3.5 w-3.5 text-emerald-400 shrink-0" />
+                  <span className="truncate">
+                    <span className="hidden sm:inline">Encrypted 256-Bit SSL · Merchant of Record: Paddle</span>
+                    <span className="sm:hidden">Paddle Secure</span>
+                  </span>
                 </div>
               </div>
 
               <button
                 onClick={handleCloseCheckout}
                 aria-label="Close checkout"
-                className="rounded-full border border-hair/60 p-1.5 text-mist transition-colors hover:bg-surface hover:text-pearl"
+                className="rounded-full border border-hair/60 p-1.5 text-mist transition-colors hover:bg-surface hover:text-pearl shrink-0 ml-2"
               >
                 <X className="h-5 w-5" />
               </button>
