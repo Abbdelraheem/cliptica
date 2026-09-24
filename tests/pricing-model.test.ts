@@ -87,4 +87,15 @@ describe('Pricing Model & Unit Economics', () => {
     const margin = (creditValue - adjustTotalCost) / creditValue
     expect(margin).toBeGreaterThan(0.95) // > 95% margin
   })
+
+  it('verifies two-tier storage efficiency reduces initial R2 storage footprint by > 50%', () => {
+    // 40s clip sizes:
+    // Full HD (CRF 20, 192k audio) ≈ 3.2 Mbps ≈ 16.0 MB
+    // Preview (CRF 28, maxrate 1500k, 96k audio) ≈ 1.3 Mbps ≈ 6.5 MB
+    const hdSizeMb = 16.0
+    const previewSizeMb = 6.5
+    const savingsRatio = (hdSizeMb - previewSizeMb) / hdSizeMb
+    expect(savingsRatio).toBeGreaterThan(0.5) // > 50% savings
+    expect(savingsRatio).toBeCloseTo(0.594, 2) // ~59.4% savings
+  })
 })

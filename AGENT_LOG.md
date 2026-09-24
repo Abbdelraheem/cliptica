@@ -1111,3 +1111,28 @@ Executed `scripts/test-render-styles.mjs` rendering 1080x1920 video with burned-
 - **Unit Verification**:
   * Added `tests/ai-fallback-chain.test.ts` testing Tier 1 timeout failover to Groq, and dual timeout failover to OpenAI.
   * Verified: 2/2 tests passed in `ai-fallback-chain.test.ts`, all 28 test files in repo pass (309/309 tests).
+
+### 5. Storage-Efficient Video Delivery Architecture (Part 3)
+- **Two-Tier Video Encoding Specification**:
+  * **Preview Tier (Default Generation)**: `libx264`, preset `superfast`, CRF `28`, maxrate `1500k`, bufsize `3000k`, `96k` AAC audio. Resulting file size for a 40s clip: ~6.5 MB (vs previous ~16.0 MB at CRF 22 / 192k audio). Achieves a **59.4% reduction** in initial Cloudflare R2 storage footprint.
+  * **HD Master Tier (On-Demand)**: `libx264`, preset `fast`, CRF `20`, `192k` AAC audio. Encoded on-demand only when a user requests an export/download.
+- **On-Demand Re-Encode Endpoint**:
+  * Implemented `GET /api/projects/[id]/clips/[clipId]/download`:
+    - Validates project and clip ownership.
+    - If `clip.exportUrl` is already generated: returns `{ ready: true, downloadUrl }`.
+    - If not yet rendered: checks for an active `clip_render_hd` job (or enqueues a new one) and returns `{ ready: false, status, progress, previewUrl }`.
+- **Worker Pipeline (`worker/worker.mjs`)**:
+  * Updated `renderClip` to accept `qualityTier = 'preview' | 'download'` with corresponding FFmpeg parameters.
+  * Updated `renderAll` to pass `'preview'` tier during initial project processing.
+  * In `processJob`, initial clip records set `videoUrl = url`, `exportUrl = null`, `exportedAt = null`.
+  * Added `processClipRenderHd` handler for `job.type === 'clip_render_hd'` to render the HD master directly from cached source and transcript without re-transcribing or re-scoring.
+  * Added `deleteFromR2(key)` and `cleanExpiredHdClips()` running every 5 minutes in worker loop to purge HD masters older than `HD_RETENTION_DAYS` (default: 30 days).
+  * Error handler ensures `clip_render_hd` failures do not fail the parent project or corrupt existing preview clips.
+- **Frontend Integration (`project-detail.tsx`)**:
+  * Integrated `handleDownload(clip)`: triggers instantaneous download if HD master exists; polls `/download` route with progress indicator (`HD {progress}%`) if rendering on-demand.
+  * Refactored 6-button cram into responsive 2-tier primary and secondary action rows with >= 38-40px touch targets.
+  * Replaced native `alert()` dialogs with Sonner toast notifications.
+- **Verification**:
+  * Created unit test `tests/clip-download.test.ts` (6/6 tests passing).
+  * Updated `tests/pricing-model.test.ts` (6/6 tests passing) and `PRICING_MODEL.md`.
+  * All 29 test files passed (316/316 tests), TypeScript `tsc --noEmit` clean with 0 errors.

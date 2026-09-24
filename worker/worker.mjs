@@ -894,7 +894,7 @@ async function faceTrack(src, moment, dir, idx) {
 
 /* ---------- render ---------- */
 
-async function renderClip(src, moment, dir, idx, transcript, mode = 'smart', captionStyle = 'hormozi', aspectRatio = '9:16', watermark = false) {
+async function renderClip(src, moment, dir, idx, transcript, mode = 'smart', captionStyle = 'hormozi', aspectRatio = '9:16', watermark = false, qualityTier = 'preview') {
   let W = CFG.outW, H = CFG.outH
   if (aspectRatio === '1:1') {
     W = 1080
@@ -989,12 +989,16 @@ async function renderClip(src, moment, dir, idx, transcript, mode = 'smart', cap
       const margin = Math.round(W * 0.04)
       vfChain = `movie='${escWm}',scale=${wmW}:-1,format=rgba,colorchannelmixer=aa=0.85[wm];[in]${vfChain}[vbase];[vbase][wm]overlay=W-w-${margin}:${margin}`
     }
+    const isHd = qualityTier === 'download' || qualityTier === 'hd'
+    const encArgs = isHd
+      ? ['-c:v', 'libx264', '-preset', 'fast', '-crf', '20', '-c:a', 'aac', '-b:a', '192k']
+      : ['-c:v', 'libx264', '-preset', 'superfast', '-crf', '28', '-maxrate', '1500k', '-bufsize', '3000k', '-c:a', 'aac', '-b:a', '96k']
     return [
       '-y', '-ss', String(moment.start), '-t', String(targetDur), '-i', src,
       '-vf', vfChain,
       '-af', 'loudnorm=I=-14:TP=-1.5:LRA=11',
-      '-c:v', 'libx264', '-preset', 'superfast', '-crf', '22',
-      '-c:a', 'aac', '-b:a', '192k', '-movflags', '+faststart',
+      ...encArgs,
+      '-movflags', '+faststart',
     ]
   }
 
@@ -1044,7 +1048,7 @@ async function probeSize(file) {
 }
 
 /** Render all clips with bounded parallelism and per-clip progress reporting. */
-async function renderAll(src, moments, dir, transcript, framing = 'smart', captionStyle = 'hormozi', aspectRatio = '9:16', watermark = false, onProgress = null) {
+async function renderAll(src, moments, dir, transcript, framing = 'smart', captionStyle = 'hormozi', aspectRatio = '9:16', watermark = false, onProgress = null, qualityTier = 'preview') {
   const VARIETY = ['face', 'blur', 'center']
   const results = new Array(moments.length)
   let next = 0
@@ -1054,8 +1058,8 @@ async function renderAll(src, moments, dir, transcript, framing = 'smart', capti
       const i = next++
       if (i >= moments.length) return
       const mode = framing === 'variety' ? VARIETY[i % VARIETY.length] : framing
-      console.log(`[worker] rendering clip ${i + 1}/${moments.length} [${mode}, style=${captionStyle}, ratio=${aspectRatio}, watermark=${watermark}]`)
-      results[i] = await renderClip(src, moments[i], dir, i, transcript, mode, captionStyle, aspectRatio, watermark)
+      console.log(`[worker] rendering clip ${i + 1}/${moments.length} [${mode}, style=${captionStyle}, ratio=${aspectRatio}, watermark=${watermark}, tier=${qualityTier}]`)
+      results[i] = await renderClip(src, moments[i], dir, i, transcript, mode, captionStyle, aspectRatio, watermark, qualityTier)
       doneCount++
       if (typeof onProgress === 'function') {
         await onProgress(doneCount, moments.length).catch(() => {})
@@ -1074,6 +1078,18 @@ async function uploadToR2(file, key, contentType = 'video/mp4') {
     timeout: 1000 * 60 * 15,
   })
   return `${CFG.r2Endpoint}/${CFG.r2Bucket}/${key}`
+}
+
+async function deleteFromR2(key) {
+  try {
+    await sh('aws', ['s3', 'rm', `s3://${CFG.r2Bucket}/${key}`, '--endpoint-url', CFG.r2Endpoint], {
+      env: { ...process.env, AWS_ACCESS_KEY_ID: CFG.r2Key, AWS_SECRET_ACCESS_KEY: CFG.r2Secret, AWS_DEFAULT_REGION: 'auto' },
+      timeout: 1000 * 60 * 2,
+    })
+    console.log(`[worker] deleted R2 object: ${key}`)
+  } catch (e) {
+    console.warn(`[worker] failed to delete R2 object ${key}:`, e.message)
+  }
 }
 
 /* ================= job loop ================= */
@@ -1224,9 +1240,111 @@ async function processClipAdjust(job) {
   }
 }
 
+async function processClipRenderHd(job) {
+  const setP = (p, stage = null) =>
+    prisma.processingJob.update({
+      where: { id: job.id },
+      data: {
+        progress: p,
+        ...(stage ? { result: { ...(job.result || {}), stage } } : {}),
+      },
+    }).catch(() => {})
+
+  const { clipId } = job.result || {}
+  if (!clipId) throw new Error('Missing clipId in clip_render_hd job')
+
+  const project = await prisma.project.findUnique({ where: { id: job.projectId } })
+  if (!project) throw new Error(`Project ${job.projectId} not found`)
+
+  const clip = await prisma.clip.findUnique({ where: { id: clipId } })
+  if (!clip) throw new Error(`Clip ${clipId} not found`)
+
+  console.log(`[worker] [clip_render_hd] ${job.id}: rendering HD master for clip ${clipId}`)
+  await setP(15, 'Acquiring source video media...')
+
+  const dir = await mkdtemp(path.join(tmpdir(), 'nology-hd-'))
+  try {
+    const cacheDir = path.join(tmpdir(), 'nology-sources')
+    await mkdir(cacheDir, { recursive: true }).catch(() => {})
+    const cachedSrc = path.join(cacheDir, `${project.id}.mp4`)
+
+    let src = null
+    try {
+      const st = await stat(cachedSrc)
+      if (st.size > 1000) src = cachedSrc
+    } catch {}
+
+    if (!src) {
+      await setP(25, 'Loading source video media...')
+      src = project.sourceFile
+        ? await downloadFromR2(project.sourceFile, dir)
+        : await download(project.sourceUrl, dir)
+      await copyFile(src, cachedSrc).catch(() => {})
+    }
+
+    await setP(45, 'Preparing HD master typography & karaoke...')
+    let transcript = project.transcript
+    if (!transcript || !Array.isArray(transcript.words)) {
+      if (clip.captionData && Array.isArray(clip.captionData.words)) {
+        transcript = { words: clip.captionData.words }
+      } else {
+        transcript = { words: [] }
+      }
+    }
+
+    const captionStyle = clip.captionStyle || project.captionStyle || 'hormozi'
+    const moment = {
+      start: clip.sourceStart,
+      end: clip.sourceEnd,
+      title: clip.title,
+      text: clip.title,
+      emoji: clip.captionData?.emoji || '',
+      score: clip.viralScore,
+      hookHeadline: clip.captionData?.hookHeadline || clip.title,
+    }
+
+    const aspectRatio = clip.aspectRatio || project.aspectRatio || '9:16'
+    const owner = await prisma.user.findUnique({ where: { id: project.userId }, select: { role: true } })
+    const applyWatermark = !owner?.role || owner.role === 'FREE' || owner.role === 'USER'
+
+    await setP(60, 'Rendering high-definition master (CRF 20, 192k audio)...')
+    const rendered = await renderClip(
+      src,
+      moment,
+      dir,
+      `hd_${clip.id}`,
+      transcript,
+      project.framing ?? 'smart',
+      captionStyle,
+      aspectRatio,
+      applyWatermark,
+      'download'
+    )
+
+    await setP(85, 'Uploading HD master to Cloudflare R2...')
+    const base = `${project.userId}/${project.id}`
+    const hdUrl = await uploadToR2(rendered.file, `${base}/clip-${clip.id}-hd.mp4`)
+
+    await prisma.clip.update({
+      where: { id: clip.id },
+      data: {
+        exportUrl: hdUrl,
+        exportedAt: new Date(),
+      },
+    })
+
+    console.log(`[worker] [clip_render_hd] completed HD master for clip ${clipId}: ${hdUrl}`)
+  } finally {
+    await rm(dir, { recursive: true, force: true }).catch(() => {})
+  }
+}
+
 async function processJob(job) {
   if (job.type === 'clip_adjust') {
     return processClipAdjust(job)
+  }
+  if (job.type === 'clip_render_hd') {
+    return processClipRenderHd(job)
   }
 
   const project = await prisma.project.findUnique({ where: { id: job.projectId } })
@@ -1297,8 +1415,9 @@ async function processJob(job) {
       applyWatermark,
       async (done, total) => {
         const pct = Math.min(88, 58 + Math.round((done / total) * 30))
-        await setP(pct, `Rendered clip ${done} of ${total} (vertical framing & karaoke captions)...`)
-      }
+        await setP(pct, `Rendered clip ${done} of ${total} (preview tier)...`)
+      },
+      'preview'
     )
 
     for (let i = 0; i < moments.length; i++) {
@@ -1329,7 +1448,8 @@ async function processJob(job) {
           shareScore: Math.round(m.shareScore ?? m.score),
           status: 'READY',
           videoUrl: url,
-          exportUrl: url,
+          exportUrl: null,
+          exportedAt: null,
           thumbnailUrl: thumbUrl,
           captionStyle: captionStyle,
           captionData: {
@@ -1443,6 +1563,43 @@ async function cleanOrphanTempDirs() {
     }
   } catch {
     // Non-blocking
+  }
+}
+
+/** Delete HD master renders from Cloudflare R2 after retention window (HD_RETENTION_DAYS, default 30) */
+async function cleanExpiredHdClips() {
+  try {
+    const retentionDays = parseInt(process.env.HD_RETENTION_DAYS || '30', 10)
+    const expiryDate = new Date(Date.now() - retentionDays * 24 * 60 * 60 * 1000)
+    const expiredClips = await prisma.clip.findMany({
+      where: {
+        exportUrl: { not: null },
+        exportedAt: { lt: expiryDate },
+      },
+      select: { id: true, exportUrl: true },
+      take: 25,
+    })
+
+    if (!expiredClips.length) return
+
+    for (const clip of expiredClips) {
+      if (clip.exportUrl) {
+        let key = null
+        if (clip.exportUrl.includes(`/${CFG.r2Bucket}/`)) {
+          key = clip.exportUrl.split(`/${CFG.r2Bucket}/`)[1]?.split('?')[0]
+        }
+        if (key) {
+          await deleteFromR2(key)
+        }
+      }
+      await prisma.clip.update({
+        where: { id: clip.id },
+        data: { exportUrl: null, exportedAt: null },
+      })
+      console.log(`[worker] purged expired HD master for clip ${clip.id} (retention: ${retentionDays}d)`)
+    }
+  } catch (e) {
+    console.warn('[worker] cleanExpiredHdClips error:', e.message)
   }
 }
 
@@ -1624,6 +1781,7 @@ async function loop() {
       lastSweep = Date.now()
       await recoverStale()
       await cleanOrphanTempDirs()
+      await cleanExpiredHdClips()
       await checkAutoPilotChannels()
     }
 
@@ -1673,6 +1831,9 @@ async function loop() {
               console.error(`[worker] refund failed for clip adjust ${job.projectId}:`, refErr.message)
             }
           }
+        } else if (job.type === 'clip_render_hd') {
+          console.error(`[worker] clip_render_hd failed for clip ${job.result?.clipId}:`, e.message)
+          // Project remains COMPLETED, clip remains READY with preview videoUrl
         } else {
           await prisma.project.update({ where: { id: job.projectId }, data: { status: 'FAILED' } }).catch(() => {})
 

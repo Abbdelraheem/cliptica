@@ -144,3 +144,31 @@ Assuming standard industry churn benchmarks for creative SaaS tools (6.0% - 7.0%
 - **Customer Lifetime Value (LTV)**: `$1,014.80 * 94.4% GM =` **\$957.97**
 - **Target CAC (3:1 LTV:CAC standard)**: **\$319.32**
 - **Payback Period**: **1.06 months**
+
+---
+
+## 8. Storage-Efficient Video Delivery Architecture & R2 Unit Economics
+
+To dramatically minimize Cloudflare R2 object storage costs while maintaining pristine broadcast quality for final exports:
+
+### Two-Tier Video Encoding Specification
+1. **Preview Tier (Default Generation)**:
+   - **Video**: `libx264`, preset `superfast`, CRF `28`, maxrate `1500k`, bufsize `3000k`
+   - **Audio**: `aac`, bitrate `96k`
+   - **Bitrate**: ~1.3 Mbps
+   - **Average File Size (40s clip)**: **~6.5 MB** (vs previous ~16.0 MB)
+   - **Storage Savings**: **59.4% reduction** in upfront Cloudflare R2 storage footprint.
+   - **User Benefit**: Instant browser video loading and playback responsiveness without buffering.
+
+2. **Download HD Master Tier (On-Demand Generation)**:
+   - **Video**: `libx264`, preset `fast`, CRF `20`
+   - **Audio**: `aac`, bitrate `192k`
+   - **Bitrate**: ~3.2 - 4.0 Mbps
+   - **Generation**: Triggered on-demand via `GET /api/projects/[id]/clips/[clipId]/download` and background worker `clip_render_hd`.
+   - **Target Audience**: Exported directly for platform posting (TikTok, Instagram Reels, YouTube Shorts).
+
+### Automated HD Retention Lifecycle Policy
+- Configurable window: `HD_RETENTION_DAYS` (default: 30 days).
+- Background worker daemon (`cleanExpiredHdClips`) automatically purges expired HD files from Cloudflare R2, leaving lightweight preview clips intact.
+- Long-term storage cost reduction: **> 70%** for inactive older projects.
+

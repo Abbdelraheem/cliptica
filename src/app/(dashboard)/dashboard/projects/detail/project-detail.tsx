@@ -9,6 +9,7 @@ import {
 } from 'lucide-react'
 import { ConnectionSummary } from '@/lib/social/types'
 import StudioVideoEditor from '@/components/studio-video-editor'
+import { toast } from 'sonner'
 
 type Clip = {
   id: string
@@ -116,6 +117,8 @@ export default function ProjectDetail({ projectId }: { projectId: string }) {
   const [socialConnections, setSocialConnections] = useState<ConnectionSummary[]>([])
   const [selectedClipIds, setSelectedClipIds] = useState<Set<string>>(new Set())
   const [purging, setPurging] = useState(false)
+  const [downloadingClipId, setDownloadingClipId] = useState<string | null>(null)
+  const [downloadProgress, setDownloadProgress] = useState<number | null>(null)
 
   // Initialize selected clips when project clips load
   useEffect(() => {
@@ -161,11 +164,11 @@ export default function ProjectDetail({ projectId }: { projectId: string }) {
     const deleteCount = total - keepCount
 
     if (keepCount === 0) {
-      alert('Please select at least 1 clip to keep.')
+      toast.error('Please select at least 1 clip to keep.')
       return
     }
     if (deleteCount <= 0) {
-      alert('All clips are selected. To delete unwanted clips, unselect them first.')
+      toast.info('All clips are selected. To delete unwanted clips, unselect them first.')
       return
     }
 
@@ -204,13 +207,13 @@ export default function ProjectDetail({ projectId }: { projectId: string }) {
         window.dispatchEvent(new Event('credits-updated'))
       }
 
-      alert(
+      toast.success(
         `Success! Kept ${data.kept} final video(s) (1 credit each). ${
           data.creditsDeducted > 0 ? `Deducted ${data.creditsDeducted} additional credit(s).` : ''
         }`.trim()
       )
     } catch (e) {
-      alert(e instanceof Error ? e.message : 'Could not purge unselected clips')
+      toast.error(e instanceof Error ? e.message : 'Could not purge unselected clips')
     } finally {
       setPurging(false)
     }
@@ -347,8 +350,83 @@ export default function ProjectDetail({ projectId }: { projectId: string }) {
           clips: cur.clips.filter((c) => c.id !== clipId),
         }
       })
+      toast.success('Clip deleted')
     } catch {
-      alert('Could not delete clip')
+      toast.error('Could not delete clip')
+    }
+  }
+
+  const handleDownload = async (c: Clip) => {
+    if (c.exportUrl) {
+      const link = document.createElement('a')
+      link.href = c.exportUrl
+      link.download = `${(c.title || 'clip').replace(/[^a-zA-Z0-9_\u0600-\u06FF-]/g, '_')}.mp4`
+      link.target = '_blank'
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      return
+    }
+
+    setDownloadingClipId(c.id)
+    setDownloadProgress(10)
+    toast.info('جاري تجهيز الماستر عالي الدقة HD...')
+
+    try {
+      let attempts = 0
+      const maxAttempts = 40
+      while (attempts < maxAttempts) {
+        attempts++
+        const res = await fetch(`/api/projects/${projectId}/clips/${c.id}/download`)
+        if (!res.ok) throw new Error('Download request failed')
+        const data = await res.json()
+        if (data.ready && data.downloadUrl) {
+          setProject((prev) => {
+            if (!prev) return prev
+            return {
+              ...prev,
+              clips: prev.clips.map((clip) =>
+                clip.id === c.id ? { ...clip, exportUrl: data.downloadUrl } : clip
+              ),
+            }
+          })
+          toast.success('تم تجهيز الفيديو بدقة HD! جاري التحميل...')
+          const link = document.createElement('a')
+          link.href = data.downloadUrl
+          link.download = `${(c.title || 'clip').replace(/[^a-zA-Z0-9_\u0600-\u06FF-]/g, '_')}.mp4`
+          link.target = '_blank'
+          document.body.appendChild(link)
+          link.click()
+          document.body.removeChild(link)
+          return
+        }
+        if (typeof data.progress === 'number' && data.progress > 0) {
+          setDownloadProgress(data.progress)
+        } else {
+          setDownloadProgress((prev) => Math.min(92, (prev || 15) + 6))
+        }
+        await new Promise((r) => setTimeout(r, 2000))
+      }
+      if (c.videoUrl) {
+        toast.info('تم تحميل نسخة المعاينة')
+        const link = document.createElement('a')
+        link.href = c.videoUrl
+        link.download = `${(c.title || 'clip').replace(/[^a-zA-Z0-9_\u0600-\u06FF-]/g, '_')}.mp4`
+        link.target = '_blank'
+        document.body.appendChild(link)
+        link.click()
+        document.body.removeChild(link)
+      }
+    } catch (err) {
+      console.error('HD download error:', err)
+      if (c.videoUrl) {
+        window.open(c.videoUrl, '_blank')
+      } else {
+        toast.error('فشل تجهيز التنزيل')
+      }
+    } finally {
+      setDownloadingClipId(null)
+      setDownloadProgress(null)
     }
   }
 
@@ -665,90 +743,101 @@ export default function ProjectDetail({ projectId }: { projectId: string }) {
                     {isSelectedToKeep ? '✓ Saved clip' : '⚠ Will be deleted if you discard unselected'}
                   </p>
 
-                  <div className="flex gap-2">
-                    <button
-                      type="button"
-                      onClick={() => openAdjust(c)}
-                      disabled={c.status === 'GENERATING'}
-                      className={`btn-lux btn-outline flex-1 !py-1.5 !px-2 !text-xs !font-normal ${
-                        editingClipId === c.id ? '!border-gold !text-gold' : ''
-                      }`}
-                      title="Adjust clip start/end timestamps and caption style"
-                    >
-                      <Scissors className="h-3.5 w-3.5 text-champagne" />
-                      <span>{editingClipId === c.id ? 'Close' : 'Studio Editor'}</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => setExportKitClip(c)}
-                      disabled={c.status === 'GENERATING'}
-                      className="btn-lux btn-outline !py-1.5 !px-2.5 !text-xs !font-normal flex items-center gap-1.5 text-gold border-gold/30 hover:!border-gold hover:bg-gold/10"
-                      title="Viral Social Kit (Hooks, Description, Hashtags & Best Times)"
-                    >
-                      <Sparkles className="h-3.5 w-3.5 text-gold" />
-                      <span>Viral Kit</span>
-                    </button>
-
+                  {/* Primary Actions: Download HD & Viral Kit */}
+                  <div className="grid grid-cols-2 gap-2 mt-2">
                     {(c.exportUrl || c.videoUrl) && (
                       isSelectedToKeep ? (
-                        <>
-                          <a
-                            href={c.exportUrl || c.videoUrl || '#'}
-                            download={`${(c.title || 'clip').replace(/[^a-zA-Z0-9_\u0600-\u06FF-]/g, '_')}.mp4`}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="btn-lux btn-gold !py-1.5 !px-3 !text-xs !font-bold flex items-center gap-1.5 shadow-[0_0_15px_rgba(212,175,55,0.3)]"
-                            title="تنزيل الفيديو بدقة عالية"
-                          >
-                            <Download className="h-3.5 w-3.5" />
-                            <span>تنزيل</span>
-                          </a>
-                          <button
-                            type="button"
-                            onClick={() => copyVideoLink(c)}
-                            className="btn-lux btn-outline !py-1.5 !px-2.5 !text-xs"
-                            title="Copy direct video stream link"
-                          >
-                            {copiedId === `link-${c.id}` ? (
-                              <Check className="h-3.5 w-3.5 text-emerald-400" />
-                            ) : (
-                              <Share2 className="h-3.5 w-3.5 text-mist-2 hover:text-white" />
-                            )}
-                          </button>
-                        </>
+                        <button
+                          type="button"
+                          onClick={() => handleDownload(c)}
+                          disabled={downloadingClipId === c.id}
+                          className="btn-lux btn-gold !py-2 !px-3 !text-xs !font-bold flex items-center justify-center gap-1.5 shadow-[0_0_15px_rgba(212,175,55,0.3)] min-h-[40px] disabled:opacity-75"
+                          title="تنزيل الفيديو بدقة عالية (HD)"
+                        >
+                          {downloadingClipId === c.id ? (
+                            <>
+                              <Loader2 className="h-3.5 w-3.5 animate-spin text-champagne shrink-0" />
+                              <span className="truncate">HD {downloadProgress ? `${downloadProgress}%` : '...'}</span>
+                            </>
+                          ) : (
+                            <>
+                              <Download className="h-3.5 w-3.5 shrink-0" />
+                              <span className="truncate">تنزيل HD</span>
+                            </>
+                          )}
+                        </button>
                       ) : (
                         <button
                           type="button"
                           onClick={() => {
                             toggleSelectClip(c.id)
-                            alert('تم تحديد المقطع للحفظ وتأكيد اختياره — أصبح زر التنزيل متاحاً لك الآن!')
+                            toast.success('تم تحديد المقطع للحفظ وتأكيد اختياره — أصبح زر التنزيل متاحاً لك الآن!')
                           }}
-                          className="btn-lux btn-outline !py-1.5 !px-2.5 !text-xs !font-medium flex items-center gap-1.5 text-mist hover:text-white border-hair/60"
+                          className="btn-lux btn-outline !py-2 !px-2.5 !text-xs !font-medium flex items-center justify-center gap-1.5 text-mist hover:text-white border-hair/60 min-h-[40px]"
                           title="يجب تحديد المقطع للحفظ وتأكيد اختياره قبل التنزيل"
                         >
-                          <Download className="h-3.5 w-3.5 text-gold/60" />
-                          <span>تنزيل (اختر للحفظ)</span>
+                          <Download className="h-3.5 w-3.5 text-gold/60 shrink-0" />
+                          <span className="truncate">تنزيل (احفظ أولاً)</span>
                         </button>
                       )
                     )}
 
                     <button
                       type="button"
+                      onClick={() => setExportKitClip(c)}
+                      disabled={c.status === 'GENERATING'}
+                      className="btn-lux btn-outline !py-2 !px-2.5 !text-xs !font-medium flex items-center justify-center gap-1.5 text-gold border-gold/30 hover:!border-gold hover:bg-gold/10 min-h-[40px]"
+                      title="Viral Social Kit (Hooks, Description, Hashtags & Best Times)"
+                    >
+                      <Sparkles className="h-3.5 w-3.5 text-gold shrink-0" />
+                      <span className="truncate">Viral Kit</span>
+                    </button>
+                  </div>
+
+                  {/* Secondary Actions: Studio Editor, Direct Publish, Share Link, Discard */}
+                  <div className="flex items-center gap-1.5 mt-2">
+                    <button
+                      type="button"
+                      onClick={() => openAdjust(c)}
+                      disabled={c.status === 'GENERATING'}
+                      className={`btn-lux btn-outline flex-1 !py-1.5 !px-2 !text-xs !font-normal min-h-[38px] flex items-center justify-center gap-1 ${
+                        editingClipId === c.id ? '!border-gold !text-gold' : ''
+                      }`}
+                      title="Adjust clip start/end timestamps and caption style"
+                    >
+                      <Scissors className="h-3.5 w-3.5 text-champagne shrink-0" />
+                      <span className="truncate">{editingClipId === c.id ? 'Close' : 'Editor'}</span>
+                    </button>
+
+                    <button
+                      type="button"
                       onClick={() => openPublishModal(c)}
                       disabled={c.status === 'GENERATING'}
-                      className="btn-lux btn-outline !py-1.5 !px-2.5 !text-xs !font-normal flex items-center gap-1 text-champagne hover:!border-champagne"
+                      className="btn-lux btn-outline flex-1 !py-1.5 !px-2 !text-xs !font-normal min-h-[38px] flex items-center justify-center gap-1 text-champagne hover:!border-champagne"
                       title="Direct publish clip to TikTok, YouTube Shorts, or Instagram Reels"
                     >
-                      <Send className="h-3.5 w-3.5" />
-                      <span>Publish</span>
+                      <Send className="h-3.5 w-3.5 shrink-0" />
+                      <span className="truncate">Publish</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => copyVideoLink(c)}
+                      className="btn-lux btn-outline !py-1.5 !px-2.5 !text-xs min-h-[38px] shrink-0"
+                      title="Copy direct video stream link"
+                    >
+                      {copiedId === `link-${c.id}` ? (
+                        <Check className="h-3.5 w-3.5 text-emerald-400" />
+                      ) : (
+                        <Share2 className="h-3.5 w-3.5 text-mist-2 hover:text-white" />
+                      )}
                     </button>
 
                     <button
                       type="button"
                       onClick={() => handleDeleteClip(c.id)}
                       disabled={c.status === 'GENERATING'}
-                      className="btn-lux btn-outline !py-1.5 !px-2 !text-xs !font-normal text-mist-2 hover:!border-red-400/50 hover:!text-red-400"
+                      className="btn-lux btn-outline !py-1.5 !px-2.5 !text-xs !font-normal text-mist-2 hover:!border-red-400/50 hover:!text-red-400 min-h-[38px] shrink-0"
                       title="Discard / Delete this clip"
                     >
                       <Trash2 className="h-3.5 w-3.5" />
@@ -933,15 +1022,23 @@ export default function ProjectDetail({ projectId }: { projectId: string }) {
 
                   {(c.exportUrl || c.videoUrl) && (
                     <div className="space-y-2">
-                      <a
-                        href={c.exportUrl ?? c.videoUrl ?? '#'}
-                        download
-                        target="_blank"
-                        rel="noreferrer"
-                        className="btn-lux btn-primary w-full !py-2 !text-xs !font-medium"
+                      <button
+                        type="button"
+                        onClick={() => handleDownload(c)}
+                        disabled={downloadingClipId === c.id}
+                        className="btn-lux btn-primary w-full !py-2 !text-xs !font-medium flex items-center justify-center gap-1.5"
                       >
-                        <Download className="h-3.5 w-3.5" /> Download 9:16 MP4
-                      </a>
+                        {downloadingClipId === c.id ? (
+                          <>
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                            <span>Generating HD Master ({downloadProgress ? `${downloadProgress}%` : '...'})</span>
+                          </>
+                        ) : (
+                          <>
+                            <Download className="h-3.5 w-3.5" /> Download HD 9:16 MP4
+                          </>
+                        )}
+                      </button>
                       <button
                         type="button"
                         onClick={() => openPublishModal(c)}
@@ -1351,16 +1448,24 @@ export default function ProjectDetail({ projectId }: { projectId: string }) {
 
               <div className="flex items-center gap-2">
                 {exportKitClip.videoUrl || exportKitClip.exportUrl ? (
-                  <a
-                    href={exportKitClip.exportUrl || exportKitClip.videoUrl || '#'}
-                    download={`${exportKitClip.title || 'viral-clip'}.mp4`}
-                    target="_blank"
-                    rel="noreferrer"
+                  <button
+                    type="button"
+                    onClick={() => handleDownload(exportKitClip)}
+                    disabled={downloadingClipId === exportKitClip.id}
                     className="btn-lux btn-outline !py-2.5 !px-4 text-xs inline-flex items-center gap-2"
                   >
-                    <Download className="h-4 w-4 text-champagne" />
-                    <span>Download MP4</span>
-                  </a>
+                    {downloadingClipId === exportKitClip.id ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin text-champagne" />
+                        <span>Generating HD ({downloadProgress ? `${downloadProgress}%` : '...'})</span>
+                      </>
+                    ) : (
+                      <>
+                        <Download className="h-4 w-4 text-champagne" />
+                        <span>Download HD MP4</span>
+                      </>
+                    )}
+                  </button>
                 ) : null}
                 <button
                   type="button"
