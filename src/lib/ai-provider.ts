@@ -45,7 +45,7 @@ export async function executeAiChatCompletion(options: AiCompletionOptions): Pro
   let groqKey = process.env.GROQ_API_KEY?.trim() || ''
   let openaiKey = process.env.OPENAI_API_KEY?.trim() || ''
   let nvidiaModel = customNvidiaModel || process.env.NVIDIA_SCORE_MODEL?.trim() || 'deepseek-ai/deepseek-v4.1-flash'
-  let groqModel = customGroqModel || process.env.GROQ_SCORE_MODEL?.trim() || 'llama-3.3-70b-versatile'
+  let groqModel = customGroqModel || process.env.GROQ_SCORE_MODEL?.trim() || 'qwen/qwen3.8-27b'
 
   try {
     const settings = await prisma.setting.findMany({
@@ -66,7 +66,12 @@ export async function executeAiChatCompletion(options: AiCompletionOptions): Pro
     // DB lookup fallback if prisma is unavailable
   }
 
-  // --- ATTEMPT 1: NVIDIA NIM API (PRIMARY) ---
+  // Upgrade deprecated Groq model IDs automatically
+  if (groqModel === 'llama-3.3-70b-versatile' || groqModel === 'llama3-70b-8192') {
+    groqModel = 'qwen/qwen3.8-27b'
+  }
+
+  // --- ATTEMPT 1: NVIDIA NIM API (PRIMARY, fast 5s cap so it never blocks requests) ---
   if (nvidiaKey) {
     const t0 = Date.now()
     try {
@@ -76,7 +81,7 @@ export async function executeAiChatCompletion(options: AiCompletionOptions): Pro
           Authorization: `Bearer ${nvidiaKey}`,
           'Content-Type': 'application/json',
         },
-        signal: AbortSignal.timeout(timeoutMs),
+        signal: AbortSignal.timeout(Math.min(timeoutMs, 5000)),
         body: JSON.stringify({
           model: nvidiaModel,
           messages,
@@ -113,49 +118,52 @@ export async function executeAiChatCompletion(options: AiCompletionOptions): Pro
     }
   }
 
-  // --- ATTEMPT 2: GROQ API (FAST FALLBACK) ---
+  // --- ATTEMPT 2: GROQ API (FAST FALLBACK: qwen/qwen3.8-27b -> openai/gpt-oss-120b) ---
   if (groqKey) {
-    const t0 = Date.now()
-    try {
-      const resp = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${groqKey}`,
-          'Content-Type': 'application/json',
-        },
-        signal: AbortSignal.timeout(20000),
-        body: JSON.stringify({
-          model: groqModel,
-          messages,
-          temperature,
-          max_tokens: maxTokens,
-          ...(responseFormat === 'json_object' ? { response_format: { type: 'json_object' } } : {}),
-        }),
-      })
+    const groqCandidates = Array.from(new Set([groqModel, 'qwen/qwen3.8-27b', 'openai/gpt-oss-120b']))
+    for (const candidateModel of groqCandidates) {
+      const t0 = Date.now()
+      try {
+        const resp = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${groqKey}`,
+            'Content-Type': 'application/json',
+          },
+          signal: AbortSignal.timeout(12000),
+          body: JSON.stringify({
+            model: candidateModel,
+            messages,
+            temperature,
+            max_tokens: maxTokens,
+            ...(responseFormat === 'json_object' ? { response_format: { type: 'json_object' } } : {}),
+          }),
+        })
 
-      if (resp.ok) {
-        const data = await resp.json()
-        const content = data.choices?.[0]?.message?.content || ''
-        const latencyMs = Date.now() - t0
-        let parsedJson = undefined
-        if (responseFormat === 'json_object') {
-          try {
-            parsedJson = JSON.parse(content)
-          } catch {}
+        if (resp.ok) {
+          const data = await resp.json()
+          const content = data.choices?.[0]?.message?.content || ''
+          const latencyMs = Date.now() - t0
+          let parsedJson = undefined
+          if (responseFormat === 'json_object') {
+            try {
+              parsedJson = JSON.parse(content)
+            } catch {}
+          }
+          return {
+            content,
+            provider: 'groq',
+            model: candidateModel,
+            latencyMs,
+            parsedJson,
+          }
+        } else {
+          const errText = await resp.text().catch(() => '')
+          console.warn(`[AI-Provider] Groq (${candidateModel}) failed (${resp.status}): ${errText.slice(0, 150)}`)
         }
-        return {
-          content,
-          provider: 'groq',
-          model: groqModel,
-          latencyMs,
-          parsedJson,
-        }
-      } else {
-        const errText = await resp.text().catch(() => '')
-        console.warn(`[AI-Provider] Groq failed (${resp.status}): ${errText.slice(0, 150)}`)
+      } catch (gErr) {
+        console.warn(`[AI-Provider] Groq (${candidateModel}) call error:`, gErr instanceof Error ? gErr.message : gErr)
       }
-    } catch (gErr) {
-      console.warn(`[AI-Provider] Groq call error:`, gErr instanceof Error ? gErr.message : gErr)
     }
   }
 

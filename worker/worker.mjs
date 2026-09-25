@@ -445,11 +445,18 @@ async function download(url, dir) {
     categorizeDownloadError(lastErr) === 'bot-detection'
   if (isBotBlocked) {
     throw new Error(
-      'YouTube blocked access with bot detection. Please use the Direct Video Upload tab (2s instant upload without limits) or update YouTube cookies in /admin/settings.'
+      'YouTube blocked access with bot detection. Please try again or use the Direct Video Upload tab.'
     )
   }
 
-  throw lastErr ?? directErr ?? new Error('all download paths failed')
+  const rawErrMsg = (lastErr?.message || directErr?.message || '').toLowerCase()
+  if (rawErrMsg.includes('[googledrive]') || url.includes('drive.google.com')) {
+    throw new Error(
+      'Could not download the selected Google Drive file. Make sure the link points to a public video file (MP4/MOV) and not an image, document, or restricted folder.'
+    )
+  }
+
+  throw new Error('Could not download the video from the provided link. Please check that the link is a public video or upload the file directly.')
 }
 
 /** Uploaded files live in R2 — pull them with the same AWS creds. */
@@ -794,7 +801,7 @@ async function llmScoreMoments(candidates, instructions, maxClips = CFG.clipsPer
   const providers = []
   const timeoutMs = CFG.scoringTimeoutMs || 15_000
 
-  // 1. NVIDIA NIM (PRIMARY FRONTIER MODEL - Strongest Reasoning)
+  // 1. NVIDIA NIM (PRIMARY FRONTIER MODEL - fast 6s timeout cap)
   if (CFG.nvidiaKey) {
     const nvModel = CFG.nvidiaScoreModel || 'deepseek-ai/deepseek-v4.1-flash'
     providers.push({
@@ -803,31 +810,28 @@ async function llmScoreMoments(candidates, instructions, maxClips = CFG.clipsPer
       url: 'https://integrate.api.nvidia.com/v1/chat/completions',
       key: CFG.nvidiaKey,
       model: nvModel,
-      timeoutMs,
+      timeoutMs: Math.min(timeoutMs, 6000),
     })
   }
 
-  // 2. GROQ (FAST HIGH-THROUGHPUT FALLBACK)
+  // 2. GROQ (FAST HIGH-THROUGHPUT FALLBACK: qwen/qwen3.8-27b -> openai/gpt-oss-120b)
   if (CFG.groqKey) {
-    const primaryModel = CFG.groqScoreModel || process.env.GROQ_SCORE_MODEL || 'llama-3.3-70b-versatile'
     providers.push({
-      tier: 'fallback-1 groq',
-      name: `groq-${primaryModel}`,
+      tier: 'fallback-1 groq-qwen',
+      name: 'groq-qwen3.8-27b',
       url: 'https://api.groq.com/openai/v1/chat/completions',
       key: CFG.groqKey,
-      model: primaryModel,
+      model: 'qwen/qwen3.8-27b',
       timeoutMs,
     })
-    if (primaryModel !== 'qwen/qwen3.8-27b') {
-      providers.push({
-        tier: 'fallback-1.5 groq-qwen',
-        name: 'groq-qwen3.8-27b',
-        url: 'https://api.groq.com/openai/v1/chat/completions',
-        key: CFG.groqKey,
-        model: 'qwen/qwen3.8-27b',
-        timeoutMs,
-      })
-    }
+    providers.push({
+      tier: 'fallback-1.5 groq-gpt-oss',
+      name: 'groq-gpt-oss-120b',
+      url: 'https://api.groq.com/openai/v1/chat/completions',
+      key: CFG.groqKey,
+      model: 'openai/gpt-oss-120b',
+      timeoutMs,
+    })
   }
 
   // 3. OpenAI (Tertiary Fallback)

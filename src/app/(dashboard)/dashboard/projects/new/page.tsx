@@ -357,7 +357,14 @@ export default function NewProjectPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ url: clean }),
       }, 25000)
-      const data = await res.json()
+      const data = await res.json().catch(() => null)
+      if (!data) {
+        throw new Error(
+          res.status >= 500
+            ? 'Server was briefly updating or busy. Please click Analyze again.'
+            : 'Could not read campaign response. Please try again.'
+        )
+      }
       if (!res.ok || !data.success) {
         throw new Error(data?.error ?? 'Failed to inspect campaign')
       }
@@ -378,7 +385,12 @@ export default function NewProjectPage() {
         setUrl('')
       }
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Could not analyze campaign URL')
+      const msg = e instanceof Error ? e.message : 'Could not analyze campaign URL'
+      setError(
+        msg.includes('Unexpected token') || msg.includes('<!DOCTYPE')
+          ? 'Server was briefly updating. Please click Analyze again.'
+          : msg
+      )
     } finally {
       setAnalyzingCampaign(false)
     }
@@ -401,7 +413,9 @@ export default function NewProjectPage() {
         body: JSON.stringify({ filename: f.name, contentType: f.type, sizeMb: +(f.size / 1048576).toFixed(1) }),
       }, 20000)
       if (!sign.ok) throw new Error((await sign.json().catch(() => null))?.error ?? 'Sign failed')
-      const { uploadUrl, key } = await sign.json()
+      const signData = await sign.json().catch(() => null)
+      if (!signData?.uploadUrl || !signData?.key) throw new Error('Failed to get upload URL')
+      const { uploadUrl, key } = signData
 
       await new Promise<void>((resolve, reject) => {
         const xhr = new XMLHttpRequest()
@@ -466,8 +480,8 @@ export default function NewProjectPage() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ url: campaignUrl.trim() }),
         }, 25000)
-        const data = await res.json()
-        if (res.ok && data.success && data.campaign) {
+        const data = await res.json().catch(() => null)
+        if (res.ok && data?.success && data?.campaign) {
           setCampaignData(data.campaign)
           const chosen = data.campaign.primaryAsset?.url || data.campaign.assets?.[0]?.url
           if (chosen) {
