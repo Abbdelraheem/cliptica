@@ -832,7 +832,7 @@ export async function POST(req: Request) {
     const isUnusedIndividualVideo = (a: { url: string }) =>
       !a.url.includes('/folders/') && !usedSourceKeys.has(normalizeMediaUrlKey(a.url))
 
-    let primaryAsset =
+    const primaryAsset =
       rawAssets.find((a) => a.type === 'youtube' && isUnusedIndividualVideo(a) && a.label.startsWith('🤖')) ||
       rawAssets.find(
         (a) => a.url === campaignAnalysis.recommendedAssetUrl && isUnusedIndividualVideo(a)
