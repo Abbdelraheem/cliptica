@@ -1,9 +1,10 @@
 /**
  * Presets and ASS subtitle generation for CLIPZILA.
- * Supports 15 distinct visual presets with real font, positioning,
- * color, animation, and layout differences across Kinetic, Editorial,
- * and Creative categories.
+ * All presets are locked to a fixed lower-third safe zone (posYRatio: 0.82, bottom-center alignment: 2)
+ * so captions never cover the speaker's face/character or jump around the frame.
  */
+
+export const FIXED_CAPTION_Y_RATIO = 0.82
 
 export const CAPTION_STYLES = {
   // === KINETIC CATEGORY ===
@@ -11,43 +12,43 @@ export const CAPTION_STYLES = {
     id: 'hormozi',
     name: 'Hormozi Pop',
     category: 'Kinetic',
-    desc: 'Punchy 1-3 word cards with aggressive spring scale pop.',
+    desc: 'Punchy 1-3 word cards locked in the lower-third safe zone.',
     sample: 'STOP SCROLLING',
     fontName: 'DejaVu Sans',
-    fontSizeRatio: 0.082,
+    fontSizeRatio: 0.058,
     primaryColor: '&H00FFFFFF', // White
     outlineColor: '&H00000000', // Black
     backColor: '&HB4000000',
     bold: -1,
     borderStyle: 1,
-    outlineRatio: 0.012,
+    outlineRatio: 0.010,
     shadow: 2,
-    alignment: 5, // Center
-    posYRatio: 0.74,
+    alignment: 2, // Fixed Bottom-Center
+    posYRatio: FIXED_CAPTION_Y_RATIO,
     wordsPerCard: 3,
     uppercase: false,
     buildAnimation: () =>
-      `\\fad(50,50)\\t(0,90,\\fscx118\\fscy118)\\t(90,180,\\fscx100\\fscy100)`,
+      `\\fad(40,40)\\t(0,80,\\fscx106\\fscy106)\\t(80,160,\\fscx100\\fscy100)`,
   },
 
   bold_impact: {
     id: 'bold_impact',
     name: 'Bold Impact',
     category: 'Kinetic',
-    desc: 'Heavy uppercase text, golden yellow fill, thick outline, center-mid screen.',
+    desc: 'Heavy uppercase text, golden yellow fill, thick outline in lower-third safe zone.',
     sample: 'MUST WATCH THIS',
     fontName: 'DejaVu Sans',
-    fontSizeRatio: 0.092,
+    fontSizeRatio: 0.060,
     primaryColor: '&H0000D7FF', // Golden Yellow (BBGGRR: RR=FF, GG=D7, BB=00)
     outlineColor: '&H00000000', // Deep Black
     backColor: '&H00000000',
     bold: -1,
     borderStyle: 1,
-    outlineRatio: 0.016,
-    shadow: 4,
-    alignment: 5,
-    posYRatio: 0.68,
-    wordsPerCard: 2,
+    outlineRatio: 0.012,
+    shadow: 3,
+    alignment: 2,
+    posYRatio: FIXED_CAPTION_Y_RATIO,
+    wordsPerCard: 3,
     uppercase: true,
     buildAnimation: () => `\\fad(30,30)`,
   },
@@ -56,27 +57,23 @@ export const CAPTION_STYLES = {
     id: 'bounce_side',
     name: 'Side Bounce',
     category: 'Kinetic',
-    desc: 'Kinetic entry sliding from the left margin with a satisfying settling bounce.',
+    desc: 'Crisp flame-orange kinetic captions locked in the lower-third safe zone.',
     sample: 'FAST ACTION',
     fontName: 'DejaVu Sans',
-    fontSizeRatio: 0.082,
+    fontSizeRatio: 0.058,
     primaryColor: '&H001F5AFF', // Flame Orange (BBGGRR: RR=FF, GG=5A, BB=1F)
     outlineColor: '&H00000000',
     backColor: '&H90000000',
     bold: -1,
     borderStyle: 1,
-    outlineRatio: 0.014,
-    shadow: 3,
-    alignment: 5,
-    posYRatio: 0.70,
-    wordsPerCard: 2,
+    outlineRatio: 0.011,
+    shadow: 2,
+    alignment: 2,
+    posYRatio: FIXED_CAPTION_Y_RATIO,
+    wordsPerCard: 3,
     uppercase: true,
-    buildAnimation: (W, H) => {
-      const y = Math.round(H * 0.70)
-      const startX = Math.round(W * 0.35)
-      const endX = Math.round(W * 0.50)
-      return `\\move(${startX},${y},${endX},${y},0,140)\\t(0,140,\\fscx116\\fscy116)\\t(140,220,\\fscx100\\fscy100)`
-    },
+    buildAnimation: () =>
+      `\\fad(40,40)\\t(0,90,\\fscx106\\fscy106)\\t(90,170,\\fscx100\\fscy100)`,
   },
 
   pill_box: {
@@ -86,41 +83,41 @@ export const CAPTION_STYLES = {
     desc: 'Clean white typography encapsulated in a sleek dark obsidian pill badge.',
     sample: 'KEY TAKEAWAY',
     fontName: 'DejaVu Sans',
-    fontSizeRatio: 0.070,
+    fontSizeRatio: 0.054,
     primaryColor: '&H00FFFFFF',
     outlineColor: '&H00302010',
     backColor: '&HD0181410', // Obsidian slate pill backdrop
     bold: -1,
     borderStyle: 3, // Opaque box
-    outlineRatio: 0.016,
+    outlineRatio: 0.012,
     shadow: 0,
-    alignment: 5,
-    posYRatio: 0.75,
+    alignment: 2,
+    posYRatio: FIXED_CAPTION_Y_RATIO,
     wordsPerCard: 3,
     uppercase: true,
-    buildAnimation: () => `\\fad(50,50)\\t(0,90,\\fscx112\\fscy112)\\t(90,170,\\fscx100\\fscy100)`,
+    buildAnimation: () => `\\fad(40,40)`,
   },
 
   tiktok_classic: {
     id: 'tiktok_classic',
     name: 'TikTok Big Word',
     category: 'Kinetic',
-    desc: 'Single-word center punch at massive scale — maximum retention and visual grip.',
+    desc: 'High-retention punchy words anchored cleanly in the lower-third safe zone.',
     sample: 'VIRAL',
     fontName: 'DejaVu Sans',
-    fontSizeRatio: 0.115,
+    fontSizeRatio: 0.062,
     primaryColor: '&H00FFFFFF',
     outlineColor: '&H00000000',
     backColor: '&H00000000',
     bold: -1,
     borderStyle: 1,
-    outlineRatio: 0.018,
-    shadow: 4,
-    alignment: 5, // Center-Center
-    posYRatio: 0.54,
-    wordsPerCard: 1,
+    outlineRatio: 0.012,
+    shadow: 3,
+    alignment: 2,
+    posYRatio: FIXED_CAPTION_Y_RATIO,
+    wordsPerCard: 2,
     uppercase: true,
-    buildAnimation: () => `\\t(0,60,\\fscx124\\fscy124)\\t(60,130,\\fscx100\\fscy100)`,
+    buildAnimation: () => `\\fad(30,30)\\t(0,60,\\fscx108\\fscy108)\\t(60,130,\\fscx100\\fscy100)`,
   },
 
   // === EDITORIAL CATEGORY ===
@@ -131,19 +128,19 @@ export const CAPTION_STYLES = {
     desc: 'Understated lower-third phrase layout with subtle fade, no bounce.',
     sample: 'The simplest ideas win.',
     fontName: 'DejaVu Sans',
-    fontSizeRatio: 0.052,
+    fontSizeRatio: 0.050,
     primaryColor: '&H00FFFFFF',
     outlineColor: '&H00111111',
     backColor: '&H80000000',
     bold: 0,
     borderStyle: 1,
-    outlineRatio: 0.005,
+    outlineRatio: 0.006,
     shadow: 1,
     alignment: 2, // Bottom Center
-    posYRatio: 0.84,
-    wordsPerCard: 5,
+    posYRatio: FIXED_CAPTION_Y_RATIO,
+    wordsPerCard: 4,
     uppercase: false,
-    buildAnimation: () => `\\fad(80,80)`,
+    buildAnimation: () => `\\fad(60,60)`,
   },
 
   classic_subtitle: {
@@ -162,8 +159,8 @@ export const CAPTION_STYLES = {
     outlineRatio: 0.006,
     shadow: 1,
     alignment: 2,
-    posYRatio: 0.88,
-    wordsPerCard: 6,
+    posYRatio: FIXED_CAPTION_Y_RATIO,
+    wordsPerCard: 5,
     uppercase: false,
     buildAnimation: () => '',
   },
@@ -175,7 +172,7 @@ export const CAPTION_STYLES = {
     desc: 'Gentle breathing fade with warm ivory serif typography for calm, thoughtful pacing.',
     sample: 'Reflections on what matters.',
     fontName: 'DejaVu Serif',
-    fontSizeRatio: 0.056,
+    fontSizeRatio: 0.052,
     primaryColor: '&H00E8F0F8', // Warm Ivory
     outlineColor: '&H00181820',
     backColor: '&H70000000',
@@ -184,10 +181,10 @@ export const CAPTION_STYLES = {
     outlineRatio: 0.006,
     shadow: 1,
     alignment: 2,
-    posYRatio: 0.82,
+    posYRatio: FIXED_CAPTION_Y_RATIO,
     wordsPerCard: 4,
     uppercase: false,
-    buildAnimation: () => `\\fad(220,180)`,
+    buildAnimation: () => `\\fad(140,120)`,
   },
 
   cinematic_caps: {
@@ -197,7 +194,7 @@ export const CAPTION_STYLES = {
     desc: 'Widescreen letterbox aesthetic with tracked letter-spacing and silver luminescence.',
     sample: 'A NEW HORIZON BECKONS',
     fontName: 'DejaVu Sans',
-    fontSizeRatio: 0.050,
+    fontSizeRatio: 0.048,
     primaryColor: '&H00E8E8EC', // Silver White
     outlineColor: '&H00101010',
     backColor: '&H90000000',
@@ -206,10 +203,10 @@ export const CAPTION_STYLES = {
     outlineRatio: 0.007,
     shadow: 2,
     alignment: 2,
-    posYRatio: 0.88,
-    wordsPerCard: 5,
+    posYRatio: FIXED_CAPTION_Y_RATIO,
+    wordsPerCard: 4,
     uppercase: true,
-    buildAnimation: () => `\\fad(120,120)\\fsp4\\t(0,300,\\fscx102\\fscy102)`,
+    buildAnimation: () => `\\fad(90,90)\\fsp3`,
   },
 
   podcast_soft: {
@@ -219,7 +216,7 @@ export const CAPTION_STYLES = {
     desc: 'Warm peach-cream tones with friendly rounded geometry and comfortable dialog cadence.',
     sample: 'Here is what they never tell you.',
     fontName: 'DejaVu Sans',
-    fontSizeRatio: 0.064,
+    fontSizeRatio: 0.054,
     primaryColor: '&H00A0D8FF', // Soft Peach-Cream (BBGGRR: RR=FF, GG=D8, BB=A0)
     outlineColor: '&H00181420',
     backColor: '&H70201828',
@@ -227,11 +224,11 @@ export const CAPTION_STYLES = {
     borderStyle: 1,
     outlineRatio: 0.008,
     shadow: 2,
-    alignment: 5,
-    posYRatio: 0.77,
+    alignment: 2,
+    posYRatio: FIXED_CAPTION_Y_RATIO,
     wordsPerCard: 4,
     uppercase: false,
-    buildAnimation: () => `\\fad(90,90)\\t(0,100,\\fscy108)\\t(100,200,\\fscy100)`,
+    buildAnimation: () => `\\fad(70,70)`,
   },
 
   // === CREATIVE / EXPRESSIVE CATEGORY ===
@@ -239,23 +236,22 @@ export const CAPTION_STYLES = {
     id: 'neon_highlight',
     name: 'Neon Highlight',
     category: 'Creative',
-    desc: 'Electric cyan text with magenta shadow glow and expansion pulse.',
+    desc: 'Electric cyan text with magenta shadow glow in the lower-third safe zone.',
     sample: 'PURE ENERGY',
     fontName: 'DejaVu Sans',
-    fontSizeRatio: 0.080,
+    fontSizeRatio: 0.058,
     primaryColor: '&H00FFFF00', // Electric Cyan (BBGGRR)
     outlineColor: '&H00200030', // Deep Plum
     backColor: '&H00FF0080',    // Neon Pink/Magenta shadow
     bold: -1,
     borderStyle: 1,
-    outlineRatio: 0.010,
-    shadow: 3,
-    alignment: 5,
-    posYRatio: 0.72,
+    outlineRatio: 0.009,
+    shadow: 2,
+    alignment: 2,
+    posYRatio: FIXED_CAPTION_Y_RATIO,
     wordsPerCard: 3,
     uppercase: true,
-    buildAnimation: () =>
-      `\\fad(60,60)\\t(0,100,\\blur4\\fscx112\\fscy112)\\t(100,200,\\blur1\\fscx100\\fscy100)`,
+    buildAnimation: () => `\\fad(50,50)`,
   },
 
   highlighter: {
@@ -265,16 +261,16 @@ export const CAPTION_STYLES = {
     desc: 'Marker box backdrop with high contrast black lettering.',
     sample: 'HIGHLIGHTED TRUTH',
     fontName: 'DejaVu Sans',
-    fontSizeRatio: 0.072,
+    fontSizeRatio: 0.054,
     primaryColor: '&H00000000', // Black text
     outlineColor: '&H00000000',
     backColor: '&H0020E6FF',    // Vibrant Yellow-Orange marker box (BBGGRR)
     bold: -1,
     borderStyle: 3,             // Opaque background box
-    outlineRatio: 0.012,
+    outlineRatio: 0.010,
     shadow: 0,
-    alignment: 5,
-    posYRatio: 0.75,
+    alignment: 2,
+    posYRatio: FIXED_CAPTION_Y_RATIO,
     wordsPerCard: 3,
     uppercase: true,
     buildAnimation: () => `\\fad(40,40)`,
@@ -287,19 +283,19 @@ export const CAPTION_STYLES = {
     desc: 'Retro mechanical monospace with terminal green tint and crisp cadence.',
     sample: 'system.init()',
     fontName: 'DejaVu Sans Mono',
-    fontSizeRatio: 0.058,
+    fontSizeRatio: 0.050,
     primaryColor: '&H0050FF50', // Terminal Matrix Green (BBGGRR: RR=50, GG=FF, BB=50)
     outlineColor: '&H00000000',
     backColor: '&HC0121612',    // Dark terminal container box
     bold: -1,
     borderStyle: 3,
-    outlineRatio: 0.010,
+    outlineRatio: 0.009,
     shadow: 0,
-    alignment: 5,
-    posYRatio: 0.78,
+    alignment: 2,
+    posYRatio: FIXED_CAPTION_Y_RATIO,
     wordsPerCard: 3,
     uppercase: false,
-    buildAnimation: () => `\\fad(20,20)\\t(0,60,\\fscx106\\fscy106)\\t(60,120,\\fscx100\\fscy100)`,
+    buildAnimation: () => `\\fad(20,20)`,
   },
 
   two_tone: {
@@ -309,42 +305,41 @@ export const CAPTION_STYLES = {
     desc: 'Contrasting dual-color cadence alternating between brilliant gold and crisp pearl.',
     sample: 'BREAK THE PATTERN',
     fontName: 'DejaVu Sans',
-    fontSizeRatio: 0.078,
+    fontSizeRatio: 0.058,
     primaryColor: '&H00FFFFFF', // White base
     outlineColor: '&H00000000',
     backColor: '&H0000D7FF',    // Gold highlight
     bold: -1,
     borderStyle: 1,
-    outlineRatio: 0.012,
-    shadow: 3,
-    alignment: 5,
-    posYRatio: 0.73,
-    wordsPerCard: 4,
+    outlineRatio: 0.010,
+    shadow: 2,
+    alignment: 2,
+    posYRatio: FIXED_CAPTION_Y_RATIO,
+    wordsPerCard: 3,
     uppercase: true,
-    buildAnimation: () => `\\fad(40,40)\\t(0,80,\\fscx110\\fscy110)\\t(80,160,\\fscx100\\fscy100)`,
+    buildAnimation: () => `\\fad(40,40)`,
   },
 
   glitch_flicker: {
     id: 'glitch_flicker',
     name: 'Glitch Accent',
     category: 'Creative',
-    desc: 'High-energy chromatic flash with rapid opacity flickering on the accent word.',
+    desc: 'High-energy cyber-pink and cyan captions anchored in the lower-third safe zone.',
     sample: 'GLITCH IN REALITY',
     fontName: 'DejaVu Sans',
-    fontSizeRatio: 0.088,
+    fontSizeRatio: 0.058,
     primaryColor: '&H00FF32C8', // Electric Cyber Pink (BBGGRR: RR=C8, GG=32, BB=FF)
     outlineColor: '&H00FFFF00', // Cyan outline (BBGGRR: RR=00, GG=FF, BB=FF)
     backColor: '&H00000000',
     bold: -1,
     borderStyle: 1,
-    outlineRatio: 0.014,
-    shadow: 3,
-    alignment: 5,
-    posYRatio: 0.69,
-    wordsPerCard: 2,
+    outlineRatio: 0.011,
+    shadow: 2,
+    alignment: 2,
+    posYRatio: FIXED_CAPTION_Y_RATIO,
+    wordsPerCard: 3,
     uppercase: true,
-    buildAnimation: () =>
-      `\\fad(20,20)\\t(0,35,\\alpha&H60&)\\t(35,70,\\alpha&H00&)\\t(70,105,\\alpha&H80&)\\t(105,140,\\alpha&H00&\\fscx112\\fscy112)\\t(140,200,\\fscx100\\fscy100)`,
+    buildAnimation: () => `\\fad(30,30)`,
   },
 
   // === ARABIC & REGIONAL CATEGORY ===
@@ -352,55 +347,54 @@ export const CAPTION_STYLES = {
     id: 'arabic_luxury',
     name: 'Arabic Luxury',
     category: 'Arabic',
-    desc: 'Royal champagne & gold kinetic typography tailored for Arabic podcasts, interviews & luxury shorts.',
-    sample: 'أسرار النجاح الحقيقي',
+    desc: 'Royal champagne & gold kinetic typography anchored in the lower-third safe zone.',
+    sample: 'SECRET OF SUCCESS',
     fontName: 'DejaVu Sans',
-    fontSizeRatio: 0.086,
+    fontSizeRatio: 0.058,
     primaryColor: '&H00E8F0F8', // Pearl White
     outlineColor: '&H00080810', // Deep obsidian
     backColor: '&H0000D7FF',    // Gold highlight
     bold: -1,
     borderStyle: 1,
-    outlineRatio: 0.014,
-    shadow: 3,
-    alignment: 5, // Center
-    posYRatio: 0.72,
+    outlineRatio: 0.011,
+    shadow: 2,
+    alignment: 2,
+    posYRatio: FIXED_CAPTION_Y_RATIO,
     wordsPerCard: 3,
     uppercase: false,
-    buildAnimation: () =>
-      `\\fad(50,50)\\t(0,80,\\fscx114\\fscy114)\\t(80,160,\\fscx100\\fscy100)`,
+    buildAnimation: () => `\\fad(40,40)`,
   },
 
   arabic_viral: {
     id: 'arabic_viral',
     name: 'Arabic Viral Impact',
     category: 'Arabic',
-    desc: 'Punchy high-contrast yellow on black outline designed for maximum retention on Reels & TikTok.',
-    sample: 'تخيل الصدمة!',
+    desc: 'High-contrast yellow on black outline anchored in the lower-third safe zone.',
+    sample: 'WAIT FOR THIS!',
     fontName: 'DejaVu Sans',
-    fontSizeRatio: 0.096,
+    fontSizeRatio: 0.060,
     primaryColor: '&H0000D7FF', // Golden Yellow
     outlineColor: '&H00000000', // Pitch Black
     backColor: '&HB4000000',
     bold: -1,
     borderStyle: 1,
-    outlineRatio: 0.016,
-    shadow: 4,
-    alignment: 5,
-    posYRatio: 0.68,
-    wordsPerCard: 2,
+    outlineRatio: 0.012,
+    shadow: 3,
+    alignment: 2,
+    posYRatio: FIXED_CAPTION_Y_RATIO,
+    wordsPerCard: 3,
     uppercase: false,
-    buildAnimation: () => `\\fad(30,30)\\t(0,70,\\fscx120\\fscy120)\\t(70,140,\\fscx100\\fscy100)`,
+    buildAnimation: () => `\\fad(30,30)`,
   },
 
   arabic_clean: {
     id: 'arabic_clean',
     name: 'Arabic Clean Minimal',
     category: 'Arabic',
-    desc: 'Elegant lower-third phrase layout with subtle fade, ideal for documentaries and educational videos.',
-    sample: 'البدايات دائماً هي الأصعب',
+    desc: 'Elegant lower-third phrase layout with subtle fade, ideal for podcasts and interviews.',
+    sample: 'WHAT NOBODY TELLS YOU',
     fontName: 'DejaVu Sans',
-    fontSizeRatio: 0.056,
+    fontSizeRatio: 0.052,
     primaryColor: '&H00FFFFFF',
     outlineColor: '&H00151515',
     backColor: '&H70000000',
@@ -409,10 +403,10 @@ export const CAPTION_STYLES = {
     outlineRatio: 0.007,
     shadow: 2,
     alignment: 2, // Bottom Center
-    posYRatio: 0.84,
+    posYRatio: FIXED_CAPTION_Y_RATIO,
     wordsPerCard: 4,
     uppercase: false,
-    buildAnimation: () => `\\fad(70,70)`,
+    buildAnimation: () => `\\fad(60,60)`,
   },
 }
 
@@ -462,10 +456,11 @@ export function buildAssHeader(W, H, style) {
 ScriptType: v4.00+
 PlayResX: ${W}
 PlayResY: ${H}
+WrapStyle: 0
 
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, OutlineColour, BackColour, Bold, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-Style: MainStyle,${style.fontName},${fontSize},${style.primaryColor},${style.outlineColor},${style.backColor},${style.bold},${style.borderStyle},${outline},${style.shadow},${style.alignment},40,40,0,1
+Style: MainStyle,${style.fontName},${fontSize},${style.primaryColor},${style.outlineColor},${style.backColor},${style.bold},${style.borderStyle},${outline},${style.shadow},2,70,70,0,1
 
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
@@ -493,27 +488,8 @@ export function buildKaraokeAss(words, start, end, emoji = null, styleId = 'horm
   if (cur.length) cards.push(cur)
 
   let events = ''
-
-  // 1. Opening Viral Hook Title Card (first 2.4 seconds at top-third)
-  if (hookHeadline) {
-    const cleanHook = String(hookHeadline).replace(/[{}]/g, '').trim()
-    if (cleanHook.length > 0) {
-      const hookY = Math.round(H * 0.22)
-      const hookFontSize = Math.round(W * 0.056)
-      events += `Dialogue: 2,0:00:00.00,0:00:02.40,MainStyle,,0,0,0,,{\\an8\\fad(80,240)\\pos(${W / 2},${hookY})\\fs${hookFontSize}\\c&H0000D7FF&\\bord4\\3c&H00000000&\\shad3}⚡ ${cleanHook}\n`
-    }
-  }
-
-  // 2. Emoji Accent
-  if (emoji) {
-    events += `Dialogue: 1,0:00:00.00,0:00:00.80,MainStyle,,0,0,0,,{\\fad(80,120)\\pos(${W / 2},${Math.round(H * 0.34)})}${emoji}\n`
-  }
-
   const posX = Math.round(W / 2)
-  const posY = Math.round(H * style.posYRatio)
-  const stickerY = Math.round(H * (style.posYRatio > 0.6 ? style.posYRatio - 0.16 : style.posYRatio + 0.16))
-  const stickerFontSize = Math.round(W * 0.08)
-  let lastStickerTime = -5
+  const posY = Math.round(H * FIXED_CAPTION_Y_RATIO)
 
   cards.forEach((card, i) => {
     // Relative to clip start since FFmpeg cut input resets PTS to 00:00:00
@@ -522,20 +498,7 @@ export function buildKaraokeAss(words, start, end, emoji = null, styleId = 'horm
       i === cards.length - 1
         ? Math.min(card[card.length - 1].end, end)
         : Math.min(card[card.length - 1].end, cards[i + 1][0]?.start ?? end)
-    let ce = Math.max(cs + 0.35, rawCe - start)
-
-    // Dynamic Visual Reaction Sticker / GIF-style pop cue
-    if (cs - lastStickerTime >= 4.0) {
-      for (const w of card) {
-        const matched = findStickerForText(w.text)
-        if (matched) {
-          lastStickerTime = cs
-          const stDur = Math.min(0.85, ce - cs)
-          events += `Dialogue: 3,${tsAss(cs)},${tsAss(cs + stDur)},MainStyle,,0,0,0,,{\\an5\\fad(60,100)\\pos(${posX},${stickerY})\\fs${stickerFontSize}\\t(0,80,\\fscx135\\fscy135)\\t(80,170,\\fscx100\\fscy100)}${matched}\n`
-          break
-        }
-      }
-    }
+    const ce = Math.max(cs + 0.35, rawCe - start)
 
     let rawText
     if (style.id === 'two_tone') {
@@ -563,10 +526,8 @@ export function buildKaraokeAss(words, start, end, emoji = null, styleId = 'horm
 
     const anim = style.buildAnimation ? style.buildAnimation(W, H) : ''
     const animPart = anim ? `${anim}` : ''
-    // When \\move is used, \\pos must not be included (they conflict in libass)
-    const posPart = anim.includes('\\move') ? '' : `\\pos(${posX},${posY})`
 
-    events += `Dialogue: 0,${tsAss(cs)},${tsAss(ce)},MainStyle,,0,0,0,,{${animPart}${posPart}}${rawText}\n`
+    events += `Dialogue: 0,${tsAss(cs)},${tsAss(ce)},MainStyle,,0,0,0,,{\\an2${animPart}\\pos(${posX},${posY})}${rawText}\n`
   })
 
   return buildAssHeader(W, H, style) + events
@@ -574,14 +535,14 @@ export function buildKaraokeAss(words, start, end, emoji = null, styleId = 'horm
 
 export function buildPhraseAss(text, start, end, styleId = 'hormozi', W = 1080, H = 1920) {
   const style = getCaptionStyle(styleId)
-  const maxLen = style.wordsPerCard > 4 ? 60 : 36
+  const maxLen = style.wordsPerCard > 4 ? 50 : 32
   const regex = new RegExp(`.{1,${maxLen}}(\\s|$)`, 'g')
   const lines = text.match(regex) ?? [text]
   const dur = Math.max(0.1, end - start)
   const per = dur / lines.length
 
   const posX = Math.round(W / 2)
-  const posY = Math.round(H * style.posYRatio)
+  const posY = Math.round(H * FIXED_CAPTION_Y_RATIO)
 
   let events = ''
   lines.forEach((l, i) => {
@@ -598,8 +559,9 @@ export function buildPhraseAss(text, start, end, styleId = 'hormozi', W = 1080, 
       t = t.toUpperCase()
     }
     // Relative to clip start
-    events += `Dialogue: 0,${tsAss(per * i)},${tsAss(per * (i + 1))},MainStyle,,0,0,0,,{\\pos(${posX},${posY})}${t}\n`
+    events += `Dialogue: 0,${tsAss(per * i)},${tsAss(per * (i + 1))},MainStyle,,0,0,0,,{\\an2\\pos(${posX},${posY})}${t}\n`
   })
 
   return buildAssHeader(W, H, style) + events
 }
+
