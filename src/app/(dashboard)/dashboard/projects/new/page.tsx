@@ -338,6 +338,7 @@ export default function NewProjectPage() {
     primaryAsset?: { type: string; url: string; label: string; isRecommended?: boolean } | null
     aiRationale?: string
     assets: Array<{ type: string; url: string; label: string; isRecommended?: boolean }>
+    referenceLinks?: Array<{ url: string; label: string }>
     isHub?: boolean
     hubMessage?: string | null
   } | null>(null)
@@ -439,9 +440,9 @@ export default function NewProjectPage() {
       const targetUrl = selectedAsset || url
       if (targetUrl && /whop\.com|apps\.whop\.com/i.test(targetUrl)) {
         if (campaignData?.isHub) {
-          return 'هذا الرابط لمجموعة حملات (Hub). يرجى فتح الحملة المطلوبة ولصق رابطها أو اختيار فيديو من المادة الخام.'
+          return 'يرجى وضع رابط الفيديو الخام (YouTube أو Google Drive أو MP4) من ملفات الحملة لبدء القص من الصفر.'
         }
-        return 'Please inspect the campaign and select a valid video asset (MP4, Google Drive, or YouTube) to start clipping.'
+        return 'Please inspect the campaign and select or paste a raw video asset (MP4, Google Drive, or YouTube) to start clipping.'
       }
     }
     if (clipFrom && !/^\d{1,2}:\d{2}(:\d{2})?$/.test(clipFrom)) return 'Start time format: mm:ss'
@@ -487,9 +488,9 @@ export default function NewProjectPage() {
     if (tab === 'campaign' && (!targetUrl || /whop\.com|apps\.whop\.com/i.test(targetUrl))) {
       setSubmitting(false)
       if (campaignData?.isHub) {
-        return setError(campaignData.hubMessage || 'يرجى اختيار فيديو أو إدخال رابط حملة محددة من مساحة العمل لبدء القص.')
+        return setError(campaignData.hubMessage || 'يرجى اختيار فيديو خام أو لصق رابط الفيديو الطويل من ملفات الحملة لبدء القص.')
       }
-      return setError('Whop dashboard links cannot be clipped directly. Please select a video asset (MP4, Google Drive, or YouTube) from the campaign.')
+      return setError('Whop dashboard links cannot be clipped directly. Please select or paste a raw video asset (YouTube, Google Drive, or MP4) from the campaign.')
     }
 
     try {
@@ -709,17 +710,51 @@ export default function NewProjectPage() {
                   )}
                 </div>
 
-                {/* Campaign Hub notification if no direct video asset */}
+                {/* Campaign Hub or External Reference Materials */}
                 {campaignData.isHub && !selectedAsset && (
-                  <div className="rounded-xl border border-amber-500/40 bg-amber-500/10 p-4 text-xs text-amber-200 space-y-2">
+                  <div className="rounded-xl border border-amber-500/40 bg-amber-500/10 p-4 text-xs text-amber-200 space-y-3">
                     <div className="flex items-center gap-2 font-semibold text-amber-300">
                       <Sparkles className="h-4 w-4" />
-                      <span>مجموعة حملات (Campaign Hub)</span>
+                      <span>مصدر الفيديو الخام للحملة (Raw Source Footage)</span>
                     </div>
                     <p className="leading-relaxed">
                       {campaignData.hubMessage ||
-                        'تم التعرف على مساحة الحملات بنجاح. لبدء القص التلقائي، افتح الحملة المطلوبة وانسخ رابطها أو ضع رابط Google Drive / الفيديو المباشر.'}
+                        'تم التعرف على الحملة بنجاح. لبدء القص من الصفر، افتح رابط المادة الخام أدناه والصق رابط الفيديو الطويل (YouTube أو Google Drive).'}
                     </p>
+                    {campaignData.referenceLinks && campaignData.referenceLinks.length > 0 && (
+                      <div className="space-y-1.5 pt-1">
+                        <p className="text-[11px] font-semibold text-amber-300">روابط المادة الخام ودليل الحملة المرفقة:</p>
+                        <div className="flex flex-wrap gap-2">
+                          {campaignData.referenceLinks.map((ref, idx) => (
+                            <a
+                              key={idx}
+                              href={ref.url}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="inline-flex items-center gap-1.5 rounded-lg border border-amber-400/40 bg-black/40 px-3 py-1.5 text-xs font-medium text-amber-200 hover:border-amber-300 hover:text-white transition-colors"
+                            >
+                              <ExternalLink className="h-3.5 w-3.5 text-amber-400" />
+                              <span>{ref.label}</span>
+                            </a>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    <div className="pt-2">
+                      <label className="mb-1.5 block text-[11px] font-semibold text-pearl">
+                        الصق رابط الفيديو الخام (YouTube / Google Drive File / Direct MP4):
+                      </label>
+                      <input
+                        type="url"
+                        value={url}
+                        onChange={(e) => {
+                          setUrl(e.target.value)
+                          setSelectedAsset(e.target.value)
+                        }}
+                        placeholder="https://www.youtube.com/watch?v=... أو https://drive.google.com/file/d/..."
+                        className="input-lux !bg-black/60 !text-xs"
+                      />
+                    </div>
                   </div>
                 )}
 

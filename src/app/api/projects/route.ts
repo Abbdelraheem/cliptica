@@ -77,6 +77,15 @@ export async function POST(request: Request) {
           { status: 400 }
         )
       }
+      if (/cdn\.contentrewards\.com\/downloaded-videos\//i.test(url)) {
+        return NextResponse.json(
+          {
+            error:
+              'Competitor leaderboard submission clips cannot be used as raw campaign source video. Please select a raw campaign video asset (Google Drive, YouTube, or direct MP4).',
+          },
+          { status: 400 }
+        )
+      }
       sourceUrl = url
     }
     // Security: uploads may only reference the user's own R2 prefix.

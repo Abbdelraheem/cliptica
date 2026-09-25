@@ -98,7 +98,7 @@ describe('Whop & Content Rewards Campaign Ingestion', () => {
     expect(json.error).toContain('Whop campaign pages are not direct video streams')
   })
 
-  it('accepts extracted MP4 video streams in POST /api/projects', async () => {
+  it('rejects ContentRewards competitor leaderboard clips (/downloaded-videos/) in POST /api/projects', async () => {
     const { POST } = await import('@/app/api/projects/route')
     const req = new Request('http://localhost:3000/api/projects', {
       method: 'POST',
@@ -112,25 +112,55 @@ describe('Whop & Content Rewards Campaign Ingestion', () => {
     })
 
     const res = await POST(req)
+    expect(res.status).toBe(400)
+    const json = await res.json()
+    expect(json.error).toContain('Competitor leaderboard submission clips cannot be used')
+  })
+
+  it('accepts raw campaign MP4 / Google Drive / YouTube streams in POST /api/projects', async () => {
+    const { POST } = await import('@/app/api/projects/route')
+    const req = new Request('http://localhost:3000/api/projects', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        sourceType: 'url',
+        url: 'https://assets.whop.com/campaigns/raw-footage/stream-vod.mp4',
+        framing: 'smart',
+        captionStyle: 'hormozi',
+      }),
+    })
+
+    const res = await POST(req)
     expect(res.status).toBe(201)
     const json = await res.json()
     expect(json.id).toBe('proj_test_123')
   })
 
-  it('analyzes direct Whop campaign URL and extracts media assets', async () => {
-    // Mock global fetch for analyze route
+  it('analyzes direct Whop campaign URL, strips leaderboard topClips, and extracts raw campaign assets', async () => {
     const originalFetch = global.fetch
     global.fetch = vi.fn().mockImplementation(async (targetUrl: string) => {
+      if (targetUrl.includes('drive.google.com/embeddedfolderview')) {
+        return {
+          ok: true,
+          status: 200,
+          text: async () => `
+            <div class="flip-entry" id="entry-1AbCdEfGhIjKlMnOpQrStUv">
+              <a href="https://drive.google.com/file/d/1AbCdEfGhIjKlMnOpQrStUv/view?usp=drivesdk">
+                <div class="flip-entry-title">Podcast_Episode_42_Raw.mp4</div>
+              </a>
+            </div>
+          `,
+        } as Response
+      }
       if (targetUrl.includes('apps.whop.com') || targetUrl.includes('whop.com')) {
         return {
           ok: true,
           status: 200,
           text: async () => `
-            <!DOCTYPE html><html><head><title>UGC Repurposing | Content Rewards</title></head>
+            <!DOCTYPE html><html><head><title>Content Rewards</title></head>
             <body>
-              <div>\"name\":\"UGC Repurposing\",\"payouts\":[{\"maxPayoutCents\":50000,\"rateCents\":50}],\"organizationExperienceId\":\"exp_Q5JcJggb3l7FH7\"</div>
-              <a href="https://cdn.contentrewards.com/downloaded-videos/9e74efa8/instagram_DcgSHmciF32.mp4">Video 1</a>
-              <a href="https://drive.google.com/drive/folders/12345abcde">Drive Folder</a>
+              <div>\"name\":\"Call of Duty BO7 Clipping\",\"payouts\":[{\"maxPayoutCents\":50000,\"rateCents\":50}],\"organizationExperienceId\":\"exp_Q5JcJggb3l7FH7\",\"dos\":[\"Use 9:16 vertical format\",\"Mention @cod in caption\"],\"referenceMaterials\":[\"https://drive.google.com/drive/folders/12345abcdefghijkl\"],\"topClips\":[{\"videoUrl\":\"https://cdn.contentrewards.com/downloaded-videos/9e74efa8/instagram_DcgSHmciF32.mp4\"}]}</div>
+              <a href="https://www.youtube.com/watch?v=dQw4w9WgXcQ">Raw Stream VOD</a>
             </body></html>
           `,
         } as Response
@@ -153,8 +183,12 @@ describe('Whop & Content Rewards Campaign Ingestion', () => {
     expect(data.success).toBe(true)
     expect(data.campaign.platform).toBe('Whop Campaign')
     expect(data.campaign.primaryAsset).toBeDefined()
-    expect(data.campaign.primaryAsset.url).toContain('cdn.contentrewards.com')
-    expect(data.campaign.assets.length).toBeGreaterThanOrEqual(2)
+    // Must NOT include competitor topClips from /downloaded-videos/
+    const allAssetUrls = data.campaign.assets.map((a: any) => a.url)
+    expect(allAssetUrls.some((u: string) => u.includes('/downloaded-videos/'))).toBe(false)
+    // Must include expanded Google Drive file and YouTube VOD
+    expect(allAssetUrls.some((u: string) => u.includes('1AbCdEfGhIjKlMnOpQrStUv'))).toBe(true)
+    expect(allAssetUrls.some((u: string) => u.includes('youtube.com/watch?v=dQw4w9WgXcQ'))).toBe(true)
 
     global.fetch = originalFetch
   })
@@ -194,3 +228,4 @@ describe('Whop & Content Rewards Campaign Ingestion', () => {
     global.fetch = originalFetch
   })
 })
+

@@ -224,11 +224,62 @@ async function download(url, dir) {
     throw new Error('Whop dashboard pages cannot be downloaded directly. Please select a video asset (MP4, Google Drive, or YouTube) from the campaign.')
   }
 
-  // Fast direct fetch for direct CDN / video files (ContentRewards, S3, direct MP4s)
-  const isDirectVideo =
-    /\.(mp4|mov|webm|mkv)(\?.*)?$/i.test(url) ||
-    url.includes('/downloaded-videos/') ||
-    url.includes('cdn.contentrewards.com')
+  // Guard against competitor leaderboard clips from ContentRewards
+  if (/cdn\.contentrewards\.com\/downloaded-videos\//i.test(url)) {
+    throw new Error('Competitor leaderboard clips cannot be used as raw source footage. Please use the campaign raw video assets (Google Drive, YouTube, or direct MP4).')
+  }
+
+  // If URL is a public Google Drive folder, resolve the first video file inside it
+  const gdriveFolderMatch = url.match(/drive\.google\.com\/drive\/(?:u\/\d+\/)?folders\/([a-zA-Z0-9_-]{15,})/i)
+  if (gdriveFolderMatch) {
+    try {
+      const folderId = gdriveFolderMatch[1]
+      const listRes = await fetch(`https://drive.google.com/embeddedfolderview?id=${folderId}#list`, {
+        headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' },
+        signal: AbortSignal.timeout(10000),
+      })
+      if (listRes.ok) {
+        const listHtml = await listRes.text()
+        const fileMatch = listHtml.match(/href="https:\/\/drive\.google\.com\/file\/d\/([a-zA-Z0-9_-]{15,})\/view[^"]*"/i)
+        if (fileMatch) {
+          url = `https://drive.google.com/file/d/${fileMatch[1]}/view`
+          console.log(`[worker:download] Resolved Google Drive folder ${folderId} to file: ${url}`)
+        }
+      }
+    } catch (e) {
+      console.warn(`[worker:download] Google Drive folder resolution failed:`, e?.message || e)
+    }
+  }
+
+  // Fast direct fetch for Google Drive file links via drive.usercontent.google.com
+  const gdriveFileMatch =
+    url.match(/drive\.google\.com\/file\/d\/([a-zA-Z0-9_-]{15,})/i) ||
+    url.match(/drive\.google\.com\/(?:open|uc)\?(?:[^#]*&)?id=([a-zA-Z0-9_-]{15,})/i)
+  if (gdriveFileMatch) {
+    const fileId = gdriveFileMatch[1]
+    const directDriveUrl = `https://drive.usercontent.google.com/download?id=${fileId}&export=download&confirm=t`
+    const target = path.join(dir, 'source.mp4')
+    const t0 = Date.now()
+    try {
+      console.log(`[worker:download] Google Drive file detected (${fileId}), fetching via direct download...`)
+      await sh('curl', ['-f', '-L', '-s', '-S', '--max-time', '600', '-o', target, directDriveUrl])
+      const st = await stat(target)
+      if (st.size > 100_000) {
+        const probedDur = await probeDuration(target).catch(() => null)
+        if (Number.isFinite(probedDur) && probedDur > 0) {
+          console.log(`[worker:download] Google Drive direct download complete in ${Date.now() - t0}ms (${st.size} bytes, ${Math.round(probedDur)}s)`)
+          return target
+        }
+      }
+      await rm(target, { force: true }).catch(() => {})
+    } catch (driveErr) {
+      await rm(target, { force: true }).catch(() => {})
+      console.warn(`[worker:download] Google Drive direct curl failed, falling back to yt-dlp:`, driveErr?.message || driveErr)
+    }
+  }
+
+  // Fast direct fetch for direct CDN / video files (S3, R2, direct MP4s)
+  const isDirectVideo = /\.(mp4|mov|webm|mkv)(\?.*)?$/i.test(url)
 
   if (isDirectVideo) {
     const ext = (url.match(/\.(mp4|mov|webm|mkv)/i)?.[1] || 'mp4').toLowerCase()
@@ -362,6 +413,9 @@ async function probeDuration(file) {
  */
 async function probeUrlDuration(url) {
   await assertPublicHttpUrl(url)
+  if (/\.(mp4|mov|webm|mkv)(\?.*)?$/i.test(url) || /drive\.google\.com/i.test(url)) {
+    return null
+  }
   try {
     const out = await sh(
       '/opt/nology-venv/bin/yt-dlp',
@@ -516,6 +570,47 @@ async function transcribe(file, dir, language = 'auto') {
 
 /* ---------- scoring ---------- */
 
+function calcOverlapRatio(aStart, aEnd, bStart, bEnd) {
+  const inter = Math.max(0, Math.min(aEnd, bEnd) - Math.max(aStart, bStart))
+  if (inter <= 0) return 0
+  const minLen = Math.max(1, Math.min(aEnd - aStart, bEnd - bStart))
+  return inter / minLen
+}
+
+function calcWordOverlapRatio(aText, bText) {
+  const aWords = new Set(String(aText || '').toLowerCase().split(/\s+/).filter((w) => w.length > 2))
+  const bWords = new Set(String(bText || '').toLowerCase().split(/\s+/).filter((w) => w.length > 2))
+  if (aWords.size < 5 || bWords.size < 5) return 0
+  let shared = 0
+  for (const w of aWords) {
+    if (bWords.has(w)) shared++
+  }
+  return shared / Math.min(aWords.size, bWords.size)
+}
+
+/**
+ * Non-Maximum Suppression (NMS) for video moments:
+ * Greedily selects the highest-scoring moments while rejecting any candidate
+ * whose time window overlaps an already-selected clip by > maxOverlapRatio (default 15%)
+ * or repeats the same transcript sentences (> 65% word overlap).
+ */
+function dedupeOverlappingMoments(moments, maxClips, maxOverlapRatio = 0.15) {
+  const sorted = [...moments].sort((a, b) => (b.score ?? 0) - (a.score ?? 0))
+  const selected = []
+  for (const m of sorted) {
+    if (selected.length >= maxClips) break
+    const hasOverlap = selected.some(
+      (s) =>
+        calcOverlapRatio(s.start, s.end, m.start, m.end) > maxOverlapRatio ||
+        calcWordOverlapRatio(s.text, m.text) > 0.65
+    )
+    if (!hasOverlap) {
+      selected.push(m)
+    }
+  }
+  return selected
+}
+
 /**
  * Semantic & pause-aware candidate generation.
  * Rather than imposing an arbitrary fixed cut (e.g. 12s), this allows the AI to discover natural
@@ -527,9 +622,9 @@ function generateCandidateMoments(transcript, duration, from = 0, minDur = 15, m
 
   if (!segs.length) {
     const fallback = []
-    const win = Math.min(duration, Math.min(60, Math.max(minDur, 30)))
+    const win = Math.min(duration, Math.min(45, Math.max(minDur, 20)))
     if (duration > 0 && win > 0) {
-      for (let s = Math.max(0, from); s + win <= duration && fallback.length < 50; s += Math.max(5, win / 2)) {
+      for (let s = Math.max(0, from); s + win <= duration && fallback.length < 50; s += win) {
         fallback.push({ start: Math.round(s), end: Math.round(s + win), text: '' })
       }
     }
@@ -548,13 +643,15 @@ function generateCandidateMoments(transcript, duration, from = 0, minDur = 15, m
     return endsWithPunct || gap >= 0.5
   }
 
-  const candidates = []
-  const usedRanges = []
+  const allCandidates = []
+  let lastAcceptedStart = -999
 
-  // Step through segment by segment
-  for (let i = 0; i < segs.length && candidates.length < 60; i++) {
+  // Step through segment by segment across the entire transcript
+  for (let i = 0; i < segs.length; i++) {
     const startSeg = segs[i]
     if (startSeg.start < from) continue
+    // Avoid generating near-identical start points (< 4s apart)
+    if (startSeg.start - lastAcceptedStart < 4) continue
 
     let accumulatedText = []
     let clipStart = startSeg.start
@@ -571,18 +668,13 @@ function generateCandidateMoments(transcript, duration, from = 0, minDur = 15, m
           const wordCount = fullText.split(/\s+/).filter(Boolean).length
 
           // Avoid dead silence or tiny blips
-          if (wordCount >= 16) {
-            const overlap = usedRanges.some(
-              (r) => Math.abs(r.start - clipStart) < 6 && Math.abs(r.end - clipEnd) < 6
-            )
-            if (!overlap) {
-              candidates.push({
-                start: Math.round(clipStart),
-                end: Math.round(clipEnd),
-                text: fullText,
-              })
-              usedRanges.push({ start: clipStart, end: clipEnd })
-            }
+          if (wordCount >= 14) {
+            allCandidates.push({
+              start: Math.round(clipStart),
+              end: Math.round(clipEnd),
+              text: fullText,
+            })
+            lastAcceptedStart = clipStart
           }
           break
         }
@@ -590,18 +682,28 @@ function generateCandidateMoments(transcript, duration, from = 0, minDur = 15, m
     }
   }
 
-  // Fallback if semantic grouping produced too few candidates
+  // Downsample evenly across the full video timeline if there are more than 75 candidates
+  let candidates = allCandidates
+  if (allCandidates.length > 75) {
+    const step = allCandidates.length / 75
+    candidates = Array.from({ length: 75 }, (_, idx) => allCandidates[Math.floor(idx * step)])
+  }
+
+  // Fallback if semantic grouping produced too few candidates: add non-overlapping contiguous windows first
   if (candidates.length < 3) {
-    for (const win of [30, 45, 60]) {
+    for (const win of [minDur, 25, 35, 45, 60]) {
       const actualWin = Math.min(duration, win)
       if (actualWin < minDur && duration >= minDur) continue
-      for (let s = Math.max(0, from); s + actualWin <= duration && candidates.length < 40; s += Math.max(5, actualWin / 2)) {
+      for (let s = Math.max(0, from); s + actualWin <= duration && candidates.length < 40; s += actualWin) {
+        const startR = Math.round(s)
+        const endR = Math.round(s + actualWin)
+        if (candidates.some((c) => Math.abs(c.start - startR) < 4 && Math.abs(c.end - endR) < 4)) continue
         const text = segs
           .filter((x) => x.start >= s - 1 && x.end <= s + actualWin + 1)
           .map((x) => x.text)
           .join(' ')
           .trim()
-        candidates.push({ start: Math.round(s), end: Math.round(s + actualWin), text })
+        candidates.push({ start: startR, end: endR, text })
       }
     }
   }
@@ -618,7 +720,7 @@ function generateCandidateMoments(transcript, duration, from = 0, minDur = 15, m
   return candidates
 }
 
-async function llmScoreMoments(candidates, instructions) {
+async function llmScoreMoments(candidates, instructions, maxClips = CFG.clipsPerVideo) {
   const providers = []
   const timeoutMs = CFG.scoringTimeoutMs || 15_000
 
@@ -670,10 +772,12 @@ async function llmScoreMoments(candidates, instructions) {
     })
   }
 
+  const requestCount = Math.min(candidates.length, Math.max(maxClips, maxClips * 2))
   let system =
     'You are a master viral video editor for TikTok, Instagram Reels, and YouTube Shorts.\n' +
     'Analyze the provided speech moments (which may be in Arabic, English, or mixed) and evaluate their virality.\n' +
-    'IMPORTANT: Every moment has its own natural dynamic duration (from 15 seconds up to 90 seconds). Evaluate each moment by its complete narrative hook, development, and punchline — do not force a fixed length.\n' +
+    'IMPORTANT: Every moment has its own natural dynamic duration (from 15 seconds up to 90 seconds) and a time window [startSec, endSec]. Evaluate each moment by its complete narrative hook, development, and punchline — do not force a fixed length.\n' +
+    'CRITICAL RULE: Do NOT select overlapping moments! Every selected moment MUST cover a distinct, non-overlapping time range (startSec to endSec) from a different part of the video. Never pick two moments that share the same sentences or overlap in time.\n' +
     'For each moment evaluate three distinct sub-scores from 0 to 100:\n' +
     '- hookScore: Power of the first 3 seconds to halt scrolling (provocative question, shocking statement, mystery, or curiosity gap).\n' +
     '- retentionScore: Pacing, storytelling flow, and lack of fluff that keeps viewers watching until the end.\n' +
@@ -686,7 +790,7 @@ async function llmScoreMoments(candidates, instructions) {
     '"hashtags":["#tag1", "#tag2", "#tag3", "#tag4", "#tag5"],' +
     '"cta":"one short engaging sentence encouraging comments",' +
     '"reason":"one sentence why it performs","emoji":"one fitting emoji"}]}.\n' +
-    `Return exactly the ${CFG.clipsPerVideo} strongest moments, best first.`
+    `Return up to ${requestCount} non-overlapping moments, best first.`
   if (instructions?.trim()) {
     system += ` The uploader added these instructions — follow them strictly when picking and ranking: "${instructions.trim().slice(0, 500)}"`
   }
@@ -697,6 +801,8 @@ async function llmScoreMoments(candidates, instructions) {
     const wpm = Math.round((words / dur) * 60)
     return {
       index: i,
+      startSec: c.start,
+      endSec: c.end,
       durationSec: dur,
       speechRateWpm: wpm,
       acousticCadence: wpm > 155 ? 'fast/high-energy' : wpm < 105 ? 'slow/deliberate' : 'conversational',
@@ -757,7 +863,7 @@ async function llmScoreMoments(candidates, instructions) {
         const latency = Date.now() - t0
         const fallbackNote = attempts.length > 0 ? ` | fallback chain: ${attempts.join(' -> ')}` : ''
         console.log(`[worker] scored via ${p.name} in ${latency}ms [${p.tier}]${fallbackNote}`)
-        return valid.slice(0, CFG.clipsPerVideo)
+        return valid
       }
       throw new Error('Empty or invalid moments array returned')
     } catch (e) {
@@ -856,18 +962,36 @@ function heuristicScoreMoments(candidates) {
       }
     })
     .sort((a, b) => b.score - a.score)
-    .slice(0, CFG.clipsPerVideo)
 }
 
 async function scoreMoments(transcript, duration, from = 0, instructions = null) {
   const minDur = CFG.clipMinLength ?? 15
   const maxDur = CFG.clipMaxLength ?? 90
+  const effectiveDuration = Math.max(0, duration - Math.max(0, from))
+  const maxClips =
+    effectiveDuration > 0
+      ? Math.min(CFG.clipsPerVideo, Math.max(1, Math.floor(effectiveDuration / minDur)))
+      : CFG.clipsPerVideo
+
   const candidates = generateCandidateMoments(transcript, duration, from, minDur, maxDur)
   if (!candidates.length) return []
-  const llmResult = await llmScoreMoments(candidates, instructions)
-  if (llmResult && llmResult.length) return llmResult
+
+  const llmResult = await llmScoreMoments(candidates, instructions, maxClips)
+  const heurResult = heuristicScoreMoments(candidates)
+
+  if (llmResult && llmResult.length) {
+    let deduped = dedupeOverlappingMoments(llmResult, maxClips, 0.15)
+    if (deduped.length < maxClips) {
+      deduped = dedupeOverlappingMoments([...deduped, ...heurResult], maxClips, 0.15)
+    }
+    console.log(`[worker] selected ${deduped.length}/${maxClips} non-overlapping clips (video duration=${Math.round(duration)}s)`)
+    return deduped
+  }
+
   console.log('[worker] scored via heuristic (fallback safety net)')
-  return heuristicScoreMoments(candidates)
+  const deduped = dedupeOverlappingMoments(heurResult, maxClips, 0.15)
+  console.log(`[worker] selected ${deduped.length}/${maxClips} non-overlapping heuristic clips (video duration=${Math.round(duration)}s)`)
+  return deduped
 }
 
 /* ---------- premium vision ---------- */
@@ -1390,7 +1514,10 @@ async function processJob(job) {
     console.log('[worker] transcribing')
     await setP(30, 'Transcribing speech audio with AI Whisper model...')
     const transcript = await transcribe(src, dir, project.language ?? 'auto')
-    await prisma.project.update({ where: { id: project.id }, data: { transcript } }).catch((e) => {
+    await prisma.project.update({
+      where: { id: project.id },
+      data: { transcript, duration: Math.round(duration || 0) },
+    }).catch((e) => {
       console.warn('[worker] failed to cache transcript to project:', e.message)
     })
 
