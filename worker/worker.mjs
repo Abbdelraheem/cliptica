@@ -1007,7 +1007,7 @@ async function llmDirectMomentsFromTranscript(
   // so the entire video transcript fits cleanly within the LLM context window.
   const transcriptLines = []
   if (segs.length > 0) {
-    const targetLines = 160
+    const targetLines = 85
     const groupSize = Math.max(1, Math.ceil(segs.length / targetLines))
     for (let i = 0; i < segs.length; i += groupSize) {
       const slice = segs.slice(i, i + groupSize)
@@ -1018,6 +1018,7 @@ async function llmDirectMomentsFromTranscript(
         .join(' ')
         .replace(/\s+/g, ' ')
         .trim()
+        .slice(0, 110)
       if (text) {
         transcriptLines.push(`[${sTime}s-${eTime}s] ${text}`)
       }
@@ -1126,7 +1127,7 @@ async function llmDirectMomentsFromTranscript(
           temperature: 0.25,
           messages: [
             { role: 'system', content: system },
-            { role: 'user', content: transcriptLines.join('\n').slice(0, 22_000) },
+            { role: 'user', content: transcriptLines.join('\n').slice(0, 8500) },
           ],
         }),
       })
@@ -1198,7 +1199,7 @@ async function llmScoreMoments(candidates, instructions, maxClips = CFG.clipsPer
   let system =
     'You are a master viral video editor for TikTok, Instagram Reels, and YouTube Shorts.\n' +
     'Analyze the provided speech moments (which may be in Arabic, English, or mixed) and evaluate their virality.\n' +
-    'IMPORTANT: Prefer rich, complete narrative moments (at least 28 seconds long, with NO upper duration limit) that contain a strong hook, buildup, and complete payoff. Avoid short fragments unless the entire video is short.\n' +
+    'IMPORTANT: Prefer rich, complete narrative moments (between 28 and 60 seconds long, NEVER exceeding 60 seconds) that contain a strong hook, buildup, and complete payoff. Avoid short fragments unless the entire video is short.\n' +
     'CRITICAL RULE: Do NOT select overlapping moments! Every selected moment MUST cover a distinct, non-overlapping time range (startSec to endSec) from a different part of the video. Never pick two moments that share the same sentences or overlap in time.\n' +
     'For each moment evaluate three distinct sub-scores from 0 to 100:\n' +
     '- hookScore: Power of the first 3 seconds to halt scrolling (provocative question, shocking statement, mystery, or curiosity gap).\n' +
@@ -1217,18 +1218,26 @@ async function llmScoreMoments(candidates, instructions, maxClips = CFG.clipsPer
     system += ` The uploader added these instructions — follow them strictly when picking and ranking: "${instructions.trim().slice(0, 500)}"`
   }
 
-  const candidatePayload = candidates.map((c, i) => {
+  const maxCandidatesForPrompt = 18
+  const candStep = candidates.length > maxCandidatesForPrompt ? candidates.length / maxCandidatesForPrompt : 1
+  const sampledIdxs =
+    candidates.length > maxCandidatesForPrompt
+      ? Array.from({ length: maxCandidatesForPrompt }, (_, k) => Math.floor(k * candStep))
+      : candidates.map((_, k) => k)
+
+  const candidatePayload = sampledIdxs.map((origIdx) => {
+    const c = candidates[origIdx]
     const dur = Math.max(1, c.end - c.start)
     const words = (c.text || '').split(/\s+/).filter(Boolean).length
     const wpm = Math.round((words / dur) * 60)
     return {
-      index: i,
+      index: origIdx,
       startSec: c.start,
       endSec: c.end,
       durationSec: dur,
       speechRateWpm: wpm,
       acousticCadence: wpm > 155 ? 'fast/high-energy' : wpm < 105 ? 'slow/deliberate' : 'conversational',
-      text: c.text.slice(0, 700),
+      text: c.text.slice(0, 260),
     }
   })
 
