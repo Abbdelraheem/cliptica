@@ -1898,7 +1898,16 @@ async function processClipAdjust(job) {
       },
     }).catch(() => {})
 
-  const { clipId, start, end, captionStyle: reqStyle } = job.result || {}
+  const {
+    clipId,
+    start,
+    end,
+    captionStyle: reqStyle,
+    aspectRatio: reqRatio,
+    framing: reqFraming,
+    title: reqTitle,
+    words: reqWords,
+  } = job.result || {}
   if (!clipId || start == null || end == null) {
     throw new Error('Invalid clip adjust parameters')
   }
@@ -1910,7 +1919,7 @@ async function processClipAdjust(job) {
   if (!clip) throw new Error(`Clip ${clipId} not found`)
 
   console.log(`[worker] [clip_adjust] ${job.id}: adjusting clip ${clipId} to [${start}s, ${end}s]`)
-  await setP(10, 'Initializing clip re-trim workspace...')
+  await setP(10, 'Initializing Studio Editor workspace...')
 
   const dir = await mkdtemp(path.join(tmpdir(), 'nology-adj-'))
   try {
@@ -1941,9 +1950,9 @@ async function processClipAdjust(job) {
       await copyFile(src, cachedSrc).catch(() => {})
     }
 
-    await setP(40, 'Aligning transcript timing & karaoke subtitles...')
+    await setP(40, 'Aligning edited transcript timing & karaoke subtitles...')
 
-    // 2. Transcript words: read from cached project.transcript or clip.captionData
+    // 2. Transcript words: prefer custom Studio-edited words if provided, otherwise project.transcript or clip.captionData
     let transcript = project.transcript
     if (!transcript || !Array.isArray(transcript.words)) {
       if (clip.captionData && Array.isArray(clip.captionData.words)) {
@@ -1952,21 +1961,40 @@ async function processClipAdjust(job) {
         transcript = { words: [] }
       }
     }
+    if (Array.isArray(reqWords) && reqWords.length > 0) {
+      const customWords = reqWords
+        .map((w) => ({
+          start: Number(w.start),
+          end: Number(w.end),
+          text: String(w.text ?? w.word ?? '').trim(),
+        }))
+        .filter((w) => w.text.length > 0 && Number.isFinite(w.start) && Number.isFinite(w.end))
+      if (customWords.length > 0) {
+        // Merge edited window words into full transcript so user edits override [start, end]
+        const outsideWords = (transcript.words ?? []).filter((w) => w.end <= start || w.start >= end)
+        transcript = {
+          ...transcript,
+          words: [...outsideWords, ...customWords].sort((a, b) => a.start - b.start),
+        }
+      }
+    }
 
     const captionStyle = reqStyle || clip.captionStyle || project.captionStyle || 'hormozi'
+    const aspectRatio = reqRatio || project.aspectRatio || '9:16'
+    const framingMode = reqFraming || project.framing || 'smart'
+    const finalTitle = reqTitle || clip.title
     const moment = {
       start,
       end,
-      title: clip.title,
-      text: clip.title,
+      title: finalTitle,
+      text: finalTitle,
       emoji: clip.captionData?.emoji || '',
       score: clip.viralScore,
     }
 
-    console.log(`[worker] [clip_adjust] rendering clip ${clipId} [${start}s-${end}s, style=${captionStyle}]`)
-    await setP(60, 'Re-rendering adjusted clip & subtitle burn-in...')
+    console.log(`[worker] [clip_adjust] rendering clip ${clipId} [${start}s-${end}s, style=${captionStyle}, ratio=${aspectRatio}, framing=${framingMode}]`)
+    await setP(60, 'Re-rendering Studio clip & lower-third subtitle burn-in...')
 
-    const aspectRatio = project.aspectRatio ?? '9:16'
     const owner = await prisma.user.findUnique({ where: { id: project.userId }, select: { role: true } })
     const applyWatermark = !owner?.role || owner.role === 'FREE' || owner.role === 'USER'
     const rendered = await renderClip(
@@ -1975,13 +2003,13 @@ async function processClipAdjust(job) {
       dir,
       `adj_${Date.now()}`,
       transcript,
-      project.framing ?? 'smart',
+      framingMode,
       captionStyle,
       aspectRatio,
       applyWatermark
     )
 
-    await setP(85, 'Uploading adjusted clip to Cloudflare R2...')
+    await setP(85, 'Uploading Studio master clip to Cloudflare R2...')
     console.log(`[worker] [clip_adjust] uploading adjusted clip to R2`)
 
     const base = `${project.userId}/${project.id}`
@@ -1994,6 +2022,7 @@ async function processClipAdjust(job) {
     await prisma.clip.update({
       where: { id: clip.id },
       data: {
+        title: finalTitle,
         sourceStart: Math.round(start),
         sourceEnd: Math.round(end),
         duration: Math.round(end - start),
@@ -2003,10 +2032,13 @@ async function processClipAdjust(job) {
         thumbnailUrl: thumbUrl,
         captionStyle,
         captionData: {
+          ...(typeof clip.captionData === 'object' && clip.captionData !== null ? clip.captionData : {}),
           mode: 'karaoke',
           emoji: moment.emoji ?? '',
           words: winWords,
           style: captionStyle,
+          aspectRatio,
+          framing: framingMode,
           unlocked: Boolean(clip.captionData?.unlocked),
         },
       },

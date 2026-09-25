@@ -66,11 +66,38 @@ export const VALID_CAPTION_STYLES = [
   'arabic_clean',
 ] as const
 
+export const VALID_FRAMING_MODES = [
+  'smart',
+  'face',
+  'split',
+  'podcast_split',
+  'gaming',
+  'gaming_split',
+  'facecam_top',
+  'blur',
+  'letter',
+  'center',
+  'variety',
+] as const
+
+export const VALID_ASPECT_RATIOS = ['9:16', '1:1', '16:9'] as const
+
+export const clipWordSchema = z.object({
+  start: z.number(),
+  end: z.number(),
+  text: z.string().max(120).optional(),
+  word: z.string().max(120).optional(),
+})
+
 export const clipAdjustSchema = z
   .object({
     start: z.number().min(0, 'Start time must be >= 0'),
     end: z.number().min(0, 'End time must be > start time'),
     captionStyle: z.enum(VALID_CAPTION_STYLES).optional(),
+    aspectRatio: z.enum(VALID_ASPECT_RATIOS).optional(),
+    framing: z.enum(VALID_FRAMING_MODES).optional(),
+    title: z.string().min(1).max(160).optional(),
+    words: z.array(clipWordSchema).max(1500).optional(),
   })
   .refine((data) => data.end > data.start, {
     message: 'End time must be greater than start time',
@@ -80,8 +107,8 @@ export const clipAdjustSchema = z
     message: 'Clip duration must be at least 15 seconds',
     path: ['end'],
   })
-  .refine((data) => data.end - data.start <= 120, {
-    message: 'Clip duration cannot exceed 120 seconds',
+  .refine((data) => data.end - data.start <= 60, {
+    message: 'Clip duration cannot exceed 60 seconds',
     path: ['end'],
   })
 

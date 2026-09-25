@@ -37,12 +37,12 @@ export async function POST(
       )
     }
 
-    const { start, end, captionStyle } = parseResult.data
+    const { start, end, captionStyle, aspectRatio, framing, title, words } = parseResult.data
 
     // Fetch project and clip, ensuring user owns both
     const project = await prisma.project.findFirst({
       where: { id: projectId, userId: session.user.id },
-      select: { id: true, duration: true, captionStyle: true },
+      select: { id: true, duration: true, captionStyle: true, aspectRatio: true, framing: true },
     })
 
     if (!project) {
@@ -89,6 +89,18 @@ export async function POST(
     }
 
     const finalStyle = captionStyle || clip.captionStyle || project.captionStyle || 'hormozi'
+    const finalAspectRatio = aspectRatio || project.aspectRatio || '9:16'
+    const finalFraming = framing || project.framing || 'smart'
+    const finalTitle = title?.trim() || clip.title
+    const normalizedWords = Array.isArray(words)
+      ? words
+          .map((w) => ({
+            start: Number(w.start),
+            end: Number(w.end),
+            text: String(w.text ?? w.word ?? '').trim(),
+          }))
+          .filter((w) => w.text.length > 0 && Number.isFinite(w.start) && Number.isFinite(w.end))
+      : undefined
 
     const job = await prisma.$transaction(async (tx) => {
       if (cost > 0) {
@@ -101,12 +113,14 @@ export async function POST(
             userId: session.user.id,
             amount: -cost,
             type: 'usage',
-            description: `Clip re-trim adjustment for "${clip.title}" (${Math.round(start)}s-${Math.round(end)}s)`,
+            description: `Studio Editor re-render for "${finalTitle}" (${Math.round(start)}s-${Math.round(end)}s)`,
             metadata: {
               projectId: project.id,
               clipId: clip.id,
               start: Math.round(start),
               end: Math.round(end),
+              aspectRatio: finalAspectRatio,
+              framing: finalFraming,
             },
           },
         })
@@ -115,6 +129,7 @@ export async function POST(
       await tx.clip.update({
         where: { id: clip.id },
         data: {
+          title: finalTitle,
           status: 'GENERATING',
           captionStyle: finalStyle,
         },
@@ -131,6 +146,10 @@ export async function POST(
             start: Math.round(start),
             end: Math.round(end),
             captionStyle: finalStyle,
+            aspectRatio: finalAspectRatio,
+            framing: finalFraming,
+            title: finalTitle,
+            ...(normalizedWords && normalizedWords.length > 0 ? { words: normalizedWords } : {}),
             chargedCredits: cost,
           },
         },
@@ -139,13 +158,16 @@ export async function POST(
 
     return NextResponse.json({
       success: true,
-      message: 'Clip adjustment queued for fast re-trim',
+      message: 'Clip adjustment queued for Studio re-render',
       jobId: job.id,
       clipId: clip.id,
       start: Math.round(start),
       end: Math.round(end),
       duration: Math.round(end - start),
       captionStyle: finalStyle,
+      aspectRatio: finalAspectRatio,
+      framing: finalFraming,
+      title: finalTitle,
       chargedCredits: cost,
     })
   } catch (error) {

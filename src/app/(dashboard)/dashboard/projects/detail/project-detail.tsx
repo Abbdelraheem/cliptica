@@ -28,7 +28,14 @@ type Clip = {
   exportUrl: string | null
   thumbnailUrl: string | null
   captionStyle: string
-  captionData: { mode?: string; emoji?: string; unlocked?: boolean; words?: Array<{ start: number; end: number; word: string }> } | null
+  captionData: {
+    mode?: string
+    emoji?: string
+    unlocked?: boolean
+    aspectRatio?: string
+    framing?: string
+    words?: Array<{ start: number; end: number; word?: string; text?: string }>
+  } | null
   createdAt: string
 }
 
@@ -813,13 +820,13 @@ export default function ProjectDetail({ projectId }: { projectId: string }) {
                       type="button"
                       onClick={() => openAdjust(c)}
                       disabled={c.status === 'GENERATING'}
-                      className={`btn-lux btn-outline flex-1 !py-1.5 !px-2 !text-xs !font-normal min-h-[38px] flex items-center justify-center gap-1 ${
+                      className={`btn-lux btn-outline flex-1 !py-1.5 !px-2.5 !text-xs !font-semibold min-h-[38px] flex items-center justify-center gap-1.5 border-gold/30 hover:!border-gold hover:bg-gold/10 text-champagne ${
                         editingClipId === c.id ? '!border-gold !text-gold' : ''
                       }`}
-                      title="Adjust clip start/end timestamps and caption style"
+                      title="Open Studio NLE Video Editor (Timeline, Transcript Words, 18 Captions & Framing)"
                     >
-                      <Scissors className="h-3.5 w-3.5 text-champagne shrink-0" />
-                      <span className="truncate">{editingClipId === c.id ? 'Close' : 'Editor'}</span>
+                      <Scissors className="h-3.5 w-3.5 text-gold shrink-0" />
+                      <span className="truncate">Studio Editor</span>
                     </button>
 
                     {unlocked && (
@@ -1471,6 +1478,8 @@ export default function ProjectDetail({ projectId }: { projectId: string }) {
           onClose={() => setStudioEditorClip(null)}
           clip={studioEditorClip}
           projectDuration={project.duration}
+          projectFraming={project.framing}
+          projectAspectRatio={project.aspectRatio}
           onSave={async (clipId, params) => {
             const res = await fetch(`/api/projects/${projectId}/clips/${clipId}/adjust`, {
               method: 'POST',
@@ -1485,9 +1494,19 @@ export default function ProjectDetail({ projectId }: { projectId: string }) {
               if (!cur) return cur
               return {
                 ...cur,
-                clips: cur.clips.map((c) => (c.id === clipId ? { ...c, status: 'GENERATING' } : c)),
+                clips: cur.clips.map((c) =>
+                  c.id === clipId
+                    ? {
+                        ...c,
+                        title: params.title || c.title,
+                        captionStyle: params.captionStyle || c.captionStyle,
+                        status: 'GENERATING',
+                      }
+                    : c
+                ),
               }
             })
+            toast.success('Studio edits saved! Re-rendering master MP4 (~15s)...')
             load()
           }}
         />
