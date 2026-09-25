@@ -78,8 +78,15 @@ export function recordProxyResult(proxy, success, errorMsg = '') {
     console.log(`[proxy-pool] proxy=${redacted} status=SUCCESS total_successes=${rec.successes}`)
   } else {
     rec.failures += 1
-    // Quarantine proxy for 15 minutes after 2 consecutive failures
-    if (rec.failures >= 2) {
+    const lowerErr = String(errorMsg || '').toLowerCase()
+    const isPaymentOrQuotaError =
+      lowerErr.includes('response 402') ||
+      lowerErr.includes('402 payment required') ||
+      lowerErr.includes('bandwidthlimit')
+    // Quarantine 402 bandwidth-exhausted proxies for 6 hours immediately; normal failures after 2 attempts for 15m
+    if (isPaymentOrQuotaError) {
+      rec.quarantinedUntil = Date.now() + 6 * 60 * 60 * 1000
+    } else if (rec.failures >= 2 && !proxy.includes('127.0.0.1:40000')) {
       rec.quarantinedUntil = Date.now() + 15 * 60 * 1000
     }
     const shortErr = String(errorMsg).split('\n')[0].slice(0, 80)
@@ -102,7 +109,12 @@ export function prioritizeProxies(candidates, envList = [], now = Date.now()) {
   })
 
   return unquarantined.sort((a, b) => {
-    // 1. Paid/env proxies always come first
+    // 0. Local Cloudflare WARP daemon always comes first
+    const isWarpA = a.includes('127.0.0.1:40000') ? 1 : 0
+    const isWarpB = b.includes('127.0.0.1:40000') ? 1 : 0
+    if (isWarpA !== isWarpB) return isWarpB - isWarpA
+
+    // 1. Paid/env proxies come next
     const isEnvA = envSet.has(a) ? 1 : 0
     const isEnvB = envSet.has(b) ? 1 : 0
     if (isEnvA !== isEnvB) return isEnvB - isEnvA
@@ -120,6 +132,8 @@ export function prioritizeProxies(candidates, envList = [], now = Date.now()) {
  * Returns prioritized proxy pool list.
  */
 export async function ytProxyPool(options = {}) {
+  const warpProxy = process.env.WARP_PROXY || 'socks5://127.0.0.1:40000'
+  const hasExplicitOptions = options.envProxies !== undefined || options.filePath !== undefined
   const envList = (options.envProxies ?? process.env.YTDLP_PROXIES ?? '')
     .split(',')
     .map((p) => p.trim())
@@ -129,11 +143,12 @@ export async function ytProxyPool(options = {}) {
   let fileList = []
   try {
     const raw = await fs.readFile(filePath, 'utf8')
-    fileList = raw.split('\n').map((l) => l.trim()).filter(Boolean)
+    fileList = raw.split('\n').map((l) => l.trim()).filter((l) => l && !l.startsWith('#'))
   } catch {
     // File missing or inaccessible: ignore
   }
 
-  const all = [...envList, ...fileList]
+  const all = hasExplicitOptions ? [...envList, ...fileList] : [warpProxy, ...envList, ...fileList]
   return prioritizeProxies(all, envList, options.now ?? Date.now())
 }
+

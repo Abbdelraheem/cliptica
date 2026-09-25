@@ -285,22 +285,75 @@ export async function POST(req: Request) {
       }
     }
 
-    // 2. Google Drive (expand folders into individual video files when possible)
+    // 2. Google Drive (expand folders into individual video files and filter out non-video image/logo files)
     const driveMatches =
       combinedSearchHtml.match(/https?:\/\/(?:drive|docs)\.google\.com\/(?:drive\/folders|file\/d)\/[^\s"'<>\\]+/gi) ||
       []
     const driveFoldersToExpand: string[] = []
+    const driveFilesToVerify: string[] = []
     for (const dUrl of driveMatches) {
-      const clean = dUrl.replace(/\\+$/, '').replace(/["'\\]+$/, '').replace(/&amp;/g, '&')
-      if (!assetMap.has(clean)) {
-        const isFolder = clean.includes('/folders/')
-        if (isFolder && driveFoldersToExpand.length < 2) {
-          driveFoldersToExpand.push(clean)
+      let clean = dUrl
+        .replace(/\\+$/, '')
+        .replace(/["'\\]+$/, '')
+        .replace(/&amp;/g, '&')
+        .replace(/[?&]sa=D&source=editors.*$/i, '')
+      const folderIdMatch = clean.match(/\/folders\/([a-zA-Z0-9_-]{15,})/)
+      const fileIdMatch = clean.match(/\/file\/d\/([a-zA-Z0-9_-]{15,})/)
+      if (folderIdMatch) {
+        clean = `https://drive.google.com/drive/folders/${folderIdMatch[1]}`
+        if (!assetMap.has(clean)) {
+          if (driveFoldersToExpand.length < 2) driveFoldersToExpand.push(clean)
+          assetMap.set(clean, {
+            type: 'drive',
+            url: clean,
+            label: 'Google Drive Raw Assets Folder',
+          })
         }
-        assetMap.set(clean, {
+      } else if (fileIdMatch) {
+        const fileId = fileIdMatch[1]
+        clean = `https://drive.google.com/file/d/${fileId}/view`
+        if (!driveFilesToVerify.includes(fileId) && driveFilesToVerify.length < 4) {
+          driveFilesToVerify.push(fileId)
+        }
+      }
+    }
+
+    for (const fileId of driveFilesToVerify) {
+      const canonicalFileUrl = `https://drive.google.com/file/d/${fileId}/view`
+      if (assetMap.has(canonicalFileUrl)) continue
+      let isNonVideo = false
+      let fileLabel = 'Google Drive Raw Video File'
+      try {
+        const headRes = await fetch(
+          `https://drive.usercontent.google.com/download?id=${fileId}&export=download&confirm=t`,
+          { method: 'HEAD', headers: reqHeaders, signal: AbortSignal.timeout(3500) }
+        )
+        const cType = (headRes.headers.get('content-type') || '').toLowerCase()
+        const cDisp = headRes.headers.get('content-disposition') || ''
+        const fnMatch = cDisp.match(/filename="([^"]+)"/i)
+        const fileName = fnMatch?.[1] || ''
+        if (
+          cType.startsWith('image/') ||
+          cType.startsWith('application/pdf') ||
+          /\.(png|jpe?g|gif|webp|svg|pdf|zip|rar|psd|ai)$/i.test(fileName)
+        ) {
+          isNonVideo = true
+          if (!referenceLinks.some((r) => r.url === canonicalFileUrl)) {
+            referenceLinks.push({
+              url: canonicalFileUrl,
+              label: fileName ? `Brand Asset (${fileName})` : 'Google Drive Brand Asset',
+            })
+          }
+        } else if (fileName) {
+          fileLabel = `Google Drive Video: ${fileName}`
+        }
+      } catch {}
+
+      if (!isNonVideo) {
+        assetMap.set(canonicalFileUrl, {
           type: 'drive',
-          url: clean,
-          label: isFolder ? 'Google Drive Raw Assets Folder' : 'Google Drive Raw Video File',
+          url: canonicalFileUrl,
+          label: fileLabel,
         })
       }
     }

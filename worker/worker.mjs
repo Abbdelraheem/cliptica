@@ -14,7 +14,7 @@ import { PrismaClient } from '@prisma/client'
 import { execFile } from 'child_process'
 import { promisify } from 'util'
 import { mkdtemp, rm, writeFile, readFile, mkdir, copyFile, stat } from 'fs/promises'
-import { existsSync, readFileSync } from 'fs'
+import { existsSync, readFileSync, writeFileSync } from 'fs'
 import { fileURLToPath } from 'url'
 import { tmpdir } from 'os'
 import path from 'path'
@@ -190,7 +190,7 @@ async function sh(cmd, args, opts) {
 /** Base yt-dlp args: JS runtimes (deno preferred — solves YouTube's n challenge), mandatory impersonate
  * (server IP is a flagged AWS datacenter; faking a real browser TLS fingerprint is what gets past the
  * "Sign in to confirm you're not a bot" wall), plus optional cookies file / proxy given via extra. */
-function ytdlpArgs(extra) {
+function ytdlpArgs(extra, includeCookies = true) {
   const denoPath = existsSync('/usr/local/bin/deno') ? 'deno:/usr/local/bin/deno' : 'deno'
   const nodePath = existsSync('/usr/bin/node') ? 'node:/usr/bin/node' : 'node'
   const args = [
@@ -205,13 +205,35 @@ function ytdlpArgs(extra) {
     '--extractor-args',
     'youtube:player_client=mweb,web_creator,android',
   ]
-  const cookiePath =
-    (existsSync('/opt/nology/cookies.txt') ? '/opt/nology/cookies.txt' : null) ||
-    process.env.YTDLP_COOKIES ||
-    (existsSync('/opt/nology/youtube-cookies.txt') ? '/opt/nology/youtube-cookies.txt' : null) ||
-    (existsSync('cookies.txt') ? 'cookies.txt' : null)
-  if (cookiePath) args.push('--cookies', cookiePath)
+  if (includeCookies) {
+    const cookiePath =
+      (existsSync('/opt/nology/cookies.txt') ? '/opt/nology/cookies.txt' : null) ||
+      process.env.YTDLP_COOKIES ||
+      (existsSync('/opt/nology/youtube-cookies.txt') ? '/opt/nology/youtube-cookies.txt' : null) ||
+      (existsSync('cookies.txt') ? 'cookies.txt' : null)
+    if (cookiePath) {
+      try {
+        const rawCookies = readFileSync(cookiePath, 'utf8')
+        // Only pass --cookies if it contains authenticated YouTube session cookies,
+        // and copy to /tmp so yt-dlp never overwrites and wipes the master cookie file.
+        if (/__Secure-[13]PSID\b|LOGIN_INFO\b/.test(rawCookies)) {
+          const runtimeCookiePath = path.join(tmpdir(), 'nology-yt-cookies-runtime.txt')
+          writeFileSync(runtimeCookiePath, rawCookies, 'utf8')
+          args.push('--cookies', runtimeCookiePath)
+        }
+      } catch {}
+    }
+  }
   return args.concat(extra)
+}
+
+async function ensureWarpConnected() {
+  try {
+    await sh('warp-cli', ['--accept-tos', 'mode', 'proxy'], { timeout: 5000 }).catch(() => {})
+    await sh('warp-cli', ['--accept-tos', 'proxy', 'port', '40000'], { timeout: 5000 }).catch(() => {})
+    await sh('warp-cli', ['--accept-tos', 'connect'], { timeout: 8000 }).catch(() => {})
+    await new Promise((r) => setTimeout(r, 1500))
+  } catch {}
 }
 
 /* ================= stages ================= */
@@ -260,21 +282,37 @@ async function download(url, dir) {
     const directDriveUrl = `https://drive.usercontent.google.com/download?id=${fileId}&export=download&confirm=t`
     const target = path.join(dir, 'source.mp4')
     const t0 = Date.now()
+    let nonVideoDetected = false
     try {
       console.log(`[worker:download] Google Drive file detected (${fileId}), fetching via direct download...`)
       await sh('curl', ['-f', '-L', '-s', '-S', '--max-time', '600', '-o', target, directDriveUrl])
       const st = await stat(target)
-      if (st.size > 100_000) {
+      if (st.size > 0) {
         const probedDur = await probeDuration(target).catch(() => null)
         if (Number.isFinite(probedDur) && probedDur > 0) {
           console.log(`[worker:download] Google Drive direct download complete in ${Date.now() - t0}ms (${st.size} bytes, ${Math.round(probedDur)}s)`)
           return target
         }
+        // Check if downloaded file is an image or PDF document (e.g., campaign logo PNG inside Google Doc)
+        const headBuf = await readFile(target).then((b) => b.subarray(0, 16)).catch(() => Buffer.alloc(0))
+        const headHex = headBuf.toString('hex')
+        const headAscii = headBuf.toString('utf8')
+        if (
+          headHex.startsWith('89504e47') || // PNG
+          headHex.startsWith('ffd8ff') ||   // JPEG
+          headAscii.startsWith('GIF8') ||   // GIF
+          headAscii.startsWith('%PDF')      // PDF
+        ) {
+          nonVideoDetected = true
+        }
       }
       await rm(target, { force: true }).catch(() => {})
     } catch (driveErr) {
       await rm(target, { force: true }).catch(() => {})
-      console.warn(`[worker:download] Google Drive direct curl failed, falling back to yt-dlp:`, driveErr?.message || driveErr)
+      console.warn(`[worker:download] Google Drive direct curl failed:`, driveErr?.message || driveErr)
+    }
+    if (nonVideoDetected) {
+      throw new Error('The selected Google Drive file is an image or document (e.g. brand logo), not a video file. Please select a video asset from the campaign.')
     }
   }
 
@@ -304,11 +342,11 @@ async function download(url, dir) {
       ytdlpArgs([
         ...(proxy ? ['--proxy', proxy] : []),
         '--socket-timeout',
-        proxy ? '10' : '12',
+        proxy ? '15' : '12',
         '--retries',
-        '1',
+        '2',
         '--fragment-retries',
-        '1',
+        '2',
         '-N',
         '8',
         '-f',
@@ -326,8 +364,38 @@ async function download(url, dir) {
       { timeout: timeoutMs }
     )
 
-  // Direct first with fast 35s timeout — if YouTube throttles, immediately rotate to proxies.
+  const isYouTube = /(?:youtube\.com|youtu\.be)/i.test(url)
+  const warpProxy = process.env.WARP_PROXY || 'socks5://127.0.0.1:40000'
   let directErr = null
+  let lastErr = null
+
+  // For YouTube on AWS EC2, try the local Cloudflare WARP proxy first (fast, unthrottled, not datacenter-blocked).
+  if (isYouTube) {
+    for (let warpTry = 0; warpTry < 2; warpTry++) {
+      const wStart = Date.now()
+      try {
+        await attempt(warpProxy, 1000 * 60 * 3)
+        const sourceFile = await findFile(dir, /^source\./)
+        const dur = Date.now() - wStart
+        recordProxyResult(warpProxy, true)
+        console.log(`[worker:download] proxy=warp(${warpProxy}) duration_ms=${dur} outcome=success`)
+        return sourceFile
+      } catch (e) {
+        lastErr = e
+        const dur = Date.now() - wStart
+        console.warn(
+          `[worker:download] proxy=warp(${warpProxy}) try=${warpTry + 1} duration_ms=${dur} outcome=failure error="${e.message
+            .split('\n')[0]
+            .slice(0, 120)}"`
+        )
+        if (warpTry === 0) {
+          await ensureWarpConnected()
+        }
+      }
+    }
+  }
+
+  // Direct attempt (primary for non-YouTube URLs; fallback for YouTube)
   const t0 = Date.now()
   try {
     await attempt(null, 35000)
@@ -346,9 +414,8 @@ async function download(url, dir) {
     )
   }
 
-  // Rotate top-priority proxies only (max 3) with short timeouts to avoid 10-minute freezes.
-  let lastErr = null
-  const allProxies = await ytProxyPool()
+  // Rotate top-priority external proxies (excluding WARP if already tried above)
+  const allProxies = (await ytProxyPool()).filter((p) => !(isYouTube && p === warpProxy))
   const proxies = allProxies.slice(0, 3)
   for (const proxy of proxies) {
     const pStart = Date.now()
@@ -416,12 +483,15 @@ async function probeUrlDuration(url) {
   if (/\.(mp4|mov|webm|mkv)(\?.*)?$/i.test(url) || /drive\.google\.com/i.test(url)) {
     return null
   }
+  const isYouTube = /(?:youtube\.com|youtu\.be)/i.test(url)
+  const warpProxy = process.env.WARP_PROXY || 'socks5://127.0.0.1:40000'
   try {
     const out = await sh(
       '/opt/nology-venv/bin/yt-dlp',
       ytdlpArgs([
+        ...(isYouTube ? ['--proxy', warpProxy] : []),
         '--socket-timeout',
-        '20',
+        '15',
         '-f',
         'bv*[height<=1080]+ba/b[height<=1080]/b',
         '--print',
@@ -429,7 +499,7 @@ async function probeUrlDuration(url) {
         '--no-download',
         url,
       ]),
-      { timeout: 1000 * 60 * 2 }
+      { timeout: 1000 * 45 }
     )
     const v = parseFloat(out.trim())
     return Number.isFinite(v) && v > 0 ? v : null
