@@ -549,32 +549,101 @@ async function probeUrlDuration(url) {
 
 async function extractAudio(file, dir) {
   const mp3 = path.join(dir, 'audio.mp3')
-  await sh('ffmpeg', ['-y', '-i', file, '-vn', '-ac', '1', '-ar', '16000', '-b:a', '64k', mp3], {
+  await sh('ffmpeg', ['-y', '-i', file, '-vn', '-ac', '1', '-ar', '16000', '-b:a', '32k', mp3], {
     timeout: 1000 * 60 * 10,
   })
   return mp3
 }
 
-async function transcribeGroq(mp3, language) {
-  const form = new FormData()
-  form.append('file', new Blob([await readFile(mp3)]), 'audio.mp3')
-  form.append('model', 'whisper-large-v3-turbo')
-  form.append('response_format', 'verbose_json')
-  form.append('timestamp_granularities[]', 'segment')
-  form.append('timestamp_granularities[]', 'word')
-  if (language && language !== 'auto') form.append('language', language) // force — fixes Arabic→English mixups
-  const res = await fetch('https://api.groq.com/openai/v1/audio/transcriptions', {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${CFG.groqKey}` },
-    body: form,
-    signal: AbortSignal.timeout(90_000),
+async function transcribeGroqSingleChunk(mp3Path, language) {
+  const buf = await readFile(mp3Path)
+  const models = ['whisper-large-v3-turbo', 'whisper-large-v3']
+  let lastErr = null
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const model = models[attempt % models.length]
+    try {
+      const form = new FormData()
+      form.append('file', new Blob([buf]), path.basename(mp3Path))
+      form.append('model', model)
+      form.append('response_format', 'verbose_json')
+      form.append('timestamp_granularities[]', 'segment')
+      form.append('timestamp_granularities[]', 'word')
+      if (language && language !== 'auto') form.append('language', language)
+      const res = await fetch('https://api.groq.com/openai/v1/audio/transcriptions', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${CFG.groqKey}` },
+        body: form,
+        signal: AbortSignal.timeout(90_000),
+      })
+      if (!res.ok) {
+        const errText = (await res.text()).slice(0, 200)
+        throw new Error(`Groq ${res.status}: ${errText}`)
+      }
+      const d = await res.json()
+      return {
+        language: d.language ?? 'en',
+        segments: (d.segments ?? []).map((s) => ({ start: s.start, end: s.end, text: (s.text ?? '').trim() })),
+        words: (d.words ?? []).map((w) => ({ start: w.start, end: w.end, text: (w.word ?? '').trim() })),
+      }
+    } catch (err) {
+      lastErr = err
+      if (attempt < 2) {
+        await new Promise((r) => setTimeout(r, 1500 * (attempt + 1)))
+      }
+    }
+  }
+  throw lastErr
+}
+
+async function transcribeGroq(mp3, language, dir) {
+  const CHUNK_SEC = 900 // 15 minutes (~3.6 MB at 32k mono)
+  const dur = await probeDuration(mp3).catch(() => 0)
+  if (!dur || dur <= CHUNK_SEC + 60) {
+    return transcribeGroqSingleChunk(mp3, language)
+  }
+
+  const chunkPattern = path.join(dir, 'audio_chunk_%03d.mp3')
+  await sh('ffmpeg', ['-y', '-i', mp3, '-f', 'segment', '-segment_time', String(CHUNK_SEC), '-c', 'copy', chunkPattern], {
+    timeout: 1000 * 60 * 2,
   })
-  if (!res.ok) throw new Error(`Groq ${res.status}: ${(await res.text()).slice(0, 200)}`)
-  const d = await res.json()
+  const files = (await readdir(dir))
+    .filter((f) => /^audio_chunk_\d+\.mp3$/.test(f))
+    .sort()
+
+  if (files.length === 0) {
+    return transcribeGroqSingleChunk(mp3, language)
+  }
+
+  console.log(`[worker] splitting ${Math.round(dur)}s audio into ${files.length} chunks for fast Groq Whisper API transcription...`)
+  let detectedLang = language && language !== 'auto' ? language : 'en'
+  const allSegments = []
+  const allWords = []
+
+  for (let i = 0; i < files.length; i++) {
+    const chunkPath = path.join(dir, files[i])
+    const offset = i * CHUNK_SEC
+    const part = await transcribeGroqSingleChunk(chunkPath, language)
+    if (i === 0 && part.language) detectedLang = part.language
+    for (const s of part.segments) {
+      allSegments.push({
+        start: Number((s.start + offset).toFixed(2)),
+        end: Number((s.end + offset).toFixed(2)),
+        text: s.text,
+      })
+    }
+    for (const w of part.words) {
+      allWords.push({
+        start: Number((w.start + offset).toFixed(2)),
+        end: Number((w.end + offset).toFixed(2)),
+        text: w.text,
+      })
+    }
+  }
+
   return {
-    language: d.language ?? 'en',
-    segments: (d.segments ?? []).map((s) => ({ start: s.start, end: s.end, text: (s.text ?? '').trim() })),
-    words: (d.words ?? []).map((w) => ({ start: w.start, end: w.end, text: (w.word ?? '').trim() })),
+    language: detectedLang,
+    segments: allSegments,
+    words: allWords,
   }
 }
 
@@ -655,7 +724,7 @@ async function transcribe(file, dir, language = 'auto') {
     if (CFG.groqKey) {
       const t0 = Date.now()
       const mp3 = await extractAudio(file, dir)
-      const r = await transcribeGroq(mp3, language)
+      const r = await transcribeGroq(mp3, language, dir)
       console.log(`[worker] Groq transcription done in ${((Date.now() - t0) / 1000).toFixed(0)}s (${r.words.length} words, lang=${language})`)
       return r
     } else {
