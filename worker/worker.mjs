@@ -106,20 +106,20 @@ const CFG = {
 const ENV_DEFAULTS = {
   pipeline_premium: process.env.PIPELINE_PREMIUM !== '0',
   clips_per_video: Number(process.env.CLIPS_PER_VIDEO ?? 3),
-  clip_min_seconds: Number(process.env.CLIP_MIN_SECONDS ?? 15),
+  clip_min_seconds: Number(process.env.CLIP_MIN_SECONDS ?? 25),
   clip_max_seconds: Number(process.env.CLIP_MAX_SECONDS ?? 90),
   clip_target_seconds: Number(process.env.CLIP_TARGET_SECONDS ?? 45),
   render_parallel: Number(process.env.RENDER_PARALLEL ?? 4),
   stale_job_minutes: Number(process.env.STALE_JOB_MINUTES ?? 30),
-  groq_score_model: process.env.GROQ_SCORE_MODEL || 'allam-2-7b',
+  groq_score_model: process.env.GROQ_SCORE_MODEL || 'qwen/qwen3.8-27b',
 }
 
 const SETTING_PARSE = {
   pipeline_premium: (v) => v === 'true',
   clips_per_video: (v) => Math.max(1, Number(v) || 3),
-  clip_min_seconds: (v) => Math.max(5, Number(v) || 15),
-  clip_max_seconds: (v) => Math.min(180, Math.max(20, Number(v) || 90)),
-  clip_target_seconds: (v) => Math.max(5, Number(v) || 45),
+  clip_min_seconds: (v) => Math.max(20, Number(v) || 25),
+  clip_max_seconds: (v) => Math.min(180, Math.max(30, Number(v) || 90)),
+  clip_target_seconds: (v) => Math.max(25, Number(v) || 45),
   render_parallel: (v) => Math.max(1, Math.min(8, Number(v) || 4)),
   stale_job_minutes: (v) => Math.max(1, Number(v) || 30),
   nvidia_api_key: (v) => String(v || '').trim(),
@@ -159,7 +159,7 @@ async function syncConfigInto() {
   const c = await cfg()
   CFG.premium = c.pipeline_premium
   CFG.clipsPerVideo = c.clips_per_video
-  CFG.clipMinLength = c.clip_min_seconds ?? 15
+  CFG.clipMinLength = Math.max(25, c.clip_min_seconds ?? 25)
   CFG.clipMaxLength = c.clip_max_seconds ?? 90
   CFG.clipLength = c.clip_target_seconds ?? 45
   CFG.renderParallel = c.render_parallel
@@ -169,7 +169,7 @@ async function syncConfigInto() {
   CFG.groqKey = c.groq_api_key || process.env.GROQ_API_KEY || CFG.groqKey
   CFG.openaiKey = c.openai_api_key || process.env.OPENAI_API_KEY || CFG.openaiKey
   CFG.whisperModel = c.whisper_model || process.env.WHISPER_MODEL || CFG.whisperModel
-  CFG.groqScoreModel = c.groq_score_model || process.env.GROQ_SCORE_MODEL || 'allam-2-7b'
+  CFG.groqScoreModel = c.groq_score_model || process.env.GROQ_SCORE_MODEL || 'qwen/qwen3.8-27b'
   CFG.aiSimulationMode = c.ai_simulation_mode || process.env.AI_SIMULATION_MODE || CFG.aiSimulationMode
 
   if (c.youtube_cookies) {
@@ -689,17 +689,18 @@ function dedupeOverlappingMoments(moments, maxClips, maxOverlapRatio = 0.15) {
 }
 
 /**
- * Semantic & pause-aware candidate generation.
- * Rather than imposing an arbitrary fixed cut (e.g. 12s), this allows the AI to discover natural
- * viral moments of variable length (from minDur up to maxDur, e.g. 15s to 90s).
+ * Multi-scale semantic & pause-aware candidate generation.
+ * Generates natural narrative windows across multiple target duration bands (e.g. 28s, 38s, 52s, 68s)
+ * instead of stopping at the very first sentence after 15 seconds.
  * Every candidate begins on a clean sentence hook and concludes on a completed thought.
  */
-function generateCandidateMoments(transcript, duration, from = 0, minDur = 15, maxDur = 90) {
+function generateCandidateMoments(transcript, duration, from = 0, minDur = 25, maxDur = 90, excludedRanges = []) {
   const segs = (transcript.segments ?? []).filter((s) => s.start >= Math.max(0, from - 2))
+  const effectiveMinDur = duration >= 65 ? Math.max(26, minDur) : duration >= 35 ? Math.max(22, Math.min(minDur, duration * 0.6)) : Math.max(12, Math.floor(duration * 0.7))
 
   if (!segs.length) {
     const fallback = []
-    const win = Math.min(duration, Math.min(45, Math.max(minDur, 20)))
+    const win = Math.min(duration, Math.min(45, Math.max(effectiveMinDur, 28)))
     if (duration > 0 && win > 0) {
       for (let s = Math.max(0, from); s + win <= duration && fallback.length < 50; s += win) {
         fallback.push({ start: Math.round(s), end: Math.round(s + win), text: '' })
@@ -717,64 +718,85 @@ function generateCandidateMoments(transcript, duration, from = 0, minDur = 15, m
     const text = (segs[idx].text || '').trim()
     const endsWithPunct = /[.?!؟…]$/.test(text)
     const gap = segs[idx + 1].start - segs[idx].end
-    return endsWithPunct || gap >= 0.5
+    return endsWithPunct || gap >= 0.45
   }
+
+  // Target narrative duration bands so the AI & scorer have complete 28s-70s arcs (never stuck at 15s!)
+  const targetBands =
+    duration >= 75
+      ? [28, 38, 50, 65]
+      : duration >= 45
+        ? [25, 34, 44]
+        : [Math.max(16, Math.round(duration * 0.72))]
 
   const allCandidates = []
   let lastAcceptedStart = -999
 
-  // Step through segment by segment across the entire transcript
   for (let i = 0; i < segs.length; i++) {
     const startSeg = segs[i]
     if (startSeg.start < from) continue
-    // Avoid generating near-identical start points (< 4s apart)
-    if (startSeg.start - lastAcceptedStart < 4) continue
+    if (startSeg.start - lastAcceptedStart < 5) continue
 
     let accumulatedText = []
     let clipStart = startSeg.start
     let clipEnd = startSeg.end
+    let bandIdx = 0
 
-    for (let j = i; j < segs.length; j++) {
-      accumulatedText.push(segs[j].text.trim())
+    for (let j = i; j < segs.length && bandIdx < targetBands.length; j++) {
+      accumulatedText.push((segs[j].text || '').trim())
       clipEnd = segs[j].end
       const currentDur = clipEnd - clipStart
+      const targetDur = Math.max(effectiveMinDur, targetBands[bandIdx])
 
-      if (currentDur >= minDur) {
+      if (currentDur >= targetDur) {
         if (isBoundary(j) || currentDur >= maxDur) {
           const fullText = accumulatedText.join(' ').trim()
           const wordCount = fullText.split(/\s+/).filter(Boolean).length
 
-          // Avoid dead silence or tiny blips
-          if (wordCount >= 14) {
+          if (wordCount >= 18 || duration < 35) {
             allCandidates.push({
               start: Math.round(clipStart),
-              end: Math.round(clipEnd),
+              end: Math.round(Math.min(duration, clipEnd)),
               text: fullText,
             })
             lastAcceptedStart = clipStart
           }
-          break
+          // Advance to next duration band so we also capture 38s, 50s, 65s arcs from this hook
+          while (bandIdx < targetBands.length && currentDur >= targetBands[bandIdx] - 4) {
+            bandIdx++
+          }
+          if (currentDur >= maxDur) break
         }
       }
     }
   }
 
-  // Downsample evenly across the full video timeline if there are more than 75 candidates
-  let candidates = allCandidates
-  if (allCandidates.length > 75) {
-    const step = allCandidates.length / 75
-    candidates = Array.from({ length: 75 }, (_, idx) => allCandidates[Math.floor(idx * step)])
+  // Filter out candidates that overlap with previously clipped ranges from earlier runs on the same video
+  let filteredCandidates = allCandidates
+  if (Array.isArray(excludedRanges) && excludedRanges.length > 0) {
+    const nonExcluded = allCandidates.filter(
+      (c) => !excludedRanges.some((ex) => calcOverlapRatio(c.start, c.end, ex.start, ex.end) > 0.25)
+    )
+    if (nonExcluded.length >= 2) {
+      filteredCandidates = nonExcluded
+    }
   }
 
-  // Fallback if semantic grouping produced too few candidates: add non-overlapping contiguous windows first
+  let candidates = filteredCandidates
+  if (filteredCandidates.length > 75) {
+    const step = filteredCandidates.length / 75
+    candidates = Array.from({ length: 75 }, (_, idx) => filteredCandidates[Math.floor(idx * step)])
+  }
+
+  // Fallback if semantic grouping produced too few candidates: add non-overlapping 32s-50s windows
   if (candidates.length < 3) {
-    for (const win of [minDur, 25, 35, 45, 60]) {
+    for (const win of [32, 42, 55, Math.max(25, effectiveMinDur)]) {
       const actualWin = Math.min(duration, win)
-      if (actualWin < minDur && duration >= minDur) continue
+      if (actualWin < effectiveMinDur && duration >= effectiveMinDur) continue
       for (let s = Math.max(0, from); s + actualWin <= duration && candidates.length < 40; s += actualWin) {
         const startR = Math.round(s)
         const endR = Math.round(s + actualWin)
-        if (candidates.some((c) => Math.abs(c.start - startR) < 4 && Math.abs(c.end - endR) < 4)) continue
+        if (candidates.some((c) => Math.abs(c.start - startR) < 5 && Math.abs(c.end - endR) < 5)) continue
         const text = segs
           .filter((x) => x.start >= s - 1 && x.end <= s + actualWin + 1)
           .map((x) => x.text)
@@ -786,7 +808,7 @@ function generateCandidateMoments(transcript, duration, from = 0, minDur = 15, m
   }
 
   if (candidates.length === 0 && duration > 0) {
-    const defaultEnd = Math.round(Math.min(duration, maxDur))
+    const defaultEnd = Math.round(Math.min(duration, Math.max(30, maxDur)))
     candidates.push({
       start: 0,
       end: defaultEnd,
@@ -797,40 +819,40 @@ function generateCandidateMoments(transcript, duration, from = 0, minDur = 15, m
   return candidates
 }
 
-async function llmScoreMoments(candidates, instructions, maxClips = CFG.clipsPerVideo) {
+function getAiProviders() {
   const providers = []
   const timeoutMs = CFG.scoringTimeoutMs || 15_000
 
-  // 1. NVIDIA NIM (PRIMARY FRONTIER MODEL - fast 6s timeout cap)
-  if (CFG.nvidiaKey) {
-    const nvModel = CFG.nvidiaScoreModel || 'deepseek-ai/deepseek-v4.1-flash'
-    providers.push({
-      tier: 'tier-1 nvidia',
-      name: `nvidia-${nvModel}`,
-      url: 'https://integrate.api.nvidia.com/v1/chat/completions',
-      key: CFG.nvidiaKey,
-      model: nvModel,
-      timeoutMs: Math.min(timeoutMs, 6000),
-    })
-  }
-
-  // 2. GROQ (FAST HIGH-THROUGHPUT FALLBACK: qwen/qwen3.8-27b -> openai/gpt-oss-120b)
+  // 1. GROQ (PRIMARY ULTRA-FAST ~500ms: qwen/qwen3.8-27b -> openai/gpt-oss-120b)
   if (CFG.groqKey) {
     providers.push({
-      tier: 'fallback-1 groq-qwen',
+      tier: 'tier-1 groq-qwen',
       name: 'groq-qwen3.8-27b',
       url: 'https://api.groq.com/openai/v1/chat/completions',
       key: CFG.groqKey,
       model: 'qwen/qwen3.8-27b',
-      timeoutMs,
+      timeoutMs: Math.min(timeoutMs, 12_000),
     })
     providers.push({
-      tier: 'fallback-1.5 groq-gpt-oss',
+      tier: 'tier-1.5 groq-gpt-oss',
       name: 'groq-gpt-oss-120b',
       url: 'https://api.groq.com/openai/v1/chat/completions',
       key: CFG.groqKey,
       model: 'openai/gpt-oss-120b',
-      timeoutMs,
+      timeoutMs: Math.min(timeoutMs, 12_000),
+    })
+  }
+
+  // 2. NVIDIA NIM (SECONDARY FALLBACK - 4s cap)
+  if (CFG.nvidiaKey) {
+    const nvModel = CFG.nvidiaScoreModel || 'deepseek-ai/deepseek-v4.1-flash'
+    providers.push({
+      tier: 'fallback-1 nvidia',
+      name: `nvidia-${nvModel}`,
+      url: 'https://integrate.api.nvidia.com/v1/chat/completions',
+      key: CFG.nvidiaKey,
+      model: nvModel,
+      timeoutMs: Math.min(timeoutMs, 4000),
     })
   }
 
@@ -846,11 +868,206 @@ async function llmScoreMoments(candidates, instructions, maxClips = CFG.clipsPer
     })
   }
 
+  return providers
+}
+
+/**
+ * Direct AI Transcript Director:
+ * Passes the full timestamped Whisper transcript directly to the AI so the AI itself chooses
+ * the exact startSec and endSec timestamps for complete viral stories (28s to 75s),
+ * snapped cleanly to Whisper sentence boundaries and avoiding any previously clipped ranges.
+ */
+async function llmDirectMomentsFromTranscript(
+  transcript,
+  duration,
+  from = 0,
+  instructions = null,
+  maxClips = CFG.clipsPerVideo,
+  minDur = 26,
+  maxDur = 85,
+  excludedRanges = []
+) {
+  const segs = (transcript.segments ?? []).filter((s) => s.start >= Math.max(0, from - 1))
+  if (!segs.length) return null
+
+  const providers = getAiProviders()
+  if (!providers.length) return null
+
+  const effectiveMinDur =
+    duration >= 65 ? Math.max(28, minDur) : duration >= 35 ? Math.max(22, Math.min(minDur, duration * 0.65)) : Math.max(15, Math.floor(duration * 0.75))
+  const effectiveMaxDur = Math.min(Math.round(duration), Math.max(effectiveMinDur + 10, maxDur))
+
+  // Group segments into compact timestamped blocks (~6-10s per line) if the video is very long
+  // so the entire video transcript fits cleanly within the LLM context window.
+  const targetLines = 160
+  const groupSize = Math.max(1, Math.ceil(segs.length / targetLines))
+  const transcriptLines = []
+  for (let i = 0; i < segs.length; i += groupSize) {
+    const slice = segs.slice(i, i + groupSize)
+    const sTime = Math.round(slice[0].start)
+    const eTime = Math.round(slice[slice.length - 1].end)
+    const text = slice
+      .map((x) => (x.text || '').trim())
+      .join(' ')
+      .replace(/\s+/g, ' ')
+      .trim()
+    if (text) {
+      transcriptLines.push(`[${sTime}s-${eTime}s] ${text}`)
+    }
+  }
+
+  const excludedNote =
+    Array.isArray(excludedRanges) && excludedRanges.length > 0
+      ? `\nCRITICAL DEDUPLICATION RULE: This video was clipped previously at these exact time ranges: ${excludedRanges
+          .map((r) => `[${r.start}s-${r.end}s]`)
+          .join(', ')}. You MUST NOT select any clip that overlaps with those already-used time ranges! Pick completely different moments from other parts of the transcript.`
+      : ''
+
+  const requestCount = Math.max(maxClips, Math.min(6, maxClips * 2))
+  let system =
+    'You are an autonomous AI Viral Video Director and Master Editor for TikTok, Instagram Reels, and YouTube Shorts.\n' +
+    `You are given the full timestamped transcript of a ${Math.round(duration)}-second video.\n` +
+    'Your job is to read the transcript, discover the most viral, high-retention story arcs, and choose the EXACT startSec and endSec timestamps to cut each clip.\n' +
+    `CRITICAL DURATION RULE: Every clip you cut MUST be a complete narrative arc (Hook -> Rising Tension/Story -> Climax/Payoff) with a duration between ${effectiveMinDur} seconds and ${effectiveMaxDur} seconds (ideal sweet spot: 32 to 60 seconds). NEVER cut 15-second micro-clips that end abruptly!\n` +
+    'CRITICAL NON-OVERLAP RULE: Every selected clip MUST come from a completely distinct, non-overlapping part of the video. Do not pick overlapping time ranges.' +
+    excludedNote +
+    '\nIf the transcript is in Arabic, write "title" (3-6 words), "titles", "hookHeadline", "cta", and "reason" in Arabic.\n' +
+    'Return strict JSON: {"moments":[' +
+    '{"startSec":<int>,"endSec":<int>,"score":<0-100>,"hookScore":<0-100>,"retentionScore":<0-100>,"shareScore":<0-100>,' +
+    '"title":"<=6 punchy words",' +
+    '"titles":["3-6 words Question hook","3-6 words Shocking hook","3-6 words Direct value hook"],' +
+    '"hookHeadline":"3-5 words ultra viral headline card for first 2 seconds",' +
+    '"hashtags":["#tag1","#tag2","#tag3","#tag4","#tag5"],' +
+    '"cta":"one short engaging sentence encouraging comments",' +
+    '"reason":"one sentence explaining the viral arc","emoji":"one fitting emoji"}' +
+    `]}. Return up to ${requestCount} non-overlapping clips, best first.`
+
+  if (instructions?.trim()) {
+    system += `\nCampaign / Creator Instructions — follow these strictly when choosing moments and hooks: "${instructions.trim().slice(0, 600)}"`
+  }
+
+  // Helper to snap AI-chosen [startSec, endSec] to clean Whisper segment boundaries and enforce effectiveMinDur
+  const snapMomentToSegments = (rawStart, rawEnd) => {
+    let startIdx = segs.findIndex((s) => s.end > rawStart + 0.5)
+    if (startIdx < 0) startIdx = 0
+    let endIdx = startIdx
+    while (endIdx < segs.length - 1 && segs[endIdx].end < rawEnd) {
+      endIdx++
+    }
+    // Enforce minimum duration by extending endIdx to a clean sentence boundary
+    while (endIdx < segs.length - 1 && segs[endIdx].end - segs[startIdx].start < effectiveMinDur) {
+      endIdx++
+    }
+    // Continue up to 2 more segments if needed to finish a sentence cleanly without exceeding effectiveMaxDur
+    for (let k = 0; k < 2 && endIdx < segs.length - 1; k++) {
+      const txt = (segs[endIdx].text || '').trim()
+      const gap = segs[endIdx + 1].start - segs[endIdx].end
+      if (/[.?!؟…]$/.test(txt) || gap >= 0.45) break
+      if (segs[endIdx + 1].end - segs[startIdx].start <= effectiveMaxDur) {
+        endIdx++
+      }
+    }
+    // If near the end of the video and still shorter than effectiveMinDur, pull startIdx earlier
+    while (startIdx > 0 && segs[endIdx].end - segs[startIdx].start < effectiveMinDur) {
+      startIdx--
+    }
+
+    const start = Math.max(0, Math.round(segs[startIdx].start))
+    const end = Math.min(Math.round(duration), Math.max(start + Math.min(effectiveMinDur, Math.round(duration)), Math.round(segs[endIdx].end)))
+    const text = segs
+      .slice(startIdx, endIdx + 1)
+      .map((s) => (s.text || '').trim())
+      .join(' ')
+      .trim()
+    return { start, end, text }
+  }
+
+  for (const p of providers) {
+    const t0 = Date.now()
+    try {
+      const res = await fetch(p.url, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${p.key}`, 'Content-Type': 'application/json' },
+        signal: AbortSignal.timeout(p.timeoutMs || 12_000),
+        body: JSON.stringify({
+          model: p.model,
+          response_format: { type: 'json_object' },
+          temperature: 0.25,
+          messages: [
+            { role: 'system', content: system },
+            { role: 'user', content: transcriptLines.join('\n').slice(0, 22_000) },
+          ],
+        }),
+      })
+      if (!res.ok) throw new Error(`${p.name} HTTP ${res.status}`)
+      const data = await res.json()
+      const rawText = data.choices?.[0]?.message?.content || data.choices?.[0]?.message?.reasoning_content || '{}'
+      const parsed = JSON.parse(rawText)
+      const directed = (parsed.moments ?? [])
+        .filter((m) => Number.isFinite(Number(m.startSec)) && Number.isFinite(Number(m.endSec)))
+        .map((m) => {
+          const snapped = snapMomentToSegments(Number(m.startSec), Number(m.endSec))
+          const mainTitle = String(m.title ?? '').slice(0, 80)
+          const titleOptions =
+            Array.isArray(m.titles) && m.titles.length
+              ? m.titles.map((t) => String(t).slice(0, 80))
+              : [mainTitle]
+          const hashtags =
+            Array.isArray(m.hashtags) && m.hashtags.length
+              ? m.hashtags.map((h) => String(h).slice(0, 30))
+              : ['#Shorts', '#Reels', '#TikTok', '#Viral', '#fyp']
+          return {
+            start: snapped.start,
+            end: snapped.end,
+            text: snapped.text,
+            score: Math.max(0, Math.min(100, Math.round(Number(m.score) || 85))),
+            hookScore: Math.max(0, Math.min(100, Math.round(Number(m.hookScore ?? m.score) || 85))),
+            retentionScore: Math.max(0, Math.min(100, Math.round(Number(m.retentionScore ?? m.score) || 85))),
+            shareScore: Math.max(0, Math.min(100, Math.round(Number(m.shareScore ?? m.score) || 85))),
+            title: mainTitle,
+            titleOptions,
+            hookHeadline: String(m.hookHeadline ?? m.title ?? '').slice(0, 80),
+            hashtags,
+            cta: String(m.cta ?? '').slice(0, 120),
+            reason: String(m.reason ?? 'AI-directed complete viral story arc'),
+            emoji: String(m.emoji ?? '🔥').slice(0, 4),
+          }
+        })
+        .filter((m) => {
+          if (m.end <= m.start) return false
+          if (
+            Array.isArray(excludedRanges) &&
+            excludedRanges.some((ex) => calcOverlapRatio(m.start, m.end, ex.start, ex.end) > 0.25)
+          ) {
+            return false
+          }
+          return true
+        })
+
+      if (directed.length > 0) {
+        const latency = Date.now() - t0
+        console.log(
+          `[worker] AI Transcript Director selected ${directed.length} clips via ${p.name} in ${latency}ms (durations: ${directed.map((d) => `${d.end - d.start}s`).join(', ')})`
+        )
+        return directed
+      }
+      throw new Error('AI Director returned no valid moments')
+    } catch (e) {
+      console.warn(`[worker] AI Director tier ${p.name} notice (${e.message}) — trying next tier...`)
+    }
+  }
+
+  return null
+}
+
+async function llmScoreMoments(candidates, instructions, maxClips = CFG.clipsPerVideo) {
+  const providers = getAiProviders()
+
   const requestCount = Math.min(candidates.length, Math.max(maxClips, maxClips * 2))
   let system =
     'You are a master viral video editor for TikTok, Instagram Reels, and YouTube Shorts.\n' +
     'Analyze the provided speech moments (which may be in Arabic, English, or mixed) and evaluate their virality.\n' +
-    'IMPORTANT: Every moment has its own natural dynamic duration (from 15 seconds up to 90 seconds) and a time window [startSec, endSec]. Evaluate each moment by its complete narrative hook, development, and punchline — do not force a fixed length.\n' +
+    'IMPORTANT: Prefer rich, complete narrative moments between 28 seconds and 65 seconds long that contain a strong hook, buildup, and payoff. Avoid short fragments unless the entire video is short.\n' +
     'CRITICAL RULE: Do NOT select overlapping moments! Every selected moment MUST cover a distinct, non-overlapping time range (startSec to endSec) from a different part of the video. Never pick two moments that share the same sentences or overlap in time.\n' +
     'For each moment evaluate three distinct sub-scores from 0 to 100:\n' +
     '- hookScore: Power of the first 3 seconds to halt scrolling (provocative question, shocking statement, mystery, or curiosity gap).\n' +
@@ -978,14 +1195,15 @@ function heuristicScoreMoments(candidates) {
       let hookScore = 50 + (hookCount * 7) + (openingHook * 15) + (hasOpeningQ ? 16 : 0) + (hasOpeningEx ? 8 : 0)
       hookScore = Math.min(99, Math.max(40, Math.round(hookScore)))
 
-      // 2. Retention score (0-100): cadence, energy, clean ending
+      // 2. Retention score (0-100): cadence, energy, clean ending, and ideal 30s-60s story length bonus
       let paceBonus = 0
       if (wps >= 2.0 && wps <= 3.6) paceBonus = 18
       else if (wps >= 1.5 && wps < 2.0) paceBonus = 8
       else if (wps > 3.6 && wps <= 4.5) paceBonus = 10
 
+      const durationBonus = dur >= 30 && dur <= 62 ? 12 : dur >= 25 ? 6 : 0
       const endsCleanly = /[.!?؟]$/.test(text.trim())
-      let retentionScore = 46 + paceBonus + (endsCleanly ? 12 : 0) + Math.min(18, Math.round(wordCount * 0.18))
+      let retentionScore = 46 + paceBonus + durationBonus + (endsCleanly ? 12 : 0) + Math.min(18, Math.round(wordCount * 0.18))
       retentionScore = Math.min(98, Math.max(38, Math.round(retentionScore)))
 
       // 3. Shareability score (0-100): curiosity, numbers, facts
@@ -1038,27 +1256,58 @@ function heuristicScoreMoments(candidates) {
     .sort((a, b) => b.score - a.score)
 }
 
-async function scoreMoments(transcript, duration, from = 0, instructions = null) {
-  const minDur = CFG.clipMinLength ?? 15
+async function scoreMoments(transcript, duration, from = 0, instructions = null, excludedRanges = []) {
+  const minDur = Math.max(25, CFG.clipMinLength ?? 25)
   const maxDur = CFG.clipMaxLength ?? 90
   const effectiveDuration = Math.max(0, duration - Math.max(0, from))
+  // Ensure we don't chop a short video into tiny 15s pieces: 1 clip per ~32s of source media
   const maxClips =
     effectiveDuration > 0
-      ? Math.min(CFG.clipsPerVideo, Math.max(1, Math.floor(effectiveDuration / minDur)))
+      ? Math.min(CFG.clipsPerVideo, Math.max(1, Math.floor(effectiveDuration / 30)))
       : CFG.clipsPerVideo
 
-  const candidates = generateCandidateMoments(transcript, duration, from, minDur, maxDur)
+  // 1. Primary: Autonomous AI Transcript Director chooses exact startSec & endSec (28s-75s complete arcs)
+  const aiDirected = await llmDirectMomentsFromTranscript(
+    transcript,
+    duration,
+    from,
+    instructions,
+    maxClips,
+    minDur,
+    maxDur,
+    excludedRanges
+  )
+
+  const candidates = generateCandidateMoments(transcript, duration, from, minDur, maxDur, excludedRanges)
+  const heurResult = candidates.length ? heuristicScoreMoments(candidates) : []
+
+  if (aiDirected && aiDirected.length) {
+    let deduped = dedupeOverlappingMoments(aiDirected, maxClips, 0.15)
+    if (deduped.length < maxClips && candidates.length) {
+      const llmCandidates = await llmScoreMoments(candidates, instructions, maxClips)
+      deduped = dedupeOverlappingMoments(
+        [...deduped, ...(llmCandidates || []), ...heurResult],
+        maxClips,
+        0.15
+      )
+    }
+    console.log(
+      `[worker] selected ${deduped.length}/${maxClips} AI-directed non-overlapping clips (video duration=${Math.round(duration)}s, clip durations=${deduped.map((d) => `${d.end - d.start}s`).join(', ')})`
+    )
+    return deduped
+  }
+
   if (!candidates.length) return []
 
   const llmResult = await llmScoreMoments(candidates, instructions, maxClips)
-  const heurResult = heuristicScoreMoments(candidates)
-
   if (llmResult && llmResult.length) {
     let deduped = dedupeOverlappingMoments(llmResult, maxClips, 0.15)
     if (deduped.length < maxClips) {
       deduped = dedupeOverlappingMoments([...deduped, ...heurResult], maxClips, 0.15)
     }
-    console.log(`[worker] selected ${deduped.length}/${maxClips} non-overlapping clips (video duration=${Math.round(duration)}s)`)
+    console.log(
+      `[worker] selected ${deduped.length}/${maxClips} non-overlapping clips (video duration=${Math.round(duration)}s, clip durations=${deduped.map((d) => `${d.end - d.start}s`).join(', ')})`
+    )
     return deduped
   }
 
@@ -1596,8 +1845,28 @@ async function processJob(job) {
     })
 
     console.log('[worker] scoring moments')
-    await setP(52, 'Scoring viral moments, hooks, retention & shareability...')
-    const moments = await scoreMoments(transcript, duration, project.clipFrom ?? 0, project.instructions)
+    await setP(52, 'AI Director selecting viral story arcs, timestamps & hooks...')
+    let excludedRanges = []
+    if (project.sourceUrl) {
+      try {
+        const prevClips = await prisma.clip.findMany({
+          where: {
+            userId: project.userId,
+            projectId: { not: project.id },
+            project: { sourceUrl: project.sourceUrl },
+          },
+          select: { sourceStart: true, sourceEnd: true, title: true },
+          take: 30,
+        })
+        excludedRanges = prevClips
+          .filter((c) => Number.isFinite(c.sourceStart) && Number.isFinite(c.sourceEnd))
+          .map((c) => ({ start: c.sourceStart, end: c.sourceEnd, title: c.title }))
+        if (excludedRanges.length > 0) {
+          console.log(`[worker] ${project.id}: excluding ${excludedRanges.length} previously clipped time ranges on same sourceUrl`)
+        }
+      } catch {}
+    }
+    const moments = await scoreMoments(transcript, duration, project.clipFrom ?? 0, project.instructions, excludedRanges)
     if (!moments.length) throw new Error('no viable moments found')
 
     const captionStyle = project.captionStyle ?? 'hormozi'

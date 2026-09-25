@@ -71,7 +71,57 @@ export async function executeAiChatCompletion(options: AiCompletionOptions): Pro
     groqModel = 'qwen/qwen3.8-27b'
   }
 
-  // --- ATTEMPT 1: NVIDIA NIM API (PRIMARY, fast 5s cap so it never blocks requests) ---
+  // --- ATTEMPT 1: GROQ API (PRIMARY ULTRA-FAST ~500ms: qwen/qwen3.8-27b -> openai/gpt-oss-120b) ---
+  if (groqKey) {
+    const groqCandidates = Array.from(new Set([groqModel, 'qwen/qwen3.8-27b', 'openai/gpt-oss-120b']))
+    for (const candidateModel of groqCandidates) {
+      const t0 = Date.now()
+      try {
+        const resp = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${groqKey}`,
+            'Content-Type': 'application/json',
+          },
+          signal: AbortSignal.timeout(Math.min(timeoutMs, 10000)),
+          body: JSON.stringify({
+            model: candidateModel,
+            messages,
+            temperature,
+            max_tokens: maxTokens,
+            ...(responseFormat === 'json_object' ? { response_format: { type: 'json_object' } } : {}),
+          }),
+        })
+
+        if (resp.ok) {
+          const data = await resp.json()
+          const msg = data.choices?.[0]?.message
+          const content = msg?.content || msg?.reasoning_content || ''
+          const latencyMs = Date.now() - t0
+          let parsedJson = undefined
+          if (responseFormat === 'json_object') {
+            try {
+              parsedJson = JSON.parse(content)
+            } catch {}
+          }
+          return {
+            content,
+            provider: 'groq',
+            model: candidateModel,
+            latencyMs,
+            parsedJson,
+          }
+        } else {
+          const errText = await resp.text().catch(() => '')
+          console.warn(`[AI-Provider] Groq (${candidateModel}) failed (${resp.status}): ${errText.slice(0, 150)}`)
+        }
+      } catch (gErr) {
+        console.warn(`[AI-Provider] Groq (${candidateModel}) call error:`, gErr instanceof Error ? gErr.message : gErr)
+      }
+    }
+  }
+
+  // --- ATTEMPT 2: NVIDIA NIM API (SECONDARY FALLBACK, fast 4s cap) ---
   if (nvidiaKey) {
     const t0 = Date.now()
     try {
@@ -81,7 +131,7 @@ export async function executeAiChatCompletion(options: AiCompletionOptions): Pro
           Authorization: `Bearer ${nvidiaKey}`,
           'Content-Type': 'application/json',
         },
-        signal: AbortSignal.timeout(Math.min(timeoutMs, 5000)),
+        signal: AbortSignal.timeout(Math.min(timeoutMs, 4000)),
         body: JSON.stringify({
           model: nvidiaModel,
           messages,
@@ -111,59 +161,10 @@ export async function executeAiChatCompletion(options: AiCompletionOptions): Pro
         }
       } else {
         const errText = await resp.text().catch(() => '')
-        console.warn(`[AI-Provider] NVIDIA NIM failed (${resp.status}): ${errText.slice(0, 150)}. Switching to Groq fallback immediately...`)
+        console.warn(`[AI-Provider] NVIDIA NIM failed (${resp.status}): ${errText.slice(0, 150)}.`)
       }
     } catch (nvErr) {
-      console.warn(`[AI-Provider] NVIDIA NIM timeout/error (${nvErr instanceof Error ? nvErr.message : 'Unknown'}). Switching to Groq fallback immediately...`)
-    }
-  }
-
-  // --- ATTEMPT 2: GROQ API (FAST FALLBACK: qwen/qwen3.8-27b -> openai/gpt-oss-120b) ---
-  if (groqKey) {
-    const groqCandidates = Array.from(new Set([groqModel, 'qwen/qwen3.8-27b', 'openai/gpt-oss-120b']))
-    for (const candidateModel of groqCandidates) {
-      const t0 = Date.now()
-      try {
-        const resp = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-          method: 'POST',
-          headers: {
-            Authorization: `Bearer ${groqKey}`,
-            'Content-Type': 'application/json',
-          },
-          signal: AbortSignal.timeout(12000),
-          body: JSON.stringify({
-            model: candidateModel,
-            messages,
-            temperature,
-            max_tokens: maxTokens,
-            ...(responseFormat === 'json_object' ? { response_format: { type: 'json_object' } } : {}),
-          }),
-        })
-
-        if (resp.ok) {
-          const data = await resp.json()
-          const content = data.choices?.[0]?.message?.content || ''
-          const latencyMs = Date.now() - t0
-          let parsedJson = undefined
-          if (responseFormat === 'json_object') {
-            try {
-              parsedJson = JSON.parse(content)
-            } catch {}
-          }
-          return {
-            content,
-            provider: 'groq',
-            model: candidateModel,
-            latencyMs,
-            parsedJson,
-          }
-        } else {
-          const errText = await resp.text().catch(() => '')
-          console.warn(`[AI-Provider] Groq (${candidateModel}) failed (${resp.status}): ${errText.slice(0, 150)}`)
-        }
-      } catch (gErr) {
-        console.warn(`[AI-Provider] Groq (${candidateModel}) call error:`, gErr instanceof Error ? gErr.message : gErr)
-      }
+      console.warn(`[AI-Provider] NVIDIA NIM timeout/error (${nvErr instanceof Error ? nvErr.message : 'Unknown'}).`)
     }
   }
 

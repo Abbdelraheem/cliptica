@@ -227,5 +227,70 @@ describe('Whop & Content Rewards Campaign Ingestion', () => {
 
     global.fetch = originalFetch
   })
+
+  it('filters out <15MB short example clips, deduplicates already-used sources, and uses AI search to discover long-form raw footage', async () => {
+    mockPrisma.project.findMany = vi.fn().mockResolvedValue([
+      { sourceUrl: 'https://www.youtube.com/watch?v=alreadyUsed1' },
+    ])
+
+    const originalFetch = global.fetch
+    global.fetch = vi.fn().mockImplementation(async (targetUrl: string) => {
+      if (targetUrl.includes('drive.usercontent.google.com/download?id=1VUKlZoT878GkjNTcEkB21e_9NM30Vc6N')) {
+        return {
+          ok: true,
+          status: 200,
+          headers: new Headers({
+            'content-type': 'video/mp4',
+            'content-disposition': 'attachment; filename="Togi x Steve $100K.mp4"',
+            'content-length': '4003927', // 3.8MB short pre-edited clip
+          }),
+        } as Response
+      }
+      if (targetUrl.includes('youtube.com/results?search_query=')) {
+        return {
+          ok: true,
+          status: 200,
+          text: async () =>
+            '{"contents":[' +
+            '"videoRenderer":{"videoId":"alreadyUsed1","title":{"runs":[{"text":"Already Clipped Stream"}]},"lengthText":{"simpleText":"14:20"}},' +
+            '"videoRenderer":{"videoId":"0aUwXvKRMLQ","title":{"runs":[{"text":"TOGI AND STEVE HIGH STAKES STREAM HIGHLIGHTS"}]},"lengthText":{"simpleText":"12:48"}}' +
+            ']}',
+        } as Response
+      }
+      return {
+        ok: true,
+        status: 200,
+        text: async () => `
+          <!DOCTYPE html><html><head><title>ROOBET CAMPAIGN V3 | Content Rewards</title></head>
+          <body>
+            <div>"name":"ROOBET CAMPAIGN V3","url":"https://docs.google.com/document/d/1RoobetBriefDocId12345/edit"</div>
+            <a href="https://www.google.com/url?q=https%3A%2F%2Fdrive.google.com%2Ffile%2Fd%2F1VUKlZoT878GkjNTcEkB21e_9NM30Vc6N%2Fview&sa=D">Example Clip</a>
+          </body></html>
+        `,
+      } as Response
+    })
+
+    const { POST } = await import('@/app/api/campaigns/analyze/route')
+    const req = new Request('http://localhost:3000/api/campaigns/analyze', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        url: 'https://whop.com/creator-casino/exp_abc123/app/campaigns/camp_roobet_v3/',
+      }),
+    })
+
+    const res = await POST(req)
+    expect(res.status).toBe(200)
+    const data = await res.json()
+    expect(data.success).toBe(true)
+    const assetUrls = data.campaign.assets.map((a: any) => a.url)
+    // Must exclude the 3.8MB pre-edited short example clip
+    expect(assetUrls).not.toContain('https://drive.google.com/file/d/1VUKlZoT878GkjNTcEkB21e_9NM30Vc6N/view')
+    // Must exclude already-used video and select the fresh 12:48 long-form video
+    expect(assetUrls).not.toContain('https://www.youtube.com/watch?v=alreadyUsed1')
+    expect(data.campaign.primaryAsset?.url).toBe('https://www.youtube.com/watch?v=0aUwXvKRMLQ')
+
+    global.fetch = originalFetch
+  })
 })
 
