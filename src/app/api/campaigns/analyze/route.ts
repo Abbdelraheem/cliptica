@@ -148,7 +148,7 @@ async function searchYoutubeLongFormVideos(
   usedKeys: Set<string>,
   reqHeaders: Record<string, string>,
   minSec = 150,
-  maxSec = 1170
+  maxSec = Infinity
 ): Promise<Array<{ type: 'youtube'; url: string; label: string }>> {
   const cleanQueries = Array.from(new Set(queries.map((q) => q.trim()).filter((q) => q.length >= 3))).slice(0, 3)
   const discovered: Array<{ type: 'youtube'; url: string; label: string }> = []
@@ -180,7 +180,7 @@ async function searchYoutubeLongFormVideos(
 
           const durStr = lenMatch[1]
           const durSec = parseDurationToSeconds(durStr)
-          // Strictly require long-form videos (2.5 min to 19.5 min) — never Shorts or ready-made micro-clips
+          // Require long-form videos (>= minSec, no upper limit!) — never Shorts or ready-made micro-clips
           if (durSec < minSec || durSec > maxSec) continue
 
           const vTitle = titleMatch[1].replace(/\\u0026/g, '&').trim()
@@ -702,7 +702,7 @@ export async function POST(req: Request) {
       recommendedInstructions:
         extractedGuidelines.length > 0
           ? extractedGuidelines.join('. ').slice(0, 450)
-          : 'Focus on high energy viral moments (30-60 seconds) with a strong opening hook, rising tension, and clear payoff that match the campaign guidelines.',
+          : 'Focus on complete, high-energy viral moments (with no upper duration cap) that start on a strong opening hook, build tension, and finish the full payoff matching the campaign guidelines.',
       recommendedAssetUrl: rawAssets[0]?.url || '',
       aiRationale: rawAssets.length > 0 ? 'Verified raw source footage detected for this campaign.' : '',
       recommendedCaptionStyle: 'hormozi',
@@ -729,12 +729,12 @@ export async function POST(req: Request) {
         'Understand the exact creators/streamers, brand, core objectives, and rules to formulate an integrated viral clip strategy AND discover fresh long-form raw videos on YouTube. ' +
         'Output a valid JSON object with: ' +
         'title (string), payout (string or null), guidelines (string array), requiredHashtags (string array), ' +
-        'recommendedInstructions (string: detailed instructions for the AI video cutter/director specifying what moments, creators, hooks, and 30s-60s narrative arcs to extract), ' +
+        'recommendedInstructions (string: detailed instructions for the AI video cutter/director specifying what moments, creators, hooks, and complete narrative arcs to extract without an upper duration limit), ' +
         'campaignHook (string: opening viral title hook text under 6 words), ' +
         'recommendedCaptionStyle (string: one of ["hormozi", "neon", "luxury", "beast", "bold"]), ' +
         'recommendedAssetUrl (string: the exact URL from the detected assets list that is the best UNUSED long-form raw footage), ' +
         'aiRationale (string: 1 clear sentence explaining why this raw asset and cutting strategy were chosen), ' +
-        'searchQueries (array of 3 specific YouTube search queries to find 4-to-19 minute raw long-form streams/videos/highlights featuring the exact creators, streamers, or brand mentioned in this campaign brief and example titles so we can cut fresh clips from scratch).'
+        'searchQueries (array of 3 specific YouTube search queries to find raw long-form streams/videos/highlights featuring the exact creators, streamers, or brand mentioned in this campaign brief and example titles so we can cut fresh clips from scratch).'
 
       const aiRes = await executeAiChatCompletion({
         responseFormat: 'json_object',

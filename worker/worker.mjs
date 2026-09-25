@@ -107,7 +107,7 @@ const ENV_DEFAULTS = {
   pipeline_premium: process.env.PIPELINE_PREMIUM !== '0',
   clips_per_video: Number(process.env.CLIPS_PER_VIDEO ?? 3),
   clip_min_seconds: Number(process.env.CLIP_MIN_SECONDS ?? 25),
-  clip_max_seconds: Number(process.env.CLIP_MAX_SECONDS ?? 90),
+  clip_max_seconds: Number(process.env.CLIP_MAX_SECONDS ?? Infinity),
   clip_target_seconds: Number(process.env.CLIP_TARGET_SECONDS ?? 45),
   render_parallel: Number(process.env.RENDER_PARALLEL ?? 4),
   stale_job_minutes: Number(process.env.STALE_JOB_MINUTES ?? 30),
@@ -118,7 +118,7 @@ const SETTING_PARSE = {
   pipeline_premium: (v) => v === 'true',
   clips_per_video: (v) => Math.max(1, Number(v) || 3),
   clip_min_seconds: (v) => Math.max(20, Number(v) || 25),
-  clip_max_seconds: (v) => Math.min(180, Math.max(30, Number(v) || 90)),
+  clip_max_seconds: (v) => (Number(v) > 0 ? Math.max(30, Number(v)) : Infinity),
   clip_target_seconds: (v) => Math.max(25, Number(v) || 45),
   render_parallel: (v) => Math.max(1, Math.min(8, Number(v) || 4)),
   stale_job_minutes: (v) => Math.max(1, Number(v) || 30),
@@ -160,7 +160,7 @@ async function syncConfigInto() {
   CFG.premium = c.pipeline_premium
   CFG.clipsPerVideo = c.clips_per_video
   CFG.clipMinLength = Math.max(25, c.clip_min_seconds ?? 25)
-  CFG.clipMaxLength = c.clip_max_seconds ?? 90
+  CFG.clipMaxLength = Infinity
   CFG.clipLength = c.clip_target_seconds ?? 45
   CFG.renderParallel = c.render_parallel
   CFG.nvidiaKey = c.nvidia_api_key || process.env.NVIDIA_API_KEY || CFG.nvidiaKey
@@ -354,9 +354,7 @@ async function download(url, dir) {
         '--merge-output-format',
         'mp4',
         '--max-filesize',
-        '2.5G',
-        '--match-filter',
-        'duration <=? 7200',
+        '10G',
         '-o',
         out,
         url,
@@ -694,7 +692,7 @@ function dedupeOverlappingMoments(moments, maxClips, maxOverlapRatio = 0.15) {
  * instead of stopping at the very first sentence after 15 seconds.
  * Every candidate begins on a clean sentence hook and concludes on a completed thought.
  */
-function generateCandidateMoments(transcript, duration, from = 0, minDur = 25, maxDur = 90, excludedRanges = []) {
+function generateCandidateMoments(transcript, duration, from = 0, minDur = 25, maxDur = Infinity, excludedRanges = []) {
   const segs = (transcript.segments ?? []).filter((s) => s.start >= Math.max(0, from - 2))
   const effectiveMinDur = duration >= 65 ? Math.max(26, minDur) : duration >= 35 ? Math.max(22, Math.min(minDur, duration * 0.6)) : Math.max(12, Math.floor(duration * 0.7))
 
@@ -721,12 +719,12 @@ function generateCandidateMoments(transcript, duration, from = 0, minDur = 25, m
     return endsWithPunct || gap >= 0.45
   }
 
-  // Target narrative duration bands so the AI & scorer have complete 28s-70s arcs (never stuck at 15s!)
+  // Target narrative duration bands with NO artificial upper cap so the AI & scorer have complete arcs of any length
   const targetBands =
     duration >= 75
-      ? [28, 38, 50, 65]
+      ? [28, 40, 55, 75, 105, 140, 180, 240, 300]
       : duration >= 45
-        ? [25, 34, 44]
+        ? [25, 34, 44, 60]
         : [Math.max(16, Math.round(duration * 0.72))]
 
   const allCandidates = []
@@ -761,7 +759,7 @@ function generateCandidateMoments(transcript, duration, from = 0, minDur = 25, m
             })
             lastAcceptedStart = clipStart
           }
-          // Advance to next duration band so we also capture 38s, 50s, 65s arcs from this hook
+          // Advance to next duration band so we also capture longer complete arcs from this hook
           while (bandIdx < targetBands.length && currentDur >= targetBands[bandIdx] - 4) {
             bandIdx++
           }
@@ -788,9 +786,9 @@ function generateCandidateMoments(transcript, duration, from = 0, minDur = 25, m
     candidates = Array.from({ length: 75 }, (_, idx) => filteredCandidates[Math.floor(idx * step)])
   }
 
-  // Fallback if semantic grouping produced too few candidates: add non-overlapping 32s-50s windows
+  // Fallback if semantic grouping produced too few candidates: add non-overlapping windows
   if (candidates.length < 3) {
-    for (const win of [32, 42, 55, Math.max(25, effectiveMinDur)]) {
+    for (const win of [32, 45, 65, Math.max(25, effectiveMinDur)]) {
       const actualWin = Math.min(duration, win)
       if (actualWin < effectiveMinDur && duration >= effectiveMinDur) continue
       for (let s = Math.max(0, from); s + actualWin <= duration && candidates.length < 40; s += actualWin) {
@@ -808,7 +806,7 @@ function generateCandidateMoments(transcript, duration, from = 0, minDur = 25, m
   }
 
   if (candidates.length === 0 && duration > 0) {
-    const defaultEnd = Math.round(Math.min(duration, Math.max(30, maxDur)))
+    const defaultEnd = Math.round(duration)
     candidates.push({
       start: 0,
       end: defaultEnd,
@@ -874,7 +872,7 @@ function getAiProviders() {
 /**
  * Direct AI Transcript Director:
  * Passes the full timestamped Whisper transcript directly to the AI so the AI itself chooses
- * the exact startSec and endSec timestamps for complete viral stories (28s to 75s),
+ * the exact startSec and endSec timestamps for complete viral stories (with NO upper duration limit),
  * snapped cleanly to Whisper sentence boundaries and avoiding any previously clipped ranges.
  */
 async function llmDirectMomentsFromTranscript(
@@ -884,7 +882,7 @@ async function llmDirectMomentsFromTranscript(
   instructions = null,
   maxClips = CFG.clipsPerVideo,
   minDur = 26,
-  maxDur = 85,
+  maxDur = Infinity,
   excludedRanges = []
 ) {
   const segs = (transcript.segments ?? []).filter((s) => s.start >= Math.max(0, from - 1))
@@ -895,7 +893,9 @@ async function llmDirectMomentsFromTranscript(
 
   const effectiveMinDur =
     duration >= 65 ? Math.max(28, minDur) : duration >= 35 ? Math.max(22, Math.min(minDur, duration * 0.65)) : Math.max(15, Math.floor(duration * 0.75))
-  const effectiveMaxDur = Math.min(Math.round(duration), Math.max(effectiveMinDur + 10, maxDur))
+  const effectiveMaxDur = Number.isFinite(maxDur)
+    ? Math.min(Math.round(duration), Math.max(effectiveMinDur + 10, maxDur))
+    : Math.round(duration)
 
   // Group segments into compact timestamped blocks (~6-10s per line) if the video is very long
   // so the entire video transcript fits cleanly within the LLM context window.
@@ -928,7 +928,7 @@ async function llmDirectMomentsFromTranscript(
     'You are an autonomous AI Viral Video Director and Master Editor for TikTok, Instagram Reels, and YouTube Shorts.\n' +
     `You are given the full timestamped transcript of a ${Math.round(duration)}-second video.\n` +
     'Your job is to read the transcript, discover the most viral, high-retention story arcs, and choose the EXACT startSec and endSec timestamps to cut each clip.\n' +
-    `CRITICAL DURATION RULE: Every clip you cut MUST be a complete narrative arc (Hook -> Rising Tension/Story -> Climax/Payoff) with a duration between ${effectiveMinDur} seconds and ${effectiveMaxDur} seconds (ideal sweet spot: 32 to 60 seconds). NEVER cut 15-second micro-clips that end abruptly!\n` +
+    `CRITICAL DURATION RULE: Every clip you cut MUST be a complete narrative arc (Hook -> Rising Tension/Story -> Climax/Payoff) with a minimum duration of ${effectiveMinDur} seconds and NO artificial upper duration cap — let each clip run until the complete story/moment naturally finishes (whether 35s, 60s, 90s, or longer). NEVER cut 15-second micro-clips or stop a clip mid-story!\n` +
     'CRITICAL NON-OVERLAP RULE: Every selected clip MUST come from a completely distinct, non-overlapping part of the video. Do not pick overlapping time ranges.' +
     excludedNote +
     '\nIf the transcript is in Arabic, write "title" (3-6 words), "titles", "hookHeadline", "cta", and "reason" in Arabic.\n' +
@@ -958,8 +958,8 @@ async function llmDirectMomentsFromTranscript(
     while (endIdx < segs.length - 1 && segs[endIdx].end - segs[startIdx].start < effectiveMinDur) {
       endIdx++
     }
-    // Continue up to 2 more segments if needed to finish a sentence cleanly without exceeding effectiveMaxDur
-    for (let k = 0; k < 2 && endIdx < segs.length - 1; k++) {
+    // Continue segments if needed to finish a sentence cleanly
+    for (let k = 0; k < 3 && endIdx < segs.length - 1; k++) {
       const txt = (segs[endIdx].text || '').trim()
       const gap = segs[endIdx + 1].start - segs[endIdx].end
       if (/[.?!؟…]$/.test(txt) || gap >= 0.45) break
@@ -1067,7 +1067,7 @@ async function llmScoreMoments(candidates, instructions, maxClips = CFG.clipsPer
   let system =
     'You are a master viral video editor for TikTok, Instagram Reels, and YouTube Shorts.\n' +
     'Analyze the provided speech moments (which may be in Arabic, English, or mixed) and evaluate their virality.\n' +
-    'IMPORTANT: Prefer rich, complete narrative moments between 28 seconds and 65 seconds long that contain a strong hook, buildup, and payoff. Avoid short fragments unless the entire video is short.\n' +
+    'IMPORTANT: Prefer rich, complete narrative moments (at least 28 seconds long, with NO upper duration limit) that contain a strong hook, buildup, and complete payoff. Avoid short fragments unless the entire video is short.\n' +
     'CRITICAL RULE: Do NOT select overlapping moments! Every selected moment MUST cover a distinct, non-overlapping time range (startSec to endSec) from a different part of the video. Never pick two moments that share the same sentences or overlap in time.\n' +
     'For each moment evaluate three distinct sub-scores from 0 to 100:\n' +
     '- hookScore: Power of the first 3 seconds to halt scrolling (provocative question, shocking statement, mystery, or curiosity gap).\n' +
@@ -1201,7 +1201,7 @@ function heuristicScoreMoments(candidates) {
       else if (wps >= 1.5 && wps < 2.0) paceBonus = 8
       else if (wps > 3.6 && wps <= 4.5) paceBonus = 10
 
-      const durationBonus = dur >= 30 && dur <= 62 ? 12 : dur >= 25 ? 6 : 0
+      const durationBonus = dur >= 30 ? 12 : dur >= 25 ? 6 : 0
       const endsCleanly = /[.!?؟]$/.test(text.trim())
       let retentionScore = 46 + paceBonus + durationBonus + (endsCleanly ? 12 : 0) + Math.min(18, Math.round(wordCount * 0.18))
       retentionScore = Math.min(98, Math.max(38, Math.round(retentionScore)))
@@ -1258,7 +1258,7 @@ function heuristicScoreMoments(candidates) {
 
 async function scoreMoments(transcript, duration, from = 0, instructions = null, excludedRanges = []) {
   const minDur = Math.max(25, CFG.clipMinLength ?? 25)
-  const maxDur = CFG.clipMaxLength ?? 90
+  const maxDur = Infinity
   const effectiveDuration = Math.max(0, duration - Math.max(0, from))
   // Ensure we don't chop a short video into tiny 15s pieces: 1 clip per ~32s of source media
   const maxClips =
@@ -1266,7 +1266,7 @@ async function scoreMoments(transcript, duration, from = 0, instructions = null,
       ? Math.min(CFG.clipsPerVideo, Math.max(1, Math.floor(effectiveDuration / 30)))
       : CFG.clipsPerVideo
 
-  // 1. Primary: Autonomous AI Transcript Director chooses exact startSec & endSec (28s-75s complete arcs)
+  // 1. Primary: Autonomous AI Transcript Director chooses exact startSec & endSec (no upper duration cap)
   const aiDirected = await llmDirectMomentsFromTranscript(
     transcript,
     duration,
@@ -1547,15 +1547,9 @@ async function deleteFromR2(key) {
  * post-download check still runs (file uploads and live/misreported URLs
  * rely on it), so this only saves bandwidth/disk on the common reject path.
  */
-async function ensureWithinPlan(project) {
-  const preDur = await probeUrlDuration(project.sourceUrl)
-  if (!preDur) return
-  const owner = await prisma.user.findUnique({ where: { id: project.userId }, select: { role: true } })
-  if (exceedsPlanMinutes(preDur / 60, owner?.role)) {
-    throw new Error(
-      `Source is ~${Math.round(preDur / 60)} min — exceeds the ${planMaxMinutes(owner?.role)} min limit for the ${owner?.role ?? 'FREE'} plan (pre-download check)`
-    )
-  }
+async function ensureWithinPlan(_project) {
+  // No upper duration limit: allow source videos of any length.
+  return
 }
 
 async function processClipAdjust(job) {
@@ -1823,7 +1817,7 @@ async function discoverLongFormYoutubeSourceViaAi(project, extraContext = '') {
             {
               role: 'system',
               content:
-                'You are an AI research director for a viral video clipping studio. Given a campaign title, instructions, and sample transcript/context from an example clip, output strict JSON {"queries":["query 1","query 2","query 3"]} with 3 specific YouTube search queries to find 4-to-19 minute LONG-FORM raw videos, full streams, or highlight compilations of the exact creator/streamer/brand so we can cut brand-new viral clips from scratch.',
+                'You are an AI research director for a viral video clipping studio. Given a campaign title, instructions, and sample transcript/context from an example clip, output strict JSON {"queries":["query 1","query 2","query 3"]} with 3 specific YouTube search queries to find LONG-FORM raw videos, full streams, or highlight compilations of the exact creator/streamer/brand so we can cut brand-new viral clips from scratch.',
             },
             {
               role: 'user',
@@ -1881,8 +1875,8 @@ async function discoverLongFormYoutubeSourceViaAi(project, extraContext = '') {
         const lenMatch = chunk.match(/"lengthText":\{[^}]*?"simpleText":"([0-9:]+)"/)
         if (!titleMatch || !lenMatch) continue
         const durSec = parseDur(lenMatch[1])
-        // Require 3 min to 19.5 min long-form video
-        if (durSec < 180 || durSec > 1170) continue
+        // Require long-form video (>= 180s, NO upper duration limit!)
+        if (durSec < 180) continue
         const vTitle = titleMatch[1].replace(/\\u0026/g, '&').trim()
         if (/#shorts|\bshorts\b|\btiktok\b/i.test(vTitle)) continue
         return {
@@ -1930,7 +1924,7 @@ async function processJob(job) {
     const owner = await prisma.user.findUnique({ where: { id: project.userId }, select: { role: true } })
 
     // If a campaign/Drive URL turned out to be a short pre-edited example clip (<120s),
-    // automatically use AI to discover a fresh long-form raw video (3-19.5 min) on YouTube and cut from scratch!
+    // automatically use AI to discover a fresh long-form raw video on YouTube and cut from scratch!
     const isCampaignOrDriveShort =
       !project.sourceFile &&
       duration < 120 &&
@@ -1979,13 +1973,6 @@ async function processJob(job) {
       await mkdir(cacheDir, { recursive: true })
       await copyFile(src, path.join(cacheDir, `${project.id}.mp4`))
     } catch {}
-
-    const maxMin = planMaxMinutes(owner?.role)
-    if (exceedsPlanMinutes(duration / 60, owner?.role)) {
-      throw new Error(
-        `Source is ${Math.round(duration / 60)} min — exceeds the ${maxMin} min limit for the ${owner?.role ?? 'FREE'} plan`
-      )
-    }
 
     console.log('[worker] transcribing')
     await setP(30, 'Transcribing speech audio with AI Whisper model...')
