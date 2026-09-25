@@ -13,7 +13,7 @@
 import { PrismaClient } from '@prisma/client'
 import { execFile } from 'child_process'
 import { promisify } from 'util'
-import { mkdtemp, rm, writeFile, readFile, mkdir, copyFile, stat } from 'fs/promises'
+import { mkdtemp, rm, writeFile, readFile, mkdir, copyFile, stat, readdir } from 'fs/promises'
 import { existsSync, readFileSync, writeFileSync } from 'fs'
 import { fileURLToPath } from 'url'
 import { tmpdir } from 'os'
@@ -2056,11 +2056,27 @@ async function processJob(job) {
   try {
     console.log(`[worker] ${job.id}: fetching source (${project.sourceFile ? 'upload' : 'youtube'})`)
     await setP(8, 'Fetching video source media...')
-    let src = project.sourceFile
-      ? await downloadFromR2(project.sourceFile, dir)
-      : (await ensureWithinPlan(project), await download(project.sourceUrl, dir, setP))
+    const cacheDir = path.join(tmpdir(), 'nology-sources')
+    await mkdir(cacheDir, { recursive: true }).catch(() => {})
+    const cachedSrc = path.join(cacheDir, `${project.id}.mp4`)
+    let src = null
+    if (existsSync(cachedSrc)) {
+      const cachedDur = await probeDuration(cachedSrc).catch(() => 0)
+      if (cachedDur >= 180) {
+        console.log(`[worker] ${job.id}: reusing cached source video ${cachedSrc} (${Math.round(cachedDur)}s)`)
+        src = cachedSrc
+      }
+    }
+    if (!src) {
+      src = project.sourceFile
+        ? await downloadFromR2(project.sourceFile, dir)
+        : (await ensureWithinPlan(project), await download(project.sourceUrl, dir, setP))
+    }
 
     let duration = await probeDuration(src)
+    if (src !== cachedSrc && duration >= 180) {
+      await copyFile(src, cachedSrc).catch(() => {})
+    }
     const owner = await prisma.user.findUnique({ where: { id: project.userId }, select: { role: true } })
 
     // Enforce minimum 3-minute (180s) source video duration:
