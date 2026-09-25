@@ -858,9 +858,9 @@ export async function POST(req: Request) {
     const requiresExternalSource = !isHub && rawAssets.length === 0
 
     const hubMessage = isHub
-      ? `تم التعرف على مساحة ${rawTitle} بنجاح. لبدء القص التلقائي، افتح الحملة المطلوبة والصق رابطها (مثال: .../app/campaigns/id) أو الصق رابط الفيديو الخام (YouTube / Google Drive) المرفق بها.`
+      ? `Recognized "${rawTitle}" workspace successfully. To start clipping automatically, open the desired campaign and paste its link (e.g. .../app/campaigns/id) or paste the attached raw source video link (YouTube / Google Drive).`
       : requiresExternalSource
-        ? `تم استخراج شروط حملة "${rawTitle}" بنجاح (وتم استبعاد مقاطع المتسابقين الجاهزة من جدول المتصدرين). الفيديوهات الخام لهذه الحملة موجودة في روابط دليل الحملة أدناه — افتح رابط المادة الخام والصق رابط الفيديو الطويل (YouTube أو Google Drive) أو ارفع الفيديو مباشرة.`
+        ? `Extracted campaign brief for "${rawTitle}" successfully (excluding pre-edited leaderboard clips). The raw footage for this campaign is available in the reference links below — open the raw footage link and paste the long-form video URL (YouTube or Google Drive) or upload the video directly.`
         : null
 
     const enrichedAssets = rawAssets.map((a) => ({

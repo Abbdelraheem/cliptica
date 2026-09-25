@@ -2322,7 +2322,7 @@ async function processJob(job) {
 
     if (duration < 180) {
       throw new Error(
-        `الفيديو الأصلي قصير جداً (${Math.round(duration)} ثانية) — الحد الأدنى لمدة الفيديوهات الأصلية هو 3 دقائق (180 ثانية) ليتمكن الذكاء الاصطناعي من قص مقاطع فايرال احترافية منه.`
+        `Source video is too short (${Math.round(duration)}s) — the minimum source video duration is 3 minutes (180 seconds) so the AI Director can extract complete viral clips.`
       )
     }
 

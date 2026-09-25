@@ -172,7 +172,7 @@ export default function ProjectDetail({ projectId }: { projectId: string }) {
     const deleteCount = total - keepCount
 
     if (keepCount === 0) {
-      toast.error('يرجى اختيار مقطع واحد على الأقل لتأكيده وفتح التحميل.')
+      toast.error('Please select at least one clip to confirm and unlock download.')
       return
     }
 
@@ -181,12 +181,12 @@ export default function ProjectDetail({ projectId }: { projectId: string }) {
 
     const costDetails =
       additionalCost > 0
-        ? `سيتم خصم ${additionalCost} كريديت من رصيدك (1 كريديت لكل مقطع مختار).`
-        : `تم دفع تكلفة هذا الاختيار مسبقاً.`
+        ? `${additionalCost} credit${additionalCost === 1 ? '' : 's'} will be deducted from your balance (1 credit per selected clip).`
+        : `This selection is already covered by previously used credits.`
 
-    const msg = `تأكيد اختيار المقاطع وفتح التحميل:\n\n• عدد المقاطع المختارة: ${keepCount}\n• ${costDetails}${
-      deleteCount > 0 ? `\n• سيتم حذف ${deleteCount} مقطع غير مختار` : ''
-    }\n\nهل تريد تأكيد الاختيار وخصم الكريديت لفتح زر التحميل؟`
+    const msg = `Confirm Clip Selection & Unlock Download:\n\n• Selected clips: ${keepCount}\n• ${costDetails}${
+      deleteCount > 0 ? `\n• ${deleteCount} unselected clip${deleteCount === 1 ? '' : 's'} will be removed` : ''
+    }\n\nConfirm selection and deduct credits to unlock download?`
     if (!confirm(msg)) return
 
     setPurging(true)
@@ -220,10 +220,10 @@ export default function ProjectDetail({ projectId }: { projectId: string }) {
 
       toast.success(
         data.message ||
-          `تم تأكيد اختيار ${data.kept} مقطع وفتح زر التحميل بنجاح!`
+          `Confirmed ${data.kept} clip${data.kept === 1 ? '' : 's'} and unlocked download!`
       )
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'تعذر تأكيد اختيار المقاطع')
+      toast.error(e instanceof Error ? e.message : 'Failed to confirm clip selection')
     } finally {
       setPurging(false)
     }
@@ -380,7 +380,7 @@ export default function ProjectDetail({ projectId }: { projectId: string }) {
 
     setDownloadingClipId(c.id)
     setDownloadProgress(10)
-    toast.info('جاري تجهيز الماستر عالي الدقة HD...')
+    toast.info('Preparing HD Master for download...')
 
     try {
       let attempts = 0
@@ -400,7 +400,7 @@ export default function ProjectDetail({ projectId }: { projectId: string }) {
               ),
             }
           })
-          toast.success('تم تجهيز الفيديو بدقة HD! جاري التحميل...')
+          toast.success('HD Master ready! Starting download...')
           const link = document.createElement('a')
           link.href = data.downloadUrl
           link.download = `${(c.title || 'clip').replace(/[^a-zA-Z0-9_\u0600-\u06FF-]/g, '_')}.mp4`
@@ -418,7 +418,7 @@ export default function ProjectDetail({ projectId }: { projectId: string }) {
         await new Promise((r) => setTimeout(r, 2000))
       }
       if (c.videoUrl) {
-        toast.info('تم تحميل نسخة المعاينة')
+        toast.info('Downloading preview clip')
         const link = document.createElement('a')
         link.href = c.videoUrl
         link.download = `${(c.title || 'clip').replace(/[^a-zA-Z0-9_\u0600-\u06FF-]/g, '_')}.mp4`
@@ -432,7 +432,7 @@ export default function ProjectDetail({ projectId }: { projectId: string }) {
       if (c.videoUrl) {
         window.open(c.videoUrl, '_blank')
       } else {
-        toast.error('فشل تجهيز التنزيل')
+        toast.error('Failed to prepare download')
       }
     } finally {
       setDownloadingClipId(null)
@@ -565,18 +565,18 @@ export default function ProjectDetail({ projectId }: { projectId: string }) {
               <Sparkles className="h-5 w-5" />
             </div>
             <div>
-              <h4 className="text-sm font-semibold text-white">اختيار المقاطع وتأكيد خصم الكريديت لفتح التحميل</h4>
+              <h4 className="text-sm font-semibold text-white">Select Clips & Confirm Credits to Unlock Download</h4>
               <p className="text-xs text-mist-2">
-                حدد المقاطع التي تعجبك ثم اضغط تأكيد الاختيار لخصم الكريديت (1 كريديت لكل مقطع) وتفعيل زر التحميل.
+                Choose the clips you want to keep, then confirm your selection (1 credit per clip) to unlock HD download.
               </p>
             </div>
           </div>
 
           <div className="flex flex-wrap items-center gap-2.5">
             <span className="rounded-xl border border-hair/80 bg-black/40 px-3 py-1.5 font-mono text-xs text-pearl flex items-center gap-1.5">
-              <span>المقاطع المختارة:</span>
+              <span>Selected:</span>
               <span className="font-bold text-gold">{selectedClipIds.size}</span>
-              <span className="text-mist-2">({selectedClipIds.size} كريديت)</span>
+              <span className="text-mist-2">({selectedClipIds.size} credit{selectedClipIds.size === 1 ? '' : 's'})</span>
             </span>
 
             <button
@@ -584,7 +584,7 @@ export default function ProjectDetail({ projectId }: { projectId: string }) {
               onClick={handleSelectAllClips}
               className="btn-lux btn-outline !py-1.5 !px-3 !text-xs !font-normal"
             >
-              تحديد الكل
+              Select All
             </button>
 
             <button
@@ -592,7 +592,7 @@ export default function ProjectDetail({ projectId }: { projectId: string }) {
               onClick={handleDeselectAllClips}
               className="btn-lux btn-outline !py-1.5 !px-3 !text-xs !font-normal text-mist-2 hover:text-white"
             >
-              إلغاء التحديد
+              Clear
             </button>
 
             {selectedClipIds.size > 0 && (
@@ -603,7 +603,7 @@ export default function ProjectDetail({ projectId }: { projectId: string }) {
                 className="btn-lux btn-gold !py-1.5 !px-3.5 !text-xs !font-semibold flex items-center gap-1.5 shadow-[0_0_20px_rgba(212,175,55,0.3)] hover:scale-[1.02] transition-transform"
               >
                 {purging ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CheckCircle2 className="h-3.5 w-3.5" />}
-                <span>تأكيد الاختيار وخصم {selectedClipIds.size} كريديت لفتح التحميل</span>
+                <span>Confirm & Deduct {selectedClipIds.size} Credit{selectedClipIds.size === 1 ? '' : 's'} to Unlock Download</span>
               </button>
             )}
           </div>
@@ -675,15 +675,15 @@ export default function ProjectDetail({ projectId }: { projectId: string }) {
                 </div>
                 {unlocked ? (
                   <span className="absolute left-2.5 top-2.5 flex items-center gap-1.5 rounded-lg border border-emerald-400/60 bg-black/90 px-2.5 py-1 font-mono text-[11px] font-bold text-emerald-400 backdrop-blur z-20 shadow-lg">
-                    <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400" /> التحميل متاح
+                    <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400" /> Download Unlocked
                   </span>
                 ) : isSelectedToKeep ? (
                   <span className="absolute left-2.5 top-2.5 flex items-center gap-1.5 rounded-lg border border-gold bg-black/90 px-2.5 py-1 font-mono text-[11px] font-bold text-gold backdrop-blur z-20 shadow-lg">
-                    <CheckCircle2 className="h-3.5 w-3.5 text-gold" /> تم التحديد (بانتظار التأكيد)
+                    <CheckCircle2 className="h-3.5 w-3.5 text-gold" /> Selected (Pending Confirm)
                   </span>
                 ) : (
                   <span className="absolute left-2.5 top-2.5 rounded-lg border border-white/20 bg-black/75 px-2 py-0.5 font-mono text-[10px] text-mist backdrop-blur z-20">
-                    غير محدد
+                    Unselected
                   </span>
                 )}
               </div>
@@ -739,12 +739,12 @@ export default function ProjectDetail({ projectId }: { projectId: string }) {
                         {isSelectedToKeep ? (
                           <>
                             <CheckCircle2 className="h-4 w-4 stroke-[2.5]" />
-                            <span>تم اختيار هذا المقطع ✓</span>
+                            <span>Clip Selected ✓</span>
                           </>
                         ) : (
                           <>
                             <Sparkles className="h-4 w-4 text-gold" />
-                            <span>اختر هذا المقطع (1 كريديت)</span>
+                            <span>Select Clip (1 Credit)</span>
                           </>
                         )}
                       </button>
@@ -759,12 +759,12 @@ export default function ProjectDetail({ projectId }: { projectId: string }) {
                           {purging ? (
                             <>
                               <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                              <span>جاري التفعيل...</span>
+                              <span>Unlocking...</span>
                             </>
                           ) : (
                             <>
                               <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />
-                              <span>تأكيد الاختيار وخصم الكريديت ({selectedClipIds.size}) لفتح التحميل</span>
+                              <span>Confirm & Unlock Download ({selectedClipIds.size})</span>
                             </>
                           )}
                         </button>
@@ -778,7 +778,7 @@ export default function ProjectDetail({ projectId }: { projectId: string }) {
                           onClick={() => handleDownload(c)}
                           disabled={downloadingClipId === c.id}
                           className="btn-lux btn-gold !py-2 !px-3 !text-xs !font-bold flex items-center justify-center gap-1.5 shadow-[0_0_15px_rgba(212,175,55,0.3)] min-h-[40px] disabled:opacity-75"
-                          title="تنزيل الفيديو بدقة عالية (HD)"
+                          title="Download HD Video"
                         >
                           {downloadingClipId === c.id ? (
                             <>
@@ -788,7 +788,7 @@ export default function ProjectDetail({ projectId }: { projectId: string }) {
                           ) : (
                             <>
                               <Download className="h-3.5 w-3.5 shrink-0" />
-                              <span className="truncate">تنزيل HD</span>
+                              <span className="truncate">Download HD</span>
                             </>
                           )}
                         </button>
@@ -1271,7 +1271,7 @@ export default function ProjectDetail({ projectId }: { projectId: string }) {
                 : ['#Shorts', '#Reels', '#TikTok', '#Viral', '#Trending', '#VideoOfTheDay', '#fyp', '#explore']
               const ctaText: string = typeof capData.cta === 'string' && capData.cta
                 ? capData.cta
-                : '💬 شاركنا رأيك في التعليقات — هل تتفق مع هذا الطرح؟\n🔥 تابع الحساب لمزيد من المقاطع اليومية!'
+                : '💬 Drop your thoughts in the comments — do you agree?\n🔥 Follow for daily viral clips!'
               const fullDesc = `${exportKitClip.description || exportKitClip.title}\n\n${ctaText}`
 
               return (

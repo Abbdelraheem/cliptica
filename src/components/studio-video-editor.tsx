@@ -47,9 +47,9 @@ export type StudioEditorProps = {
 
 const CAPTION_STYLES = [
   // ARABIC NATIVE
-  { id: 'arabic_luxury', name: 'Arabic Luxury', category: 'Arabic Luxury', color: '#FFD700', sample: 'سر النجاح المالي' },
-  { id: 'arabic_viral', name: 'Arabic Viral', category: 'Arabic Luxury', color: '#FFFFFF', sample: 'اسمع هذي المفاجأة!' },
-  { id: 'arabic_clean', name: 'Arabic Clean', category: 'Arabic Luxury', color: '#FFFFFF', sample: 'ما لم يخبرك به أحد' },
+  { id: 'arabic_luxury', name: 'Arabic Luxury', category: 'Arabic Luxury', color: '#FFD700', sample: 'SECRET OF SUCCESS' },
+  { id: 'arabic_viral', name: 'Arabic Viral', category: 'Arabic Luxury', color: '#FFFFFF', sample: 'WAIT FOR THIS!' },
+  { id: 'arabic_clean', name: 'Arabic Clean', category: 'Arabic Luxury', color: '#FFFFFF', sample: 'WHAT NOBODY TELLS YOU' },
   // KINETIC
   { id: 'hormozi', name: 'Hormozi Pop', category: 'Kinetic', color: '#FFE600', sample: 'STOP SCROLLING' },
   { id: 'bold_impact', name: 'Bold Impact', category: 'Kinetic', color: '#FFD700', sample: 'MUST WATCH THIS' },
@@ -158,11 +158,11 @@ export default function StudioVideoEditor({
 
   const handleSave = async () => {
     if (clipDuration < 15) {
-      setError('الحد الأدنى لطول المقطع هو 15 ثانية.')
+      setError('Minimum clip duration is 15 seconds.')
       return
     }
-    if (clipDuration > 120) {
-      setError('الحد الأقصى لطول المقطع هو 120 ثانية (دقيقتين).')
+    if (clipDuration > 60) {
+      setError('Maximum clip duration is 60 seconds.')
       return
     }
 
@@ -177,7 +177,7 @@ export default function StudioVideoEditor({
       })
       onClose()
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : 'فشل حفظ وتعديل المقطع')
+      setError(e instanceof Error ? e.message : 'Failed to save and update clip')
     } finally {
       setSaving(false)
     }

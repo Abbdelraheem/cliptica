@@ -29,7 +29,7 @@ const ASPECT_RATIOS = [
 
 const LANGS = [
   ['auto', 'Auto-detect'],
-  ['en', 'English'], ['ar', 'العربية (Arabic)'], ['es', 'Spanish'],
+  ['en', 'English'], ['ar', 'Arabic'], ['es', 'Spanish'],
   ['fr', 'French'], ['de', 'German'], ['tr', 'Turkish'],
 ] as const
 
@@ -41,7 +41,7 @@ const CAPTION_PRESETS = [
     name: 'Arabic Luxury (Royal Gold)',
     desc: 'Bold luxury typography with royal gold glow and high-impact keyword highlights.',
     badge: 'Popular',
-    sample: 'سر النجاح المالي',
+    sample: 'SECRET OF SUCCESS',
     sampleStyle: {
       color: '#FFD700',
       textShadow: '0 3px 6px rgba(0,0,0,1), 0 0 4px #000',
@@ -54,7 +54,7 @@ const CAPTION_PRESETS = [
     name: 'Arabic Viral (TikTok Kinetic)',
     desc: 'Fast-paced kinetic pop with yellow & white cadence designed for 3-second hook retention.',
     badge: 'Viral',
-    sample: 'اسمع هذي المفاجأة!',
+    sample: 'WAIT FOR THIS!',
     sampleStyle: {
       color: '#FFFFFF',
       textShadow: '0 2px 4px rgba(0,0,0,0.9), 0 0 2px #000',
@@ -67,7 +67,7 @@ const CAPTION_PRESETS = [
     name: 'Arabic Clean (Classic Subtitle)',
     desc: 'Crisp, high-legibility shadowed subtitles tailored for podcasts and interviews.',
     badge: 'Podcast',
-    sample: 'ما لم يخبرك به أحد',
+    sample: 'WHAT NOBODY TELLS YOU',
     sampleStyle: {
       color: '#FFFFFF',
       fontWeight: 700,
@@ -454,7 +454,7 @@ export default function NewProjectPage() {
       const targetUrl = selectedAsset || url
       if (targetUrl && /whop\.com|apps\.whop\.com/i.test(targetUrl)) {
         if (campaignData?.isHub) {
-          return 'يرجى وضع رابط الفيديو الخام (YouTube أو Google Drive أو MP4) من ملفات الحملة لبدء القص من الصفر.'
+          return 'Please paste the raw source video link (YouTube, Google Drive, or direct MP4) from the campaign materials to start clipping.'
         }
         return 'Please inspect the campaign and select or paste a raw video asset (MP4, Google Drive, or YouTube) to start clipping.'
       }
@@ -502,7 +502,7 @@ export default function NewProjectPage() {
     if (tab === 'campaign' && (!targetUrl || /whop\.com|apps\.whop\.com/i.test(targetUrl))) {
       setSubmitting(false)
       if (campaignData?.isHub) {
-        return setError(campaignData.hubMessage || 'يرجى اختيار فيديو خام أو لصق رابط الفيديو الطويل من ملفات الحملة لبدء القص.')
+        return setError(campaignData.hubMessage || 'Please select a raw source video or paste the long-form video URL from the campaign materials.')
       }
       return setError('Whop dashboard links cannot be clipped directly. Please select or paste a raw video asset (YouTube, Google Drive, or MP4) from the campaign.')
     }
@@ -729,15 +729,15 @@ export default function NewProjectPage() {
                   <div className="rounded-xl border border-amber-500/40 bg-amber-500/10 p-4 text-xs text-amber-200 space-y-3">
                     <div className="flex items-center gap-2 font-semibold text-amber-300">
                       <Sparkles className="h-4 w-4" />
-                      <span>مصدر الفيديو الخام للحملة (Raw Source Footage)</span>
+                      <span>Campaign Raw Source Footage</span>
                     </div>
                     <p className="leading-relaxed">
                       {campaignData.hubMessage ||
-                        'تم التعرف على الحملة بنجاح. لبدء القص من الصفر، افتح رابط المادة الخام أدناه والصق رابط الفيديو الطويل (YouTube أو Google Drive).'}
+                        'Campaign recognized successfully. To start clipping from scratch, open the raw footage link below and paste the long-form video URL (YouTube or Google Drive).'}
                     </p>
                     {campaignData.referenceLinks && campaignData.referenceLinks.length > 0 && (
                       <div className="space-y-1.5 pt-1">
-                        <p className="text-[11px] font-semibold text-amber-300">روابط المادة الخام ودليل الحملة المرفقة:</p>
+                        <p className="text-[11px] font-semibold text-amber-300">Attached Raw Footage & Campaign Guide Links:</p>
                         <div className="flex flex-wrap gap-2">
                           {campaignData.referenceLinks.map((ref, idx) => (
                             <a
@@ -756,7 +756,7 @@ export default function NewProjectPage() {
                     )}
                     <div className="pt-2">
                       <label className="mb-1.5 block text-[11px] font-semibold text-pearl">
-                        الصق رابط الفيديو الخام (YouTube / Google Drive File / Direct MP4):
+                        Paste Raw Video URL (YouTube / Google Drive File / Direct MP4):
                       </label>
                       <input
                         type="url"
@@ -765,7 +765,7 @@ export default function NewProjectPage() {
                           setUrl(e.target.value)
                           setSelectedAsset(e.target.value)
                         }}
-                        placeholder="https://www.youtube.com/watch?v=... أو https://drive.google.com/file/d/..."
+                        placeholder="https://www.youtube.com/watch?v=... or https://drive.google.com/file/d/..."
                         className="input-lux !bg-black/60 !text-xs"
                       />
                     </div>

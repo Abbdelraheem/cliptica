@@ -59,7 +59,7 @@ export async function GET(
 
     if (!isUnlocked) {
       return NextResponse.json(
-        { error: 'يرجى اختيار المقطع وتأكيد خصم الكريديت أولاً لفتح التحميل.' },
+        { error: 'Please select this clip and confirm credit deduction first to unlock download.' },
         { status: 402 }
       )
     }

@@ -94,13 +94,13 @@ export async function verifyAndTrackSubmission(
 
   if (!platformAllowed) {
     rulesMet = false
-    notesList.push(`المنصة (${platform}) غير مشمولة في منصات الحملة المعتمدة.`)
+    notesList.push(`Platform (${platform}) is not included in the approved campaign platforms.`)
   }
 
   if (stats.views < minViews) {
-    notesList.push(`عدد المشاهدات الحالي (${stats.views.toLocaleString()}) أقل من الحد الأدنى (${minViews.toLocaleString()}).`)
+    notesList.push(`Current views (${stats.views.toLocaleString()}) are below the minimum threshold (${minViews.toLocaleString()}).`)
   } else {
-    notesList.push(`تم استيفاء شرط المشاهدات (${stats.views.toLocaleString()} مشاهدة).`)
+    notesList.push(`Minimum views requirement met (${stats.views.toLocaleString()} views).`)
   }
 
   // Check hashtags if mentioned in rules
@@ -111,7 +111,7 @@ export async function verifyAndTrackSubmission(
       const inDesc = stats.description.toLowerCase().includes(lowerTag)
       const inTitle = stats.title.toLowerCase().includes(lowerTag)
       if (!inDesc && !inTitle) {
-        notesList.push(`الهاشتاق الإلزامي (${tag}) غير متوفر في وصف الفيديو.`)
+        notesList.push(`Required hashtag (${tag}) is missing from the video description.`)
         rulesMet = false
       }
     }

@@ -73,7 +73,7 @@ export async function POST(
 
       if (diff > 0 && user.credits < diff) {
         const err = new Error(
-          `Insufficient credits (رصيد غير كافٍ): اختيار ${totalCost} مقطع يتطلب ${totalCost} كريديت. رصيدك الحالي ${user.credits} كريديت.`
+          `Insufficient credits: Selecting ${totalCost} clip${totalCost === 1 ? '' : 's'} requires ${totalCost} credit${totalCost === 1 ? '' : 's'}. Your current balance is ${user.credits} credit${user.credits === 1 ? '' : 's'}.`
         )
         ;(err as unknown as { statusCode: number }).statusCode = 402
         throw err
@@ -167,9 +167,9 @@ export async function POST(
     return NextResponse.json({
       success: true,
       ...result,
-      message: `تم تأكيد اختيار ${result.kept} مقطع وفتح زر التحميل بنجاح.${
+      message: `Confirmed ${result.kept} clip${result.kept === 1 ? '' : 's'} and unlocked download successfully.${
         result.creditsDeducted > 0
-          ? ` تم خصم ${result.creditsDeducted} كريديت.`
+          ? ` ${result.creditsDeducted} credit${result.creditsDeducted === 1 ? '' : 's'} deducted.`
           : ''
       }`,
     })

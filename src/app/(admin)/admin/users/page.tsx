@@ -264,10 +264,10 @@ export default function AdminUsersPage() {
                       setEditing({ user: u, mode: 'role' })
                       setRoleValue(u.role)
                     }}
-                    title="تعديل صلاحية ومستوى المستخدم (مستخدم، ستوديو، أدمن)"
+                    title="Edit user role & access tier"
                     className="flex items-center gap-1 rounded-md border border-purple-500/40 bg-purple-500/15 px-1.5 py-0.5 text-[10px] font-medium text-purple-300 transition-colors hover:bg-purple-500/25"
                   >
-                    الصلاحية
+                    Role
                   </button>
                   <button
                     onClick={() => {
@@ -315,11 +315,11 @@ export default function AdminUsersPage() {
                 <div className="flex items-center gap-2 md:justify-end">
                   <span className="text-sm font-medium text-gold">{u.credits}</span>
                   <button
-                    onClick={() => { setEditing({ user: u, mode: 'credits' }); setAmount('100'); setReason('هدية ترحيبية / Welcome VIP Gift') }}
+                    onClick={() => { setEditing({ user: u, mode: 'credits' }); setAmount('100'); setReason('Welcome VIP Gift') }}
                     title="Gift or adjust credits"
                     className="flex items-center gap-1 rounded-md border border-gold/40 bg-gold/10 px-2 py-0.5 text-[11px] font-semibold text-gold transition-colors hover:bg-gold/25"
                   >
-                    <Gift className="h-3 w-3" /> أهدِ كريديت
+                    <Gift className="h-3 w-3" /> Gift Credits
                   </button>
                 </div>
                 <span className={`text-center text-[10px] uppercase tracking-widest ${u.subscriptionStatus === 'active' ? 'text-emerald-300' : 'text-mist-2'}`}>
@@ -419,14 +419,14 @@ export default function AdminUsersPage() {
             ) : editing.mode === 'role' ? (
               <div className="mt-5 space-y-4">
                 <p className="text-xs text-mist leading-relaxed">
-                  اختر الصلاحية المناسبة للمستخدم. التغيير يطبق فورياً على مستوى الحساب وميزات المنصة المتاحة.
+                  Select the appropriate role for this user. Changes take effect immediately on account permissions and platform features.
                 </p>
                 <div className="grid grid-cols-2 gap-2.5">
                   {[
-                    { id: 'FREE', title: 'Free (مستخدم مجاني)', desc: 'حساب عادي مع رصيد تجريبي فقط، بدون وصول للحملات' },
-                    { id: 'CLIPPER', title: 'Clipper ($29/mo)', desc: 'باقة المبتدئين للمونتاج الفردي 150 مقطع شهرياً' },
-                    { id: 'STUDIO', title: 'Studio ($59/mo)', desc: 'باقة الاستوديو: تفعيل إنشاء الحملات والأوتوبايلوت الكامل' },
-                    { id: 'ADMIN', title: 'Admin (مدير كامل)', desc: 'رصيد لا نهائي (∞) وصلاحية الوصول الكامل للوحة التحكم' },
+                    { id: 'FREE', title: 'Free', desc: 'Standard account with trial credits only, no campaign access' },
+                    { id: 'CLIPPER', title: 'Clipper ($29/mo)', desc: 'Individual creator plan with 150 clips per month' },
+                    { id: 'STUDIO', title: 'Studio ($59/mo)', desc: 'Studio plan with campaign creation and full autopilot' },
+                    { id: 'ADMIN', title: 'Admin', desc: 'Unlimited credits (∞) and full access to the Admin Panel' },
                   ].map((r) => (
                     <button
                       key={r.id}
@@ -448,13 +448,13 @@ export default function AdminUsersPage() {
                   disabled={roleValue === editing.user.role || roleMutation.isPending}
                   className="btn-lux btn-gold mt-4 w-full font-bold"
                 >
-                  {roleMutation.isPending ? 'جاري الحفظ...' : `حفظ وتعيين كـ ${roleValue}`}
+                  {roleMutation.isPending ? 'Saving...' : `Save & Set as ${roleValue}`}
                 </button>
               </div>
             ) : (
               <div className="mt-5 space-y-4">
                 <div>
-                  <label className="mb-1.5 block text-xs uppercase tracking-widest text-mist-2">Quick presets / اختيارات سريعة</label>
+                  <label className="mb-1.5 block text-xs uppercase tracking-widest text-mist-2">Quick Presets</label>
                   <div className="grid grid-cols-6 gap-1.5">
                     {[25, 50, 100, 250, 500, 1000].map((preset) => (
                       <button
@@ -502,13 +502,13 @@ export default function AdminUsersPage() {
                 </div>
 
                 <div>
-                  <label className="mb-1.5 block text-xs uppercase tracking-widest text-mist-2">Quick reason / سبب الإهداء</label>
+                  <label className="mb-1.5 block text-xs uppercase tracking-widest text-mist-2">Quick Reason</label>
                   <div className="flex flex-wrap gap-1.5 mb-2">
                     {[
-                      'هدية ترحيبية / Welcome Gift',
+                      'Welcome Gift',
                       'VIP Creator Bonus',
-                      'تعويض دعم فني / Support',
-                      'شحن تجريبي / Free Trial',
+                      'Support Compensation',
+                      'Free Trial Top-up',
                     ].map((chip) => (
                       <button
                         key={chip}
@@ -538,7 +538,7 @@ export default function AdminUsersPage() {
                   className="btn-lux btn-gold flex w-full items-center justify-center gap-2 font-bold"
                 >
                   <Coins className="h-4 w-4" />
-                  {creditsMutation.isPending ? 'Saving…' : Number(amount) > 0 ? `🎁 إهداء ${amount} كريديت` : `خصم ${Math.abs(Number(amount))} كريديت`}
+                  {creditsMutation.isPending ? 'Saving…' : Number(amount) > 0 ? `🎁 Gift ${amount} Credits` : `Deduct ${Math.abs(Number(amount))} Credits`}
                 </button>
               </div>
             )}
