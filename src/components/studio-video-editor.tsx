@@ -2,7 +2,7 @@
 
 import React, { useRef, useState, useEffect, useCallback, useMemo } from 'react'
 import {
-  X, Play, Pause, Scissors, Sparkles, Sliders, Type,
+  X, Play, Pause, Sparkles, Sliders, Type,
   Clock, Check, Loader2, Volume2, VolumeX, Eye,
   Layers, RotateCcw, SkipBack, SkipForward, Shield,
   Maximize2, Film, Wand2, Trash2, Edit3, Search,
@@ -394,8 +394,6 @@ export default function StudioVideoEditor({
     }
   }
 
-  if (!isOpen) return null
-
   const filteredStyles =
     styleCategory === 'All'
       ? CAPTION_STYLES
@@ -422,6 +420,8 @@ export default function StudioVideoEditor({
     }
     return bars
   }, [baseSourceStart, totalTimelineDuration, editableWords])
+
+  if (!isOpen) return null
 
   return (
     <div
