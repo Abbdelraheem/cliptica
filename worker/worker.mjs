@@ -226,8 +226,8 @@ async function ensureWarpConnected(forceRestart = false) {
   const warpProxy = process.env.WARP_PROXY || 'socks5://127.0.0.1:40000'
   if (!forceRestart) {
     try {
-      await sh('curl', ['-4', '-x', warpProxy, '-s', '-I', '-m', '5', 'https://www.youtube.com'], {
-        timeout: 6500,
+      await sh('curl', ['-4', '-x', warpProxy, '-s', '-o', '/dev/null', '-m', '8', 'https://www.youtube.com/generate_204'], {
+        timeout: 10000,
       })
       return true
     } catch {
@@ -236,11 +236,18 @@ async function ensureWarpConnected(forceRestart = false) {
   }
   try {
     await sh('systemctl', ['restart', 'warp-svc'], { timeout: 10000 }).catch(() => {})
-    await new Promise((r) => setTimeout(r, 3000))
+    await new Promise((r) => setTimeout(r, 2500))
     await sh('warp-cli', ['--accept-tos', 'mode', 'proxy'], { timeout: 5000 }).catch(() => {})
     await sh('warp-cli', ['--accept-tos', 'proxy', 'port', '40000'], { timeout: 5000 }).catch(() => {})
     await sh('warp-cli', ['--accept-tos', 'connect'], { timeout: 8000 }).catch(() => {})
-    await new Promise((r) => setTimeout(r, 3000))
+    for (let i = 0; i < 10; i++) {
+      await new Promise((r) => setTimeout(r, 1500))
+      const st = await sh('warp-cli', ['--accept-tos', 'status'], { timeout: 5000 }).catch(() => '')
+      if (/Status update:\s*Connected/i.test(st)) {
+        await new Promise((r) => setTimeout(r, 1500))
+        break
+      }
+    }
     return true
   } catch {
     return false
@@ -407,10 +414,9 @@ async function download(url, dir, onProgress = null) {
       } catch (e) {
         lastErr = e
         const dur = Date.now() - wStart
+        const errTail = e.message.split('\n').filter(Boolean).slice(-2).join(' | ').slice(0, 240)
         console.warn(
-          `[worker:download] proxy=warp(${warpProxy}) try=${warpTry + 1} duration_ms=${dur} outcome=failure error="${e.message
-            .split('\n')[0]
-            .slice(0, 120)}"`
+          `[worker:download] proxy=warp(${warpProxy}) try=${warpTry + 1} duration_ms=${dur} outcome=failure error="${errTail}"`
         )
         if (warpTry === 0) {
           await ensureWarpConnected(true)
