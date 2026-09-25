@@ -44,7 +44,7 @@ export async function executeAiChatCompletion(options: AiCompletionOptions): Pro
   let nvidiaKey = process.env.NVIDIA_API_KEY?.trim() || ''
   let groqKey = process.env.GROQ_API_KEY?.trim() || ''
   let openaiKey = process.env.OPENAI_API_KEY?.trim() || ''
-  let nvidiaModel = customNvidiaModel || process.env.NVIDIA_SCORE_MODEL?.trim() || 'deepseek-ai/deepseek-v4.1-flash'
+  let nvidiaModel = customNvidiaModel || process.env.NVIDIA_SCORE_MODEL?.trim() || 'nvidia/nemotron-3-ultra-550b-a55b'
   let groqModel = customGroqModel || process.env.GROQ_SCORE_MODEL?.trim() || 'openai/gpt-oss-120b'
 
   try {
@@ -66,6 +66,16 @@ export async function executeAiChatCompletion(options: AiCompletionOptions): Pro
     // DB lookup fallback if prisma is unavailable
   }
 
+  // Upgrade deprecated/hanging NVIDIA model IDs automatically to flagship 550B Ultra
+  if (
+    !nvidiaModel ||
+    nvidiaModel === 'deepseek-ai/deepseek-v4.1-flash' ||
+    nvidiaModel === 'meta/llama-3.3-70b-instruct' ||
+    nvidiaModel === 'nvidia/llama-3.1-nemotron-70b-instruct'
+  ) {
+    nvidiaModel = 'nvidia/nemotron-3-ultra-550b-a55b'
+  }
+
   // Upgrade deprecated or low-TPM Groq model IDs automatically to flagship 120B
   if (
     groqModel === 'llama-3.3-70b-versatile' ||
@@ -75,7 +85,55 @@ export async function executeAiChatCompletion(options: AiCompletionOptions): Pro
     groqModel = 'openai/gpt-oss-120b'
   }
 
-  // --- ATTEMPT 1: GROQ API (PRIMARY ULTRA-FAST ~200-500ms: openai/gpt-oss-120b -> openai/gpt-oss-20b -> qwen/qwen3.8-27b) ---
+  // --- ATTEMPT 1: NVIDIA NIM API (PRIMARY STRONGEST: nvidia/nemotron-3-ultra-550b-a55b 550B ~1.7s with enable_thinking: false) ---
+  if (nvidiaKey) {
+    const t0 = Date.now()
+    try {
+      const resp = await fetch('https://integrate.api.nvidia.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${nvidiaKey}`,
+          'Content-Type': 'application/json',
+        },
+        signal: AbortSignal.timeout(Math.min(timeoutMs, 12000)),
+        body: JSON.stringify({
+          model: nvidiaModel,
+          messages,
+          temperature,
+          max_tokens: maxTokens,
+          chat_template_kwargs: { enable_thinking: false },
+          ...(responseFormat === 'json_object' ? { response_format: { type: 'json_object' } } : {}),
+        }),
+      })
+
+      if (resp.ok) {
+        const data = await resp.json()
+        const msg = data.choices?.[0]?.message
+        const content = msg?.content || msg?.reasoning_content || ''
+        const latencyMs = Date.now() - t0
+        let parsedJson = undefined
+        if (responseFormat === 'json_object') {
+          try {
+            parsedJson = JSON.parse(content)
+          } catch {}
+        }
+        return {
+          content,
+          provider: 'nvidia',
+          model: nvidiaModel,
+          latencyMs,
+          parsedJson,
+        }
+      } else {
+        const errText = await resp.text().catch(() => '')
+        console.warn(`[AI-Provider] NVIDIA NIM (${nvidiaModel}) failed (${resp.status}): ${errText.slice(0, 150)}.`)
+      }
+    } catch (nvErr) {
+      console.warn(`[AI-Provider] NVIDIA NIM timeout/error (${nvErr instanceof Error ? nvErr.message : 'Unknown'}).`)
+    }
+  }
+
+  // --- ATTEMPT 2: GROQ API (ULTRA-FAST FALLBACK ~200-500ms: openai/gpt-oss-120b -> openai/gpt-oss-20b -> qwen/qwen3.8-27b) ---
   if (groqKey) {
     const groqCandidates = Array.from(
       new Set([groqModel, 'openai/gpt-oss-120b', 'openai/gpt-oss-20b', 'qwen/qwen3.8-27b'])
@@ -124,53 +182,6 @@ export async function executeAiChatCompletion(options: AiCompletionOptions): Pro
       } catch (gErr) {
         console.warn(`[AI-Provider] Groq (${candidateModel}) call error:`, gErr instanceof Error ? gErr.message : gErr)
       }
-    }
-  }
-
-  // --- ATTEMPT 2: NVIDIA NIM API (SECONDARY FALLBACK, fast 4s cap) ---
-  if (nvidiaKey) {
-    const t0 = Date.now()
-    try {
-      const resp = await fetch('https://integrate.api.nvidia.com/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${nvidiaKey}`,
-          'Content-Type': 'application/json',
-        },
-        signal: AbortSignal.timeout(Math.min(timeoutMs, 4000)),
-        body: JSON.stringify({
-          model: nvidiaModel,
-          messages,
-          temperature,
-          max_tokens: maxTokens,
-          ...(responseFormat === 'json_object' ? { response_format: { type: 'json_object' } } : {}),
-        }),
-      })
-
-      if (resp.ok) {
-        const data = await resp.json()
-        const msg = data.choices?.[0]?.message
-        const content = msg?.content || msg?.reasoning_content || ''
-        const latencyMs = Date.now() - t0
-        let parsedJson = undefined
-        if (responseFormat === 'json_object') {
-          try {
-            parsedJson = JSON.parse(content)
-          } catch {}
-        }
-        return {
-          content,
-          provider: 'nvidia',
-          model: nvidiaModel,
-          latencyMs,
-          parsedJson,
-        }
-      } else {
-        const errText = await resp.text().catch(() => '')
-        console.warn(`[AI-Provider] NVIDIA NIM failed (${resp.status}): ${errText.slice(0, 150)}.`)
-      }
-    } catch (nvErr) {
-      console.warn(`[AI-Provider] NVIDIA NIM timeout/error (${nvErr instanceof Error ? nvErr.message : 'Unknown'}).`)
     }
   }
 

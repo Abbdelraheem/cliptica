@@ -80,7 +80,7 @@ const CFG = {
   r2Secret: process.env.R2_SECRET_ACCESS_KEY,
 
   nvidiaKey: process.env.NVIDIA_API_KEY,
-  nvidiaScoreModel: process.env.NVIDIA_SCORE_MODEL ?? 'deepseek-ai/deepseek-v4.1-flash',
+  nvidiaScoreModel: process.env.NVIDIA_SCORE_MODEL ?? 'nvidia/nemotron-3-ultra-550b-a55b',
   scoringTimeoutMs: Number(process.env.AI_SCORING_TIMEOUT_MS ?? 15_000),
   groqKey: process.env.GROQ_API_KEY,
   openaiKey: process.env.OPENAI_API_KEY,
@@ -111,6 +111,7 @@ const ENV_DEFAULTS = {
   clip_target_seconds: Number(process.env.CLIP_TARGET_SECONDS ?? 45),
   render_parallel: Number(process.env.RENDER_PARALLEL ?? 4),
   stale_job_minutes: Number(process.env.STALE_JOB_MINUTES ?? 30),
+  nvidia_score_model: process.env.NVIDIA_SCORE_MODEL || 'nvidia/nemotron-3-ultra-550b-a55b',
   groq_score_model: process.env.GROQ_SCORE_MODEL || 'openai/gpt-oss-120b',
 }
 
@@ -154,6 +155,12 @@ async function cfg() {
   return configCache ?? ENV_DEFAULTS
 }
 
+const LEGACY_NVIDIA_MODELS = new Set([
+  'deepseek-ai/deepseek-v4.1-flash',
+  'meta/llama-3.3-70b-instruct',
+  'nvidia/llama-3.1-nemotron-70b-instruct',
+])
+
 /** Push DB-backed knobs into the live CFG object (mutated in place). */
 async function syncConfigInto() {
   const c = await cfg()
@@ -164,7 +171,8 @@ async function syncConfigInto() {
   CFG.clipLength = c.clip_target_seconds ?? 45
   CFG.renderParallel = c.render_parallel
   CFG.nvidiaKey = c.nvidia_api_key || process.env.NVIDIA_API_KEY || CFG.nvidiaKey
-  CFG.nvidiaScoreModel = c.nvidia_score_model || process.env.NVIDIA_SCORE_MODEL || 'deepseek-ai/deepseek-v4.1-flash'
+  const rawNvModel = c.nvidia_score_model || process.env.NVIDIA_SCORE_MODEL || 'nvidia/nemotron-3-ultra-550b-a55b'
+  CFG.nvidiaScoreModel = LEGACY_NVIDIA_MODELS.has(rawNvModel) ? 'nvidia/nemotron-3-ultra-550b-a55b' : rawNvModel
   CFG.scoringTimeoutMs = Number(c.ai_scoring_timeout_ms || process.env.AI_SCORING_TIMEOUT_MS || CFG.scoringTimeoutMs || 15_000)
   CFG.groqKey = c.groq_api_key || process.env.GROQ_API_KEY || CFG.groqKey
   CFG.openaiKey = c.openai_api_key || process.env.OPENAI_API_KEY || CFG.openaiKey
@@ -715,16 +723,101 @@ function generateSimulatedTranscript(fileDuration = 60) {
   return { language: 'en', segments, words }
 }
 
+/**
+ * Acoustic Excitement & Laughter Peak Detector:
+ * Measures per-second RMS loudness (dB) across the extracted audio using FFmpeg `astats`
+ * and combines it with lexical laughter/excitement cues so the AI Director can "hear"
+ * laughter bursts, shouting, applause, and emotional vocal peaks.
+ */
+async function annotateSegmentsWithAudioEnergy(mp3, segments) {
+  if (!Array.isArray(segments) || segments.length === 0) return segments
+  const LAUGH_OR_HYPE_RE =
+    /(?:هههه|هاها|ضحك|يضحك|والله|مستحيل|يا ساتر|يا جماعة|صدمة|كارثة|أقسم بالله|haha|hehe|lol|lmao|laugh|scream|wow|omg|no way|unbelievable|\[laughter\]|\[applause\])/i
+  try {
+    const out = await sh(
+      'ffmpeg',
+      [
+        '-v',
+        'quiet',
+        '-i',
+        mp3,
+        '-af',
+        'astats=metadata=1:reset=1,ametadata=print:key=lavfi.astats.Overall.RMS_level:file=-',
+        '-f',
+        'null',
+        '-',
+      ],
+      { timeout: 45_000 }
+    )
+    const secDb = new Map()
+    let curSec = 0
+    for (const line of out.split('\n')) {
+      const tMatch = line.match(/pts_time:\s*([\d.]+)/)
+      if (tMatch) {
+        curSec = Math.floor(parseFloat(tMatch[1]))
+        continue
+      }
+      const dbMatch = line.match(/RMS_level=\s*(-?[\d.]+)/)
+      if (dbMatch) {
+        const val = parseFloat(dbMatch[1])
+        if (Number.isFinite(val) && val > -75) {
+          const prev = secDb.get(curSec)
+          if (prev === undefined || val > prev) secDb.set(curSec, val)
+        }
+      }
+    }
+
+    const validDbs = [...secDb.values()].sort((a, b) => a - b)
+    const medianDb = validDbs.length ? validDbs[Math.floor(validDbs.length * 0.5)] : -24
+    let taggedCount = 0
+
+    for (const s of segments) {
+      const sSec = Math.max(0, Math.floor(s.start || 0))
+      const eSec = Math.max(sSec, Math.ceil(s.end || sSec + 1))
+      let peakDb = -80
+      for (let t = sSec; t <= eSec; t++) {
+        const v = secDb.get(t)
+        if (v !== undefined && v > peakDb) peakDb = v
+      }
+      const deltaDb = peakDb > -75 ? Number((peakDb - medianDb).toFixed(1)) : 0
+      const hasLaughOrHype = LAUGH_OR_HYPE_RE.test(s.text || '') || (s.text || '').includes('!')
+      s.audioDeltaDb = deltaDb
+      if (deltaDb >= 4.2 && hasLaughOrHype) {
+        s.audioTag = `🔥[LAUGHTER/HIGH-ENERGY +${deltaDb}dB]`
+        taggedCount++
+      } else if (deltaDb >= 4.5) {
+        s.audioTag = `⚡[LOUD VOCAL PEAK +${deltaDb}dB]`
+        taggedCount++
+      } else if (hasLaughOrHype && deltaDb >= 1.5) {
+        s.audioTag = `😂[EXCITED/LAUGH +${deltaDb}dB]`
+        taggedCount++
+      }
+    }
+    console.log(
+      `[worker:audio-sense] analyzed ${secDb.size}s of audio (median=${medianDb.toFixed(1)}dB, tagged ${taggedCount}/${segments.length} segments with vocal/laughter peaks)`
+    )
+  } catch (e) {
+    console.warn('[worker:audio-sense] non-fatal audio energy scan skip:', e.message)
+  }
+  return segments
+}
+
 async function transcribe(file, dir, language = 'auto') {
   if (process.env.AI_SIMULATION_MODE === 'true' || CFG.aiSimulationMode === 'true') {
     console.log('[worker] [SIMULATION] AI_SIMULATION_MODE enabled: generating fast synthetic transcript in <1s')
     return generateSimulatedTranscript()
   }
+  let mp3 = null
   try {
-    if (CFG.groqKey) {
+    mp3 = await extractAudio(file, dir)
+  } catch (e) {
+    console.warn('[worker] extractAudio notice:', e.message)
+  }
+  try {
+    if (CFG.groqKey && mp3) {
       const t0 = Date.now()
-      const mp3 = await extractAudio(file, dir)
       const r = await transcribeGroq(mp3, language, dir)
+      await annotateSegmentsWithAudioEnergy(mp3, r.segments)
       console.log(`[worker] Groq transcription done in ${((Date.now() - t0) / 1000).toFixed(0)}s (${r.words.length} words, lang=${language})`)
       return r
     } else {
@@ -737,7 +830,9 @@ async function transcribe(file, dir, language = 'auto') {
     }
   }
   try {
-    return await transcribeLocal(file, dir)
+    const r = await transcribeLocal(file, dir)
+    if (mp3) await annotateSegmentsWithAudioEnergy(mp3, r.segments)
+    return r
   } catch (e) {
     console.error('[worker] Local whisper failed (audio-only or no audio stream):', e.message)
     return { language: language === 'auto' ? 'en' : language, segments: [], words: [] }
@@ -922,10 +1017,36 @@ function getAiProviders() {
   const providers = []
   const timeoutMs = CFG.scoringTimeoutMs || 15_000
 
-  // 1. GROQ (PRIMARY ULTRA-FAST ~200-500ms: openai/gpt-oss-120b -> openai/gpt-oss-20b -> qwen/qwen3.8-27b)
+  // 1. NVIDIA NIM FLAGSHIP (PRIMARY #1 PRIORITY — Strongest 550B Model: nvidia/nemotron-3-ultra-550b-a55b ~1.7s with enable_thinking:false)
+  if (CFG.nvidiaKey) {
+    const rawModel = CFG.nvidiaScoreModel || 'nvidia/nemotron-3-ultra-550b-a55b'
+    const primaryNvModel = LEGACY_NVIDIA_MODELS.has(rawModel) ? 'nvidia/nemotron-3-ultra-550b-a55b' : rawModel
+    providers.push({
+      tier: 'tier-1 nvidia-flagship-550b',
+      name: `nvidia-${primaryNvModel}`,
+      url: 'https://integrate.api.nvidia.com/v1/chat/completions',
+      key: CFG.nvidiaKey,
+      model: primaryNvModel,
+      isNvidia: true,
+      timeoutMs: Math.min(timeoutMs, 14_000),
+    })
+    if (primaryNvModel !== 'nvidia/nemotron-3-super-120b-a12b') {
+      providers.push({
+        tier: 'tier-1.2 nvidia-super-120b',
+        name: 'nvidia-nvidia/nemotron-3-super-120b-a12b',
+        url: 'https://integrate.api.nvidia.com/v1/chat/completions',
+        key: CFG.nvidiaKey,
+        model: 'nvidia/nemotron-3-super-120b-a12b',
+        isNvidia: true,
+        timeoutMs: Math.min(timeoutMs, 11_000),
+      })
+    }
+  }
+
+  // 2. GROQ (SECONDARY ULTRA-FAST ~300-500ms: openai/gpt-oss-120b -> openai/gpt-oss-20b -> qwen/qwen3.8-27b)
   if (CFG.groqKey) {
     providers.push({
-      tier: 'tier-1 groq-gpt-oss-120b',
+      tier: 'tier-2 groq-gpt-oss-120b',
       name: 'groq-gpt-oss-120b',
       url: 'https://api.groq.com/openai/v1/chat/completions',
       key: CFG.groqKey,
@@ -933,7 +1054,7 @@ function getAiProviders() {
       timeoutMs: Math.min(timeoutMs, 12_000),
     })
     providers.push({
-      tier: 'tier-1.2 groq-gpt-oss-20b',
+      tier: 'tier-2.2 groq-gpt-oss-20b',
       name: 'groq-gpt-oss-20b',
       url: 'https://api.groq.com/openai/v1/chat/completions',
       key: CFG.groqKey,
@@ -941,7 +1062,7 @@ function getAiProviders() {
       timeoutMs: Math.min(timeoutMs, 10_000),
     })
     providers.push({
-      tier: 'tier-1.5 groq-qwen',
+      tier: 'tier-2.5 groq-qwen',
       name: 'groq-qwen3.8-27b',
       url: 'https://api.groq.com/openai/v1/chat/completions',
       key: CFG.groqKey,
@@ -950,23 +1071,10 @@ function getAiProviders() {
     })
   }
 
-  // 2. NVIDIA NIM (SECONDARY FALLBACK - 4s cap)
-  if (CFG.nvidiaKey) {
-    const nvModel = CFG.nvidiaScoreModel || 'deepseek-ai/deepseek-v4.1-flash'
-    providers.push({
-      tier: 'fallback-1 nvidia',
-      name: `nvidia-${nvModel}`,
-      url: 'https://integrate.api.nvidia.com/v1/chat/completions',
-      key: CFG.nvidiaKey,
-      model: nvModel,
-      timeoutMs: Math.min(timeoutMs, 4000),
-    })
-  }
-
   // 3. OpenAI (Tertiary Fallback)
   if (CFG.openaiKey) {
     providers.push({
-      tier: 'fallback-2 openai',
+      tier: 'fallback-3 openai',
       name: 'openai-gpt-4o-mini',
       url: 'https://api.openai.com/v1/chat/completions',
       key: CFG.openaiKey,
@@ -980,9 +1088,9 @@ function getAiProviders() {
 
 /**
  * Direct AI Transcript Director:
- * Passes the full timestamped Whisper transcript directly to the AI so the AI itself chooses
- * the exact startSec and endSec timestamps for complete viral stories (28s to 60s max),
- * snapped cleanly to Whisper sentence boundaries and avoiding any previously clipped ranges.
+ * Passes the full timestamped Whisper transcript + acoustic laughter/energy tags directly to the AI
+ * (prioritizing NVIDIA Nemotron-3-Ultra-550B) so the AI chooses the exact startSec and endSec timestamps
+ * for complete viral stories (28s to 60s max), snapped cleanly to Whisper sentence boundaries.
  */
 async function llmDirectMomentsFromTranscript(
   transcript,
@@ -1004,23 +1112,28 @@ async function llmDirectMomentsFromTranscript(
   const effectiveMaxDur = Math.min(60, Math.round(duration), Math.max(effectiveMinDur + 5, Number.isFinite(maxDur) ? maxDur : 60))
 
   // Group segments into compact timestamped blocks (~6-10s per line) if the video is very long
-  // so the entire video transcript fits cleanly within the LLM context window.
+  // and include any acoustic excitement / laughter peak tags measured by FFmpeg astats.
   const transcriptLines = []
   if (segs.length > 0) {
-    const targetLines = 85
+    const targetLines = 110
     const groupSize = Math.max(1, Math.ceil(segs.length / targetLines))
     for (let i = 0; i < segs.length; i += groupSize) {
       const slice = segs.slice(i, i + groupSize)
       const sTime = Math.round(slice[0].start)
       const eTime = Math.round(slice[slice.length - 1].end)
+      const bestTag =
+        slice.find((x) => x.audioTag?.startsWith('🔥'))?.audioTag ||
+        slice.find((x) => x.audioTag?.startsWith('⚡'))?.audioTag ||
+        slice.find((x) => x.audioTag)?.audioTag ||
+        ''
       const text = slice
         .map((x) => (x.text || '').trim())
         .join(' ')
         .replace(/\s+/g, ' ')
         .trim()
-        .slice(0, 110)
+        .slice(0, 125)
       if (text) {
-        transcriptLines.push(`[${sTime}s-${eTime}s] ${text}`)
+        transcriptLines.push(`[${sTime}s-${eTime}s]${bestTag ? ` ${bestTag}` : ''} ${text}`)
       }
     }
   } else {
@@ -1042,8 +1155,9 @@ async function llmDirectMomentsFromTranscript(
   const requestCount = Math.max(maxClips, Math.min(6, maxClips * 2))
   let system =
     'You are an autonomous AI Viral Video Director and Master Editor for TikTok, Instagram Reels, and YouTube Shorts.\n' +
-    `You are given the full timestamped transcript of a ${Math.round(duration)}-second video.\n` +
+    `You are given the full timestamped transcript of a ${Math.round(duration)}-second video, annotated with real acoustic energy & laughter spikes.\n` +
     'Your job is to read the transcript, discover the most viral, high-retention story arcs, and choose the EXACT startSec and endSec timestamps to cut each clip.\n' +
+    'ACOUSTIC & LAUGHTER PRIORITY: Lines tagged with 🔥[LAUGHTER/HIGH-ENERGY], ⚡[LOUD VOCAL PEAK], or 😂[EXCITED/LAUGH] represent real decibel surges, laughter bursts, or intense vocal reactions in the audio. Prioritize building complete viral story arcs (starting with the setup/hook just before the reaction and ending after the payoff) around those high-energy moments!\n' +
     `CRITICAL DURATION RULE: Every clip you cut MUST be a complete narrative arc (Hook -> Rising Tension/Story -> Climax/Payoff) with a duration between ${effectiveMinDur} seconds and ${effectiveMaxDur} seconds (MAXIMUM 60 seconds — NEVER exceed 60 seconds, and NEVER cut 15-second micro-clips!).\n` +
     'CRITICAL NON-OVERLAP RULE: Every selected clip MUST come from a completely distinct, non-overlapping part of the video. Do not pick overlapping time ranges.' +
     excludedNote +
@@ -1116,6 +1230,7 @@ async function llmDirectMomentsFromTranscript(
 
   for (const p of providers) {
     const t0 = Date.now()
+    const maxPromptChars = p.isNvidia ? 18_000 : 8_500
     try {
       const res = await fetch(p.url, {
         method: 'POST',
@@ -1125,9 +1240,10 @@ async function llmDirectMomentsFromTranscript(
           model: p.model,
           response_format: { type: 'json_object' },
           temperature: 0.25,
+          ...(p.isNvidia ? { chat_template_kwargs: { enable_thinking: false } } : {}),
           messages: [
             { role: 'system', content: system },
-            { role: 'user', content: transcriptLines.join('\n').slice(0, 8500) },
+            { role: 'user', content: transcriptLines.join('\n').slice(0, maxPromptChars) },
           ],
         }),
       })
@@ -1179,7 +1295,7 @@ async function llmDirectMomentsFromTranscript(
       if (directed.length > 0) {
         const latency = Date.now() - t0
         console.log(
-          `[worker] AI Transcript Director selected ${directed.length} clips via ${p.name} in ${latency}ms (durations: ${directed.map((d) => `${d.end - d.start}s`).join(', ')})`
+          `[worker] AI Transcript Director selected ${directed.length} clips via ${p.name} [${p.tier}] in ${latency}ms (durations: ${directed.map((d) => `${d.end - d.start}s`).join(', ')})`
         )
         return directed
       }
@@ -1253,6 +1369,7 @@ async function llmScoreMoments(candidates, instructions, maxClips = CFG.clipsPer
           model: p.model,
           response_format: { type: 'json_object' },
           temperature: 0.3,
+          ...(p.isNvidia ? { chat_template_kwargs: { enable_thinking: false } } : {}),
           messages: [
             { role: 'system', content: system },
             { role: 'user', content: JSON.stringify(candidatePayload) },
@@ -1396,7 +1513,78 @@ function heuristicScoreMoments(candidates) {
     .sort((a, b) => b.score - a.score)
 }
 
-async function scoreMoments(transcript, duration, from = 0, instructions = null, excludedRanges = []) {
+/**
+ * Multimodal Visual Sense (`meta/llama-3.2-11b-vision-instruct` on NVIDIA NIM):
+ * Extracts a keyframe from each selected clip and asks NVIDIA Vision AI to evaluate
+ * facial expression, visual reaction, and scene engagement (0-100), blending it into the final score.
+ */
+async function enrichMomentsWithNvidiaVision(src, dir, moments) {
+  if (!CFG.nvidiaKey || !src || !dir || !Array.isArray(moments) || moments.length === 0) {
+    return moments
+  }
+  const t0 = Date.now()
+  try {
+    await Promise.allSettled(
+      moments.map(async (m, idx) => {
+        const sampleSec = Math.max(0, m.start + Math.min(5, Math.floor((m.end - m.start) / 3)))
+        const framePath = path.join(dir, `vision_probe_${idx}.jpg`)
+        await sh(
+          'ffmpeg',
+          ['-y', '-ss', String(sampleSec), '-i', src, '-frames:v', '1', '-vf', 'scale=480:-2', '-q:v', '6', framePath],
+          { timeout: 10_000 }
+        )
+        const b64 = (await readFile(framePath)).toString('base64')
+        const res = await fetch('https://integrate.api.nvidia.com/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${CFG.nvidiaKey}`,
+            'Content-Type': 'application/json',
+          },
+          signal: AbortSignal.timeout(6_000),
+          body: JSON.stringify({
+            model: 'meta/llama-3.2-11b-vision-instruct',
+            max_tokens: 90,
+            temperature: 0.2,
+            messages: [
+              {
+                role: 'user',
+                content: [
+                  {
+                    type: 'text',
+                    text: 'Rate the visual engagement of this video frame for a viral TikTok/Reels clip from 0 to 100 (high for expressive face/laughter/gesture/dynamic scene, low for blank/static slide). Reply ONLY with JSON: {"visualScore":88}',
+                  },
+                  {
+                    type: 'image_url',
+                    image_url: { url: `data:image/jpeg;base64,${b64}` },
+                  },
+                ],
+              },
+            ],
+          }),
+        })
+        if (!res.ok) return
+        const data = await res.json()
+        const content = data.choices?.[0]?.message?.content || ''
+        const match = content.match(/"visualScore"\s*:\s*(\d+)/) || content.match(/\b(\d{2,3})\b/)
+        const vScore = match ? Math.max(40, Math.min(100, Number(match[1]))) : null
+        if (vScore !== null) {
+          m.visualScore = vScore
+          m.score = Math.min(99, Math.round(m.score * 0.85 + vScore * 0.15))
+          m.hookScore = Math.min(99, Math.round((m.hookScore ?? m.score) * 0.85 + vScore * 0.15))
+        }
+      })
+    )
+    moments.sort((a, b) => (b.score ?? 0) - (a.score ?? 0))
+    console.log(
+      `[worker:vision-sense] NVIDIA Vision (meta/llama-3.2-11b-vision-instruct) verified ${moments.length} clips in ${Date.now() - t0}ms (visual scores: ${moments.map((m) => m.visualScore ?? 'n/a').join(', ')})`
+    )
+  } catch (e) {
+    console.warn('[worker:vision-sense] non-fatal vision check skip:', e.message)
+  }
+  return moments
+}
+
+async function scoreMoments(transcript, duration, from = 0, instructions = null, excludedRanges = [], src = null, dir = null) {
   const minDur = Math.max(25, CFG.clipMinLength ?? 25)
   const maxDur = 60
   const effectiveDuration = Math.max(0, duration - Math.max(0, from))
@@ -1437,7 +1625,7 @@ async function scoreMoments(transcript, duration, from = 0, instructions = null,
         0.15
       )
     }
-    const finalClips = clampTo60(deduped)
+    const finalClips = await enrichMomentsWithNvidiaVision(src, dir, clampTo60(deduped))
     console.log(
       `[worker] selected ${finalClips.length}/${maxClips} AI-directed non-overlapping clips (video duration=${Math.round(duration)}s, clip durations=${finalClips.map((d) => `${d.end - d.start}s`).join(', ')})`
     )
@@ -1452,7 +1640,7 @@ async function scoreMoments(transcript, duration, from = 0, instructions = null,
     if (deduped.length < maxClips) {
       deduped = dedupeOverlappingMoments([...deduped, ...heurResult], maxClips, 0.15)
     }
-    const finalClips = clampTo60(deduped)
+    const finalClips = await enrichMomentsWithNvidiaVision(src, dir, clampTo60(deduped))
     console.log(
       `[worker] selected ${finalClips.length}/${maxClips} non-overlapping clips (video duration=${Math.round(duration)}s, clip durations=${finalClips.map((d) => `${d.end - d.start}s`).join(', ')})`
     )
@@ -1460,7 +1648,7 @@ async function scoreMoments(transcript, duration, from = 0, instructions = null,
   }
 
   console.log('[worker] scored via heuristic (fallback safety net)')
-  const deduped = clampTo60(dedupeOverlappingMoments(heurResult, maxClips, 0.15))
+  const deduped = await enrichMomentsWithNvidiaVision(src, dir, clampTo60(dedupeOverlappingMoments(heurResult, maxClips, 0.15)))
   console.log(`[worker] selected ${deduped.length}/${maxClips} non-overlapping heuristic clips (video duration=${Math.round(duration)}s)`)
   return deduped
 }
@@ -1962,6 +2150,7 @@ async function discoverLongFormYoutubeSourceViaAi(project, extraContext = '') {
           model: p.model,
           response_format: { type: 'json_object' },
           temperature: 0.2,
+          ...(p.isNvidia ? { chat_template_kwargs: { enable_thinking: false } } : {}),
           messages: [
             {
               role: 'system',
@@ -2145,7 +2334,7 @@ async function processJob(job) {
     } catch {}
 
     console.log('[worker] transcribing')
-    await setP(30, 'Transcribing speech audio with AI Whisper model...')
+    await setP(30, 'Transcribing speech & analyzing acoustic laughter/excitement peaks...')
     const transcript = await transcribe(src, dir, project.language ?? 'auto')
     await prisma.project.update({
       where: { id: project.id },
@@ -2155,7 +2344,7 @@ async function processJob(job) {
     })
 
     console.log('[worker] scoring moments')
-    await setP(52, 'AI Director selecting viral story arcs (<=60s), timestamps & hooks...')
+    await setP(52, 'NVIDIA 550B AI Director + Vision AI selecting viral story arcs (<=60s)...')
     let excludedRanges = []
     if (project.sourceUrl) {
       try {
@@ -2176,7 +2365,7 @@ async function processJob(job) {
         }
       } catch {}
     }
-    const moments = await scoreMoments(transcript, duration, project.clipFrom ?? 0, project.instructions, excludedRanges)
+    const moments = await scoreMoments(transcript, duration, project.clipFrom ?? 0, project.instructions, excludedRanges, src, dir)
     if (!moments.length) throw new Error('no viable moments found')
 
     const captionStyle = project.captionStyle ?? 'hormozi'

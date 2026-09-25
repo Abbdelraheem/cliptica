@@ -26,17 +26,17 @@ describe('AI Resilience: Strongest-First Fallback Chain', () => {
     global.fetch = originalFetch
   })
 
-  it('uses Tier 1 (Groq) first and falls through to Tier 2 (NVIDIA NIM) when Groq fails', async () => {
+  it('uses Tier 1 (NVIDIA NIM 550B Flagship) first and falls through to Tier 2 (Groq) when NVIDIA fails', async () => {
     global.fetch = vi.fn().mockImplementation(async (url: string) => {
-      if (url.includes('api.groq.com')) {
+      if (url.includes('integrate.api.nvidia.com')) {
         return {
           ok: false,
-          status: 429,
-          text: async () => 'Rate limit exceeded: TPM limit reached',
+          status: 503,
+          text: async () => 'Service temporarily unavailable',
         }
       }
 
-      if (url.includes('integrate.api.nvidia.com')) {
+      if (url.includes('api.groq.com')) {
         return {
           ok: true,
           status: 200,
@@ -61,9 +61,9 @@ describe('AI Resilience: Strongest-First Fallback Chain', () => {
     })
 
     expect(result).toBeDefined()
-    expect(result.provider).toBe('nvidia')
+    expect(result.provider).toBe('groq')
     expect(result.content).toContain('Viral Moment')
-    expect(global.fetch).toHaveBeenCalledTimes(4)
+    expect(global.fetch).toHaveBeenCalledTimes(2)
   })
 
   it('falls through to Tier 3 (OpenAI) when both Groq and NVIDIA error or time out', async () => {
