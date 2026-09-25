@@ -77,3 +77,9 @@ worker/node_modules/
 
 # Telegram bot deploy internals (contains owner chat id + runtime config)
 /deploy/tg-bot/
+
+backups/
+inspect-backup.mjs
+test-neon-conn.mjs
+scripts/set-password.mjs
+deploy/import-db.mjs
