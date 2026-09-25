@@ -147,7 +147,7 @@ async function searchYoutubeLongFormVideos(
   queries: string[],
   usedKeys: Set<string>,
   reqHeaders: Record<string, string>,
-  minSec = 150,
+  minSec = 180,
   maxSec = Infinity
 ): Promise<Array<{ type: 'youtube'; url: string; label: string }>> {
   const cleanQueries = Array.from(new Set(queries.map((q) => q.trim()).filter((q) => q.length >= 3))).slice(0, 3)
@@ -702,7 +702,7 @@ export async function POST(req: Request) {
       recommendedInstructions:
         extractedGuidelines.length > 0
           ? extractedGuidelines.join('. ').slice(0, 450)
-          : 'Focus on complete, high-energy viral moments (with no upper duration cap) that start on a strong opening hook, build tension, and finish the full payoff matching the campaign guidelines.',
+          : 'Focus on complete, high-energy viral moments (30-60 seconds, maximum 60 seconds) that start on a strong opening hook, build tension, and finish the full payoff matching the campaign guidelines.',
       recommendedAssetUrl: rawAssets[0]?.url || '',
       aiRationale: rawAssets.length > 0 ? 'Verified raw source footage detected for this campaign.' : '',
       recommendedCaptionStyle: 'hormozi',
@@ -720,21 +720,21 @@ export async function POST(req: Request) {
 
       const examplesHint =
         exampleClipTitles.length > 0
-          ? `\nExample Clip Titles Found in Campaign Brief (use these creator/streamer names to generate searchQueries for long-form YouTube videos!): ${exampleClipTitles.join(' | ')}`
+          ? `\nExample Clip Titles Found in Campaign Brief (use these creator/streamer names to generate searchQueries for long-form YouTube videos >= 3 minutes!): ${exampleClipTitles.join(' | ')}`
           : ''
 
       const promptSystem =
         'You are an autonomous AI clipping campaign director and viral media strategist for TikTok, YouTube Shorts, and Instagram Reels. ' +
         'Analyze the provided web page text, Google Doc campaign brief, example clip titles, and detected raw media assets of a clipping bounty/campaign. ' +
-        'Understand the exact creators/streamers, brand, core objectives, and rules to formulate an integrated viral clip strategy AND discover fresh long-form raw videos on YouTube. ' +
+        'Understand the exact creators/streamers, brand, core objectives, and rules to formulate an integrated viral clip strategy AND discover fresh long-form raw videos (>= 3 minutes) on YouTube. ' +
         'Output a valid JSON object with: ' +
         'title (string), payout (string or null), guidelines (string array), requiredHashtags (string array), ' +
-        'recommendedInstructions (string: detailed instructions for the AI video cutter/director specifying what moments, creators, hooks, and complete narrative arcs to extract without an upper duration limit), ' +
+        'recommendedInstructions (string: detailed instructions for the AI video cutter/director specifying what moments, creators, hooks, and 30s-60s narrative arcs [max 60s] to extract), ' +
         'campaignHook (string: opening viral title hook text under 6 words), ' +
         'recommendedCaptionStyle (string: one of ["hormozi", "neon", "luxury", "beast", "bold"]), ' +
         'recommendedAssetUrl (string: the exact URL from the detected assets list that is the best UNUSED long-form raw footage), ' +
         'aiRationale (string: 1 clear sentence explaining why this raw asset and cutting strategy were chosen), ' +
-        'searchQueries (array of 3 specific YouTube search queries to find raw long-form streams/videos/highlights featuring the exact creators, streamers, or brand mentioned in this campaign brief and example titles so we can cut fresh clips from scratch).'
+        'searchQueries (array of 3 specific YouTube search queries to find raw long-form streams/videos/highlights [at least 3 minutes long] featuring the exact creators, streamers, or brand mentioned in this campaign brief and example titles so we can cut fresh clips from scratch).'
 
       const aiRes = await executeAiChatCompletion({
         responseFormat: 'json_object',

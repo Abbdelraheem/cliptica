@@ -29,7 +29,7 @@ export async function GET(
 
     const project = await prisma.project.findFirst({
       where: { id: projectId, userId: session.user.id },
-      select: { id: true },
+      select: { id: true, creditsUsed: true },
     })
 
     if (!project) {
@@ -44,11 +44,24 @@ export async function GET(
         videoUrl: true,
         exportUrl: true,
         exportedAt: true,
+        captionData: true,
       },
     })
 
     if (!clip) {
       return NextResponse.json({ error: 'Clip not found' }, { status: 404 })
+    }
+
+    const cData = (clip.captionData ?? {}) as { unlocked?: boolean }
+    const isUnlocked =
+      cData.unlocked === true ||
+      (cData.unlocked !== false && (project.creditsUsed ?? 1) > 0)
+
+    if (!isUnlocked) {
+      return NextResponse.json(
+        { error: 'يرجى اختيار المقطع وتأكيد خصم الكريديت أولاً لفتح التحميل.' },
+        { status: 402 }
+      )
     }
 
     // Signed preview URL helper

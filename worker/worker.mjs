@@ -107,18 +107,18 @@ const ENV_DEFAULTS = {
   pipeline_premium: process.env.PIPELINE_PREMIUM !== '0',
   clips_per_video: Number(process.env.CLIPS_PER_VIDEO ?? 3),
   clip_min_seconds: Number(process.env.CLIP_MIN_SECONDS ?? 25),
-  clip_max_seconds: Number(process.env.CLIP_MAX_SECONDS ?? Infinity),
+  clip_max_seconds: Number(process.env.CLIP_MAX_SECONDS ?? 60),
   clip_target_seconds: Number(process.env.CLIP_TARGET_SECONDS ?? 45),
   render_parallel: Number(process.env.RENDER_PARALLEL ?? 4),
   stale_job_minutes: Number(process.env.STALE_JOB_MINUTES ?? 30),
-  groq_score_model: process.env.GROQ_SCORE_MODEL || 'qwen/qwen3.8-27b',
+  groq_score_model: process.env.GROQ_SCORE_MODEL || 'openai/gpt-oss-120b',
 }
 
 const SETTING_PARSE = {
   pipeline_premium: (v) => v === 'true',
   clips_per_video: (v) => Math.max(1, Number(v) || 3),
   clip_min_seconds: (v) => Math.max(20, Number(v) || 25),
-  clip_max_seconds: (v) => (Number(v) > 0 ? Math.max(30, Number(v)) : Infinity),
+  clip_max_seconds: (v) => Math.min(60, Math.max(30, Number(v) || 60)),
   clip_target_seconds: (v) => Math.max(25, Number(v) || 45),
   render_parallel: (v) => Math.max(1, Math.min(8, Number(v) || 4)),
   stale_job_minutes: (v) => Math.max(1, Number(v) || 30),
@@ -160,7 +160,7 @@ async function syncConfigInto() {
   CFG.premium = c.pipeline_premium
   CFG.clipsPerVideo = c.clips_per_video
   CFG.clipMinLength = Math.max(25, c.clip_min_seconds ?? 25)
-  CFG.clipMaxLength = Infinity
+  CFG.clipMaxLength = 60
   CFG.clipLength = c.clip_target_seconds ?? 45
   CFG.renderParallel = c.render_parallel
   CFG.nvidiaKey = c.nvidia_api_key || process.env.NVIDIA_API_KEY || CFG.nvidiaKey
@@ -169,7 +169,7 @@ async function syncConfigInto() {
   CFG.groqKey = c.groq_api_key || process.env.GROQ_API_KEY || CFG.groqKey
   CFG.openaiKey = c.openai_api_key || process.env.OPENAI_API_KEY || CFG.openaiKey
   CFG.whisperModel = c.whisper_model || process.env.WHISPER_MODEL || CFG.whisperModel
-  CFG.groqScoreModel = c.groq_score_model || process.env.GROQ_SCORE_MODEL || 'qwen/qwen3.8-27b'
+  CFG.groqScoreModel = c.groq_score_model || process.env.GROQ_SCORE_MODEL || 'openai/gpt-oss-120b'
   CFG.aiSimulationMode = c.ai_simulation_mode || process.env.AI_SIMULATION_MODE || CFG.aiSimulationMode
 
   if (c.youtube_cookies) {
@@ -187,23 +187,20 @@ async function sh(cmd, args, opts) {
   return stdout
 }
 
-/** Base yt-dlp args: JS runtimes (deno preferred — solves YouTube's n challenge), mandatory impersonate
- * (server IP is a flagged AWS datacenter; faking a real browser TLS fingerprint is what gets past the
- * "Sign in to confirm you're not a bot" wall), plus optional cookies file / proxy given via extra. */
+/** Base yt-dlp args: IPv4 (-4), JS runtimes (deno + node), and bgutil-ytdlp-pot-provider integration
+ * (Brainicism/bgutil-ytdlp-pot-provider running on http://127.0.0.1:4416 mints valid YouTube PO Tokens
+ * for visionos/web clients without needing curl_cffi --impersonate which breaks SOCKS5 proxy tunnels). */
 function ytdlpArgs(extra, includeCookies = true) {
   const denoPath = existsSync('/usr/local/bin/deno') ? 'deno:/usr/local/bin/deno' : 'deno'
   const nodePath = existsSync('/usr/bin/node') ? 'node:/usr/bin/node' : 'node'
   const args = [
+    '-4',
     '--js-runtimes',
     nodePath,
     '--js-runtimes',
     denoPath,
-    '--impersonate',
-    'Safari-18.4',
     '--remote-components',
     'ejs:github',
-    '--extractor-args',
-    'youtube:player_client=mweb,web_creator,android',
   ]
   if (includeCookies) {
     const cookiePath =
@@ -214,8 +211,6 @@ function ytdlpArgs(extra, includeCookies = true) {
     if (cookiePath) {
       try {
         const rawCookies = readFileSync(cookiePath, 'utf8')
-        // Only pass --cookies if it contains authenticated YouTube session cookies,
-        // and copy to /tmp so yt-dlp never overwrites and wipes the master cookie file.
         if (/__Secure-[13]PSID\b|LOGIN_INFO\b/.test(rawCookies)) {
           const runtimeCookiePath = path.join(tmpdir(), 'nology-yt-cookies-runtime.txt')
           writeFileSync(runtimeCookiePath, rawCookies, 'utf8')
@@ -227,18 +222,34 @@ function ytdlpArgs(extra, includeCookies = true) {
   return args.concat(extra)
 }
 
-async function ensureWarpConnected() {
+async function ensureWarpConnected(forceRestart = false) {
+  const warpProxy = process.env.WARP_PROXY || 'socks5://127.0.0.1:40000'
+  if (!forceRestart) {
+    try {
+      await sh('curl', ['-4', '-x', warpProxy, '-s', '-I', '-m', '5', 'https://www.youtube.com'], {
+        timeout: 6500,
+      })
+      return true
+    } catch {
+      console.warn('[worker:warp] WARP SOCKS5 health check failed — restarting warp-svc daemon...')
+    }
+  }
   try {
+    await sh('systemctl', ['restart', 'warp-svc'], { timeout: 10000 }).catch(() => {})
+    await new Promise((r) => setTimeout(r, 3000))
     await sh('warp-cli', ['--accept-tos', 'mode', 'proxy'], { timeout: 5000 }).catch(() => {})
     await sh('warp-cli', ['--accept-tos', 'proxy', 'port', '40000'], { timeout: 5000 }).catch(() => {})
     await sh('warp-cli', ['--accept-tos', 'connect'], { timeout: 8000 }).catch(() => {})
-    await new Promise((r) => setTimeout(r, 1500))
-  } catch {}
+    await new Promise((r) => setTimeout(r, 3000))
+    return true
+  } catch {
+    return false
+  }
 }
 
 /* ================= stages ================= */
 
-async function download(url, dir) {
+async function download(url, dir, onProgress = null) {
   await assertPublicHttpUrl(url)
 
   // Guard against non-video Whop dashboard links
@@ -336,43 +347,58 @@ async function download(url, dir) {
 
   const out = path.join(dir, 'source.%(ext)s')
 
-  const attempt = (proxy, timeoutMs = 1000 * 60 * 3) =>
-    sh(
-      '/opt/nology-venv/bin/yt-dlp',
-      ytdlpArgs([
-        ...(proxy ? ['--proxy', proxy] : []),
-        '--socket-timeout',
-        proxy ? '15' : '12',
-        '--retries',
-        '2',
-        '--fragment-retries',
-        '2',
-        '-N',
-        '8',
-        '-f',
-        'bv*[height<=1080][ext=mp4]+ba[ext=m4a]/bv*[height<=1080]+ba/b[height<=1080]/bv*[height<=720]+ba/b',
-        '--merge-output-format',
-        'mp4',
-        '--max-filesize',
-        '10G',
-        '-o',
-        out,
-        url,
-      ]),
-      { timeout: timeoutMs }
-    )
+  const attempt = async (proxy, timeoutMs = 1000 * 60 * 10) => {
+    let pct = 10
+    const timer =
+      typeof onProgress === 'function'
+        ? setInterval(() => {
+            pct = Math.min(25, pct + 2)
+            onProgress(pct, `Downloading high-definition source video (${pct}%)...`).catch(() => {})
+          }, 5000)
+        : null
+    try {
+      return await sh(
+        '/opt/nology-venv/bin/yt-dlp',
+        ytdlpArgs([
+          ...(proxy ? ['--proxy', proxy] : []),
+          '--socket-timeout',
+          proxy ? '15' : '12',
+          '--retries',
+          '2',
+          '--fragment-retries',
+          '2',
+          '-N',
+          '6',
+          '-f',
+          'bv*[height<=720][ext=mp4]+ba[ext=m4a]/b[height<=720][ext=mp4]/bv*[height<=1080][ext=mp4]+ba[ext=m4a]/bv*[height<=1080]+ba/b',
+          '--merge-output-format',
+          'mp4',
+          '--max-filesize',
+          '10G',
+          '-o',
+          out,
+          url,
+        ]),
+        { timeout: timeoutMs }
+      )
+    } finally {
+      if (timer) clearInterval(timer)
+    }
+  }
 
   const isYouTube = /(?:youtube\.com|youtu\.be)/i.test(url)
   const warpProxy = process.env.WARP_PROXY || 'socks5://127.0.0.1:40000'
   let directErr = null
   let lastErr = null
 
-  // For YouTube on AWS EC2, try the local Cloudflare WARP proxy first (fast, unthrottled, not datacenter-blocked).
+  // For YouTube on AWS EC2, verify Cloudflare WARP SOCKS5 health first (restarts warp-svc if stale),
+  // then download via WARP + bgutil-ytdlp-pot-provider PO Token server.
   if (isYouTube) {
+    await ensureWarpConnected(false)
     for (let warpTry = 0; warpTry < 2; warpTry++) {
       const wStart = Date.now()
       try {
-        await attempt(warpProxy, 1000 * 60 * 3)
+        await attempt(warpProxy, 1000 * 60 * 10)
         const sourceFile = await findFile(dir, /^source\./)
         const dur = Date.now() - wStart
         recordProxyResult(warpProxy, true)
@@ -387,7 +413,7 @@ async function download(url, dir) {
             .slice(0, 120)}"`
         )
         if (warpTry === 0) {
-          await ensureWarpConnected()
+          await ensureWarpConnected(true)
         }
       }
     }
@@ -692,20 +718,20 @@ function dedupeOverlappingMoments(moments, maxClips, maxOverlapRatio = 0.15) {
  * instead of stopping at the very first sentence after 15 seconds.
  * Every candidate begins on a clean sentence hook and concludes on a completed thought.
  */
-function generateCandidateMoments(transcript, duration, from = 0, minDur = 25, maxDur = Infinity, excludedRanges = []) {
+function generateCandidateMoments(transcript, duration, from = 0, minDur = 25, maxDur = 60, excludedRanges = []) {
   const segs = (transcript.segments ?? []).filter((s) => s.start >= Math.max(0, from - 2))
   const effectiveMinDur = duration >= 65 ? Math.max(26, minDur) : duration >= 35 ? Math.max(22, Math.min(minDur, duration * 0.6)) : Math.max(12, Math.floor(duration * 0.7))
 
   if (!segs.length) {
     const fallback = []
-    const win = Math.min(duration, Math.min(45, Math.max(effectiveMinDur, 28)))
+    const win = Math.min(duration, Math.min(55, Math.max(effectiveMinDur, 35)))
     if (duration > 0 && win > 0) {
       for (let s = Math.max(0, from); s + win <= duration && fallback.length < 50; s += win) {
-        fallback.push({ start: Math.round(s), end: Math.round(s + win), text: '' })
+        fallback.push({ start: Math.round(s), end: Math.round(Math.min(duration, s + 60, s + win)), text: '' })
       }
     }
     if (fallback.length === 0 && duration > 0) {
-      fallback.push({ start: 0, end: Math.round(duration), text: '' })
+      fallback.push({ start: 0, end: Math.round(Math.min(duration, 60)), text: '' })
     }
     return fallback
   }
@@ -719,13 +745,13 @@ function generateCandidateMoments(transcript, duration, from = 0, minDur = 25, m
     return endsWithPunct || gap >= 0.45
   }
 
-  // Target narrative duration bands with NO artificial upper cap so the AI & scorer have complete arcs of any length
+  // Target narrative duration bands (strictly <= 60s maximum clip duration!)
   const targetBands =
-    duration >= 75
-      ? [28, 40, 55, 75, 105, 140, 180, 240, 300]
+    duration >= 65
+      ? [28, 38, 48, 58]
       : duration >= 45
-        ? [25, 34, 44, 60]
-        : [Math.max(16, Math.round(duration * 0.72))]
+        ? [25, 34, 44, 55]
+        : [Math.min(60, Math.max(16, Math.round(duration * 0.72)))]
 
   const allCandidates = []
   let lastAcceptedStart = -999
@@ -742,28 +768,28 @@ function generateCandidateMoments(transcript, duration, from = 0, minDur = 25, m
 
     for (let j = i; j < segs.length && bandIdx < targetBands.length; j++) {
       accumulatedText.push((segs[j].text || '').trim())
-      clipEnd = segs[j].end
+      clipEnd = Math.min(clipStart + 60, segs[j].end)
       const currentDur = clipEnd - clipStart
-      const targetDur = Math.max(effectiveMinDur, targetBands[bandIdx])
+      const targetDur = Math.min(60, Math.max(effectiveMinDur, targetBands[bandIdx]))
 
       if (currentDur >= targetDur) {
-        if (isBoundary(j) || currentDur >= maxDur) {
+        if (isBoundary(j) || currentDur >= maxDur || currentDur >= 58) {
           const fullText = accumulatedText.join(' ').trim()
           const wordCount = fullText.split(/\s+/).filter(Boolean).length
 
           if (wordCount >= 18 || duration < 35) {
             allCandidates.push({
               start: Math.round(clipStart),
-              end: Math.round(Math.min(duration, clipEnd)),
+              end: Math.round(Math.min(duration, clipStart + 60, clipEnd)),
               text: fullText,
             })
             lastAcceptedStart = clipStart
           }
-          // Advance to next duration band so we also capture longer complete arcs from this hook
+          // Advance to next duration band up to 60s
           while (bandIdx < targetBands.length && currentDur >= targetBands[bandIdx] - 4) {
             bandIdx++
           }
-          if (currentDur >= maxDur) break
+          if (currentDur >= maxDur || currentDur >= 58) break
         }
       }
     }
@@ -786,14 +812,14 @@ function generateCandidateMoments(transcript, duration, from = 0, minDur = 25, m
     candidates = Array.from({ length: 75 }, (_, idx) => filteredCandidates[Math.floor(idx * step)])
   }
 
-  // Fallback if semantic grouping produced too few candidates: add non-overlapping windows
+  // Fallback if semantic grouping produced too few candidates: add non-overlapping 32s-55s windows (<=60s)
   if (candidates.length < 3) {
-    for (const win of [32, 45, 65, Math.max(25, effectiveMinDur)]) {
-      const actualWin = Math.min(duration, win)
+    for (const win of [32, 44, 56, Math.min(60, Math.max(25, effectiveMinDur))]) {
+      const actualWin = Math.min(60, Math.min(duration, win))
       if (actualWin < effectiveMinDur && duration >= effectiveMinDur) continue
       for (let s = Math.max(0, from); s + actualWin <= duration && candidates.length < 40; s += actualWin) {
         const startR = Math.round(s)
-        const endR = Math.round(s + actualWin)
+        const endR = Math.round(Math.min(duration, startR + 60, s + actualWin))
         if (candidates.some((c) => Math.abs(c.start - startR) < 5 && Math.abs(c.end - endR) < 5)) continue
         const text = segs
           .filter((x) => x.start >= s - 1 && x.end <= s + actualWin + 1)
@@ -806,7 +832,7 @@ function generateCandidateMoments(transcript, duration, from = 0, minDur = 25, m
   }
 
   if (candidates.length === 0 && duration > 0) {
-    const defaultEnd = Math.round(duration)
+    const defaultEnd = Math.round(Math.min(duration, 60))
     candidates.push({
       start: 0,
       end: defaultEnd,
@@ -821,23 +847,31 @@ function getAiProviders() {
   const providers = []
   const timeoutMs = CFG.scoringTimeoutMs || 15_000
 
-  // 1. GROQ (PRIMARY ULTRA-FAST ~500ms: qwen/qwen3.8-27b -> openai/gpt-oss-120b)
+  // 1. GROQ (PRIMARY ULTRA-FAST ~200-500ms: openai/gpt-oss-120b -> openai/gpt-oss-20b -> qwen/qwen3.8-27b)
   if (CFG.groqKey) {
     providers.push({
-      tier: 'tier-1 groq-qwen',
-      name: 'groq-qwen3.8-27b',
-      url: 'https://api.groq.com/openai/v1/chat/completions',
-      key: CFG.groqKey,
-      model: 'qwen/qwen3.8-27b',
-      timeoutMs: Math.min(timeoutMs, 12_000),
-    })
-    providers.push({
-      tier: 'tier-1.5 groq-gpt-oss',
+      tier: 'tier-1 groq-gpt-oss-120b',
       name: 'groq-gpt-oss-120b',
       url: 'https://api.groq.com/openai/v1/chat/completions',
       key: CFG.groqKey,
       model: 'openai/gpt-oss-120b',
       timeoutMs: Math.min(timeoutMs, 12_000),
+    })
+    providers.push({
+      tier: 'tier-1.2 groq-gpt-oss-20b',
+      name: 'groq-gpt-oss-20b',
+      url: 'https://api.groq.com/openai/v1/chat/completions',
+      key: CFG.groqKey,
+      model: 'openai/gpt-oss-20b',
+      timeoutMs: Math.min(timeoutMs, 10_000),
+    })
+    providers.push({
+      tier: 'tier-1.5 groq-qwen',
+      name: 'groq-qwen3.8-27b',
+      url: 'https://api.groq.com/openai/v1/chat/completions',
+      key: CFG.groqKey,
+      model: 'qwen/qwen3.8-27b',
+      timeoutMs: Math.min(timeoutMs, 10_000),
     })
   }
 
@@ -872,7 +906,7 @@ function getAiProviders() {
 /**
  * Direct AI Transcript Director:
  * Passes the full timestamped Whisper transcript directly to the AI so the AI itself chooses
- * the exact startSec and endSec timestamps for complete viral stories (with NO upper duration limit),
+ * the exact startSec and endSec timestamps for complete viral stories (28s to 60s max),
  * snapped cleanly to Whisper sentence boundaries and avoiding any previously clipped ranges.
  */
 async function llmDirectMomentsFromTranscript(
@@ -882,37 +916,43 @@ async function llmDirectMomentsFromTranscript(
   instructions = null,
   maxClips = CFG.clipsPerVideo,
   minDur = 26,
-  maxDur = Infinity,
+  maxDur = 60,
   excludedRanges = []
 ) {
   const segs = (transcript.segments ?? []).filter((s) => s.start >= Math.max(0, from - 1))
-  if (!segs.length) return null
 
   const providers = getAiProviders()
   if (!providers.length) return null
 
   const effectiveMinDur =
     duration >= 65 ? Math.max(28, minDur) : duration >= 35 ? Math.max(22, Math.min(minDur, duration * 0.65)) : Math.max(15, Math.floor(duration * 0.75))
-  const effectiveMaxDur = Number.isFinite(maxDur)
-    ? Math.min(Math.round(duration), Math.max(effectiveMinDur + 10, maxDur))
-    : Math.round(duration)
+  const effectiveMaxDur = Math.min(60, Math.round(duration), Math.max(effectiveMinDur + 5, Number.isFinite(maxDur) ? maxDur : 60))
 
   // Group segments into compact timestamped blocks (~6-10s per line) if the video is very long
   // so the entire video transcript fits cleanly within the LLM context window.
-  const targetLines = 160
-  const groupSize = Math.max(1, Math.ceil(segs.length / targetLines))
   const transcriptLines = []
-  for (let i = 0; i < segs.length; i += groupSize) {
-    const slice = segs.slice(i, i + groupSize)
-    const sTime = Math.round(slice[0].start)
-    const eTime = Math.round(slice[slice.length - 1].end)
-    const text = slice
-      .map((x) => (x.text || '').trim())
-      .join(' ')
-      .replace(/\s+/g, ' ')
-      .trim()
-    if (text) {
-      transcriptLines.push(`[${sTime}s-${eTime}s] ${text}`)
+  if (segs.length > 0) {
+    const targetLines = 160
+    const groupSize = Math.max(1, Math.ceil(segs.length / targetLines))
+    for (let i = 0; i < segs.length; i += groupSize) {
+      const slice = segs.slice(i, i + groupSize)
+      const sTime = Math.round(slice[0].start)
+      const eTime = Math.round(slice[slice.length - 1].end)
+      const text = slice
+        .map((x) => (x.text || '').trim())
+        .join(' ')
+        .replace(/\s+/g, ' ')
+        .trim()
+      if (text) {
+        transcriptLines.push(`[${sTime}s-${eTime}s] ${text}`)
+      }
+    }
+  } else {
+    // Even if audio has minimal speech (e.g. gameplay/action stream), let the AI Director plan non-overlapping 35s-55s windows!
+    const step = Math.max(35, Math.floor(duration / Math.max(4, maxClips * 2)))
+    for (let s = Math.max(0, from); s + 30 <= duration && transcriptLines.length < 30; s += step) {
+      const e = Math.min(Math.round(duration), Math.round(s + Math.min(55, step)))
+      transcriptLines.push(`[${Math.round(s)}s-${e}s] Action / highlight segment`)
     }
   }
 
@@ -928,7 +968,7 @@ async function llmDirectMomentsFromTranscript(
     'You are an autonomous AI Viral Video Director and Master Editor for TikTok, Instagram Reels, and YouTube Shorts.\n' +
     `You are given the full timestamped transcript of a ${Math.round(duration)}-second video.\n` +
     'Your job is to read the transcript, discover the most viral, high-retention story arcs, and choose the EXACT startSec and endSec timestamps to cut each clip.\n' +
-    `CRITICAL DURATION RULE: Every clip you cut MUST be a complete narrative arc (Hook -> Rising Tension/Story -> Climax/Payoff) with a minimum duration of ${effectiveMinDur} seconds and NO artificial upper duration cap — let each clip run until the complete story/moment naturally finishes (whether 35s, 60s, 90s, or longer). NEVER cut 15-second micro-clips or stop a clip mid-story!\n` +
+    `CRITICAL DURATION RULE: Every clip you cut MUST be a complete narrative arc (Hook -> Rising Tension/Story -> Climax/Payoff) with a duration between ${effectiveMinDur} seconds and ${effectiveMaxDur} seconds (MAXIMUM 60 seconds — NEVER exceed 60 seconds, and NEVER cut 15-second micro-clips!).\n` +
     'CRITICAL NON-OVERLAP RULE: Every selected clip MUST come from a completely distinct, non-overlapping part of the video. Do not pick overlapping time ranges.' +
     excludedNote +
     '\nIf the transcript is in Arabic, write "title" (3-6 words), "titles", "hookHeadline", "cta", and "reason" in Arabic.\n' +
@@ -946,20 +986,31 @@ async function llmDirectMomentsFromTranscript(
     system += `\nCampaign / Creator Instructions — follow these strictly when choosing moments and hooks: "${instructions.trim().slice(0, 600)}"`
   }
 
-  // Helper to snap AI-chosen [startSec, endSec] to clean Whisper segment boundaries and enforce effectiveMinDur
+  // Helper to snap AI-chosen [startSec, endSec] to clean Whisper segment boundaries and enforce [effectiveMinDur, 60s]
   const snapMomentToSegments = (rawStart, rawEnd) => {
-    let startIdx = segs.findIndex((s) => s.end > rawStart + 0.5)
+    const clampedRawStart = Math.max(0, Math.min(Math.max(0, duration - effectiveMinDur), rawStart))
+    const clampedRawEnd = Math.min(duration, clampedRawStart + 60, Math.max(clampedRawStart + effectiveMinDur, rawEnd))
+
+    if (!segs.length) {
+      return {
+        start: Math.round(clampedRawStart),
+        end: Math.round(Math.min(duration, clampedRawStart + 60, clampedRawEnd)),
+        text: '',
+      }
+    }
+
+    let startIdx = segs.findIndex((s) => s.end > clampedRawStart + 0.5)
     if (startIdx < 0) startIdx = 0
     let endIdx = startIdx
-    while (endIdx < segs.length - 1 && segs[endIdx].end < rawEnd) {
+    while (endIdx < segs.length - 1 && segs[endIdx].end < clampedRawEnd && segs[endIdx + 1].end - segs[startIdx].start <= 60) {
       endIdx++
     }
-    // Enforce minimum duration by extending endIdx to a clean sentence boundary
-    while (endIdx < segs.length - 1 && segs[endIdx].end - segs[startIdx].start < effectiveMinDur) {
+    // Enforce minimum duration by extending endIdx up to 60s max
+    while (endIdx < segs.length - 1 && segs[endIdx].end - segs[startIdx].start < effectiveMinDur && segs[endIdx + 1].end - segs[startIdx].start <= 60) {
       endIdx++
     }
-    // Continue segments if needed to finish a sentence cleanly
-    for (let k = 0; k < 3 && endIdx < segs.length - 1; k++) {
+    // Continue up to 2 more segments if needed to finish a sentence cleanly without exceeding 60s
+    for (let k = 0; k < 2 && endIdx < segs.length - 1; k++) {
       const txt = (segs[endIdx].text || '').trim()
       const gap = segs[endIdx + 1].start - segs[endIdx].end
       if (/[.?!؟…]$/.test(txt) || gap >= 0.45) break
@@ -968,12 +1019,17 @@ async function llmDirectMomentsFromTranscript(
       }
     }
     // If near the end of the video and still shorter than effectiveMinDur, pull startIdx earlier
-    while (startIdx > 0 && segs[endIdx].end - segs[startIdx].start < effectiveMinDur) {
+    while (startIdx > 0 && segs[endIdx].end - segs[startIdx].start < effectiveMinDur && segs[endIdx].end - segs[startIdx - 1].start <= 60) {
       startIdx--
     }
 
     const start = Math.max(0, Math.round(segs[startIdx].start))
-    const end = Math.min(Math.round(duration), Math.max(start + Math.min(effectiveMinDur, Math.round(duration)), Math.round(segs[endIdx].end)))
+    const rawSegEnd = Math.round(segs[endIdx].end)
+    const end = Math.min(
+      Math.round(duration),
+      start + 60,
+      Math.max(start + Math.min(effectiveMinDur, Math.round(duration)), rawSegEnd)
+    )
     const text = segs
       .slice(startIdx, endIdx + 1)
       .map((s) => (s.text || '').trim())
@@ -1258,7 +1314,7 @@ function heuristicScoreMoments(candidates) {
 
 async function scoreMoments(transcript, duration, from = 0, instructions = null, excludedRanges = []) {
   const minDur = Math.max(25, CFG.clipMinLength ?? 25)
-  const maxDur = Infinity
+  const maxDur = 60
   const effectiveDuration = Math.max(0, duration - Math.max(0, from))
   // Ensure we don't chop a short video into tiny 15s pieces: 1 clip per ~32s of source media
   const maxClips =
@@ -1266,7 +1322,13 @@ async function scoreMoments(transcript, duration, from = 0, instructions = null,
       ? Math.min(CFG.clipsPerVideo, Math.max(1, Math.floor(effectiveDuration / 30)))
       : CFG.clipsPerVideo
 
-  // 1. Primary: Autonomous AI Transcript Director chooses exact startSec & endSec (no upper duration cap)
+  const clampTo60 = (list) =>
+    (list || []).map((m) => ({
+      ...m,
+      end: Math.min(Math.round(duration), m.start + 60, m.end),
+    }))
+
+  // 1. Primary: Autonomous AI Transcript Director chooses exact startSec & endSec (28s-60s max complete arcs)
   const aiDirected = await llmDirectMomentsFromTranscript(
     transcript,
     duration,
@@ -1291,10 +1353,11 @@ async function scoreMoments(transcript, duration, from = 0, instructions = null,
         0.15
       )
     }
+    const finalClips = clampTo60(deduped)
     console.log(
-      `[worker] selected ${deduped.length}/${maxClips} AI-directed non-overlapping clips (video duration=${Math.round(duration)}s, clip durations=${deduped.map((d) => `${d.end - d.start}s`).join(', ')})`
+      `[worker] selected ${finalClips.length}/${maxClips} AI-directed non-overlapping clips (video duration=${Math.round(duration)}s, clip durations=${finalClips.map((d) => `${d.end - d.start}s`).join(', ')})`
     )
-    return deduped
+    return finalClips
   }
 
   if (!candidates.length) return []
@@ -1305,14 +1368,15 @@ async function scoreMoments(transcript, duration, from = 0, instructions = null,
     if (deduped.length < maxClips) {
       deduped = dedupeOverlappingMoments([...deduped, ...heurResult], maxClips, 0.15)
     }
+    const finalClips = clampTo60(deduped)
     console.log(
-      `[worker] selected ${deduped.length}/${maxClips} non-overlapping clips (video duration=${Math.round(duration)}s, clip durations=${deduped.map((d) => `${d.end - d.start}s`).join(', ')})`
+      `[worker] selected ${finalClips.length}/${maxClips} non-overlapping clips (video duration=${Math.round(duration)}s, clip durations=${finalClips.map((d) => `${d.end - d.start}s`).join(', ')})`
     )
-    return deduped
+    return finalClips
   }
 
   console.log('[worker] scored via heuristic (fallback safety net)')
-  const deduped = dedupeOverlappingMoments(heurResult, maxClips, 0.15)
+  const deduped = clampTo60(dedupeOverlappingMoments(heurResult, maxClips, 0.15))
   console.log(`[worker] selected ${deduped.length}/${maxClips} non-overlapping heuristic clips (video duration=${Math.round(duration)}s)`)
   return deduped
 }
@@ -1671,6 +1735,7 @@ async function processClipAdjust(job) {
           emoji: moment.emoji ?? '',
           words: winWords,
           style: captionStyle,
+          unlocked: Boolean(clip.captionData?.unlocked),
         },
       },
     })
@@ -1918,25 +1983,24 @@ async function processJob(job) {
     await setP(8, 'Fetching video source media...')
     let src = project.sourceFile
       ? await downloadFromR2(project.sourceFile, dir)
-      : (await ensureWithinPlan(project), await download(project.sourceUrl, dir))
+      : (await ensureWithinPlan(project), await download(project.sourceUrl, dir, setP))
 
     let duration = await probeDuration(src)
     const owner = await prisma.user.findUnique({ where: { id: project.userId }, select: { role: true } })
 
-    // If a campaign/Drive URL turned out to be a short pre-edited example clip (<120s),
-    // automatically use AI to discover a fresh long-form raw video on YouTube and cut from scratch!
-    const isCampaignOrDriveShort =
-      !project.sourceFile &&
-      duration < 120 &&
-      (Boolean(project.instructions) ||
-        /drive\.google\.com/i.test(project.sourceUrl || '') ||
-        /campaign|whop|reward/i.test(project.title || ''))
+    // Enforce minimum 3-minute (180s) source video duration:
+    // If a campaign/Drive/short URL is < 180s, automatically use AI to discover a fresh >= 180s (3+ min) long-form raw video on YouTube!
+    const isShortSource = !project.sourceFile && duration < 180
+    const isCampaignOrDrive =
+      Boolean(project.instructions) ||
+      /drive\.google\.com/i.test(project.sourceUrl || '') ||
+      /campaign|whop|reward/i.test(project.title || '')
 
-    if (isCampaignOrDriveShort) {
+    if (isShortSource && isCampaignOrDrive) {
       console.log(
-        `[worker] ${job.id}: initial source is a short example clip (${Math.round(duration)}s < 120s). Discovering long-form raw video via AI...`
+        `[worker] ${job.id}: initial source is shorter than 3 minutes (${Math.round(duration)}s < 180s). Discovering >=3m long-form raw video via AI...`
       )
-      await setP(14, 'Example clip detected — AI searching for full long-form raw video...')
+      await setP(14, 'Short clip detected (<3 min) — AI searching for full long-form raw video (>=3 min)...')
       let sampleHint = ''
       try {
         const sampleTr = await transcribe(src, dir, project.language ?? 'auto')
@@ -1946,14 +2010,14 @@ async function processJob(job) {
       const discovered = await discoverLongFormYoutubeSourceViaAi(project, sampleHint)
       if (discovered) {
         console.log(
-          `[worker] ${job.id}: AI replaced short example clip with long-form raw video: ${discovered.url} ("${discovered.title}", ${Math.round(discovered.durationSec / 60)}m)`
+          `[worker] ${job.id}: AI replaced short clip with long-form raw video: ${discovered.url} ("${discovered.title}", ${Math.round(discovered.durationSec / 60)}m)`
         )
         await setP(18, `Downloading AI-discovered long-form video (${Math.round(discovered.durationSec / 60)}m)...`)
         const longDir = path.join(dir, 'longform')
         await mkdir(longDir, { recursive: true })
-        const newSrc = await download(discovered.url, longDir)
+        const newSrc = await download(discovered.url, longDir, setP)
         const newDur = await probeDuration(newSrc)
-        if (newDur >= 120) {
+        if (newDur >= 180) {
           src = newSrc
           duration = newDur
           project.sourceUrl = discovered.url
@@ -1965,6 +2029,12 @@ async function processJob(job) {
             .catch(() => {})
         }
       }
+    }
+
+    if (duration < 180) {
+      throw new Error(
+        `الفيديو الأصلي قصير جداً (${Math.round(duration)} ثانية) — الحد الأدنى لمدة الفيديوهات الأصلية هو 3 دقائق (180 ثانية) ليتمكن الذكاء الاصطناعي من قص مقاطع فايرال احترافية منه.`
+      )
     }
 
     // Cache source video for fast subsequent clip adjustments
@@ -1985,7 +2055,7 @@ async function processJob(job) {
     })
 
     console.log('[worker] scoring moments')
-    await setP(52, 'AI Director selecting viral story arcs, timestamps & hooks...')
+    await setP(52, 'AI Director selecting viral story arcs (<=60s), timestamps & hooks...')
     let excludedRanges = []
     if (project.sourceUrl) {
       try {
@@ -2032,8 +2102,6 @@ async function processJob(job) {
 
     for (let i = 0; i < moments.length; i++) {
       const m = moments[i]
-      // Retry idempotency: a partially-failed run that uploaded clip N and is
-      // re-queued must not duplicate it. Keeping the earlier render is safe.
       const existing = await prisma.clip.findFirst({ where: { projectId: project.id, sourceStart: m.start } })
       if (existing) {
         console.log(`[worker] ${project.id}: clip @${m.start}s already exists — keeping earlier render`)
@@ -2051,7 +2119,7 @@ async function processJob(job) {
           title: m.title || `Clip ${i + 1}`,
           description: m.reason,
           sourceStart: m.start, sourceEnd: m.end,
-          duration: Math.round(m.end - m.start),
+          duration: Math.min(60, Math.round(m.end - m.start)),
           viralScore: Math.round(m.score),
           hookScore: Math.round(m.hookScore ?? m.score),
           retentionScore: Math.round(m.retentionScore ?? m.score),
@@ -2064,6 +2132,7 @@ async function processJob(job) {
           captionStyle: captionStyle,
           captionData: {
             mode: 'karaoke',
+            unlocked: false,
             emoji: m.emoji ?? '',
             words: winWords,
             style: captionStyle,
@@ -2078,53 +2147,9 @@ async function processJob(job) {
       await setP(88 + Math.round(((i + 1) / moments.length) * 11), `Uploading clip ${i + 1} of ${moments.length} to Cloudflare R2...`)
     }
 
-    await prisma.project.update({ where: { id: project.id }, data: { status: 'COMPLETED' } })
-    await setP(100, 'Processing complete! All clips ready.')
-
-    // Charge per-clip usage on completion: 1 credit per operation (user chooses 1 final video).
-    // minCredits (1) was already reserved upfront at project creation.
-    const creditsSpent = 1
-    const alreadyPaid = Math.max(0, project.creditsUsed ?? 0)
-    const diff = creditsSpent - alreadyPaid
-
-    await prisma.$transaction(async (tx) => {
-      const owner = await tx.user.findUnique({ where: { id: project.userId }, select: { credits: true, role: true } })
-      if (owner?.role === 'ADMIN') {
-        // Admin accounts have infinite credits — bypass billing
-        return
-      }
-
-      if (diff > 0) {
-        const charged = Math.max(0, Math.min(diff, owner?.credits ?? 0))
-        if (charged > 0) {
-          await tx.user.update({ where: { id: project.userId }, data: { credits: { decrement: charged } } })
-          await tx.creditTransaction.create({
-            data: {
-              userId: project.userId,
-              amount: -charged,
-              type: 'usage',
-              description: `Clipping completion "${project.title}" (${moments.length} clips)`,
-              metadata: { projectId: project.id, totalCost: creditsSpent, reserved: alreadyPaid },
-            },
-          })
-        }
-      } else if (diff < 0) {
-        // Video cost less than upfront reservation -> refund difference
-        const refundAmount = Math.abs(diff)
-        await tx.user.update({ where: { id: project.userId }, data: { credits: { increment: refundAmount } } })
-        await tx.creditTransaction.create({
-          data: {
-            userId: project.userId,
-            amount: refundAmount,
-            type: 'refund',
-            description: `Adjustment refund for "${project.title}"`,
-            metadata: { projectId: project.id, totalCost: creditsSpent, reserved: alreadyPaid },
-          },
-        })
-      }
-    })
-    await prisma.project.update({ where: { id: project.id }, data: { creditsUsed: creditsSpent } })
-    console.log(`[worker] settled ${creditsSpent} total credits for ${project.id} (alreadyPaid=${alreadyPaid}, diff=${diff})`)
+    await prisma.project.update({ where: { id: project.id }, data: { status: 'COMPLETED', creditsUsed: 0 } })
+    await setP(100, 'Processing complete! Select your clips and confirm to unlock download.')
+    console.log(`[worker] ${project.id}: rendered ${moments.length} preview clips (unlocked=false, awaiting user selection & credit deduction)`)
   } finally {
     await rm(dir, { recursive: true, force: true }).catch(() => {})
   }
@@ -2323,20 +2348,6 @@ async function checkAutoPilotChannels() {
         }
 
         await prisma.$transaction(async (tx) => {
-          if (owner.role !== 'ADMIN') {
-            await tx.user.update({
-              where: { id: ch.userId },
-              data: { credits: { decrement: 1 } },
-            })
-            await tx.creditTransaction.create({
-              data: {
-                userId: ch.userId,
-                amount: -1,
-                type: 'usage',
-                description: `Auto-Pilot: "${(videoTitle || 'New Video').slice(0, 60)}"`,
-              },
-            })
-          }
           const p = await tx.project.create({
             data: {
               userId: ch.userId,
@@ -2348,7 +2359,7 @@ async function checkAutoPilotChannels() {
               captionStyle: ch.captionStyle || 'arabic_luxury',
               aspectRatio: ch.aspectRatio || '9:16',
               status: 'PENDING',
-              creditsUsed: owner.role === 'ADMIN' ? 0 : 1,
+              creditsUsed: 0,
             },
           })
           await tx.processingJob.create({

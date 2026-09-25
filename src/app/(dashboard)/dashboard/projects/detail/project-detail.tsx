@@ -28,7 +28,7 @@ type Clip = {
   exportUrl: string | null
   thumbnailUrl: string | null
   captionStyle: string
-  captionData: { mode?: string; emoji?: string; words?: Array<{ start: number; end: number; word: string }> } | null
+  captionData: { mode?: string; emoji?: string; unlocked?: boolean; words?: Array<{ start: number; end: number; word: string }> } | null
   createdAt: string
 }
 
@@ -120,21 +120,29 @@ export default function ProjectDetail({ projectId }: { projectId: string }) {
   const [downloadingClipId, setDownloadingClipId] = useState<string | null>(null)
   const [downloadProgress, setDownloadProgress] = useState<number | null>(null)
 
-  // Initialize selected clips when project clips load
+  const isClipUnlocked = useCallback(
+    (c: Clip) =>
+      c.captionData?.unlocked === true ||
+      (c.captionData?.unlocked === undefined && (project?.creditsUsed ?? 0) > 0),
+    [project?.creditsUsed]
+  )
+
+  // Initialize selected clips only for already-unlocked clips; locked clips start unselected
   useEffect(() => {
     if (project?.clips && project.clips.length > 0) {
       setSelectedClipIds((prev) => {
+        const unlockedIds = project.clips.filter((c) => isClipUnlocked(c)).map((c) => c.id)
         if (prev.size === 0) {
-          return new Set(project.clips.map((c) => c.id))
+          return new Set(unlockedIds)
         }
         const valid = new Set<string>()
         project.clips.forEach((c) => {
           if (prev.has(c.id)) valid.add(c.id)
         })
-        return valid.size > 0 ? valid : new Set(project.clips.map((c) => c.id))
+        return valid
       })
     }
-  }, [project?.clips])
+  }, [project?.clips, isClipUnlocked])
 
   const toggleSelectClip = (clipId: string) => {
     setSelectedClipIds((prev) => {
@@ -164,23 +172,21 @@ export default function ProjectDetail({ projectId }: { projectId: string }) {
     const deleteCount = total - keepCount
 
     if (keepCount === 0) {
-      toast.error('Please select at least 1 clip to keep.')
-      return
-    }
-    if (deleteCount <= 0) {
-      toast.info('All clips are selected. To delete unwanted clips, unselect them first.')
+      toast.error('يرجى اختيار مقطع واحد على الأقل لتأكيده وفتح التحميل.')
       return
     }
 
-    const alreadyPaid = project.creditsUsed ?? 1
+    const alreadyPaid = project.creditsUsed ?? 0
     const additionalCost = Math.max(0, keepCount - alreadyPaid)
 
     const costDetails =
       additionalCost > 0
-        ? `Keeping ${keepCount} final videos costs ${keepCount} credits (1 credit per final video).\nThis will deduct ${additionalCost} additional credit(s) from your balance.`
-        : `Keeping ${keepCount} final video is covered by your initial project credit.`
+        ? `سيتم خصم ${additionalCost} كريديت من رصيدك (1 كريديت لكل مقطع مختار).`
+        : `تم دفع تكلفة هذا الاختيار مسبقاً.`
 
-    const msg = `Final Video Confirmation:\n\n• Final Videos Kept: ${keepCount}\n• Pricing: 1 credit per final video\n• ${costDetails}\n• Clips to Discard: ${deleteCount}\n\nProceed to save your selected videos and delete the rest?`
+    const msg = `تأكيد اختيار المقاطع وفتح التحميل:\n\n• عدد المقاطع المختارة: ${keepCount}\n• ${costDetails}${
+      deleteCount > 0 ? `\n• سيتم حذف ${deleteCount} مقطع غير مختار` : ''
+    }\n\nهل تريد تأكيد الاختيار وخصم الكريديت لفتح زر التحميل؟`
     if (!confirm(msg)) return
 
     setPurging(true)
@@ -191,14 +197,19 @@ export default function ProjectDetail({ projectId }: { projectId: string }) {
         body: JSON.stringify({ keepClipIds: Array.from(selectedClipIds) }),
       })
       const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'Failed to purge unselected clips')
+      if (!res.ok) throw new Error(data.error || 'Failed to confirm clip selection')
 
       setProject((cur) => {
         if (!cur) return cur
         return {
           ...cur,
           creditsUsed: data.totalCreditsUsed ?? keepCount,
-          clips: cur.clips.filter((c) => selectedClipIds.has(c.id)),
+          clips: cur.clips
+            .filter((c) => selectedClipIds.has(c.id))
+            .map((c) => ({
+              ...c,
+              captionData: { ...(c.captionData ?? {}), unlocked: true },
+            })),
         }
       })
 
@@ -208,12 +219,11 @@ export default function ProjectDetail({ projectId }: { projectId: string }) {
       }
 
       toast.success(
-        `Success! Kept ${data.kept} final video(s) (1 credit each). ${
-          data.creditsDeducted > 0 ? `Deducted ${data.creditsDeducted} additional credit(s).` : ''
-        }`.trim()
+        data.message ||
+          `تم تأكيد اختيار ${data.kept} مقطع وفتح زر التحميل بنجاح!`
       )
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Could not purge unselected clips')
+      toast.error(e instanceof Error ? e.message : 'تعذر تأكيد اختيار المقاطع')
     } finally {
       setPurging(false)
     }
@@ -548,39 +558,33 @@ export default function ProjectDetail({ projectId }: { projectId: string }) {
         </h2>
       </div>
 
-      {project.clips.length > 1 && (
+      {project.clips.length > 0 && project.clips.some((c) => !isClipUnlocked(c)) && (
         <div className="mb-6 rounded-2xl border border-gold/30 bg-onyx-2/95 p-4 shadow-2xl backdrop-blur-xl flex flex-wrap items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gold/15 text-gold border border-gold/30">
               <Sparkles className="h-5 w-5" />
             </div>
             <div>
-              <h4 className="text-sm font-semibold text-white">Clip Curation & Selection</h4>
+              <h4 className="text-sm font-semibold text-white">اختيار المقاطع وتأكيد خصم الكريديت لفتح التحميل</h4>
               <p className="text-xs text-mist-2">
-                Choose 1 or more clips you like. Discard the rest with one click to keep your project clean.
+                حدد المقاطع التي تعجبك ثم اضغط تأكيد الاختيار لخصم الكريديت (1 كريديت لكل مقطع) وتفعيل زر التحميل.
               </p>
             </div>
           </div>
 
           <div className="flex flex-wrap items-center gap-2.5">
             <span className="rounded-xl border border-hair/80 bg-black/40 px-3 py-1.5 font-mono text-xs text-pearl flex items-center gap-1.5">
-              <span>Final Videos:</span>
+              <span>المقاطع المختارة:</span>
               <span className="font-bold text-gold">{selectedClipIds.size}</span>
-              <span className="text-mist-2">({selectedClipIds.size} credit{selectedClipIds.size === 1 ? '' : 's'} — 1 credit each)</span>
+              <span className="text-mist-2">({selectedClipIds.size} كريديت)</span>
             </span>
-
-            {selectedClipIds.size > (project.creditsUsed ?? 1) && (
-              <span className="rounded-lg bg-gold/15 border border-gold/40 px-2.5 py-1 text-[11px] font-medium text-champagne">
-                +{selectedClipIds.size - (project.creditsUsed ?? 1)} credit(s) from balance
-              </span>
-            )}
 
             <button
               type="button"
               onClick={handleSelectAllClips}
               className="btn-lux btn-outline !py-1.5 !px-3 !text-xs !font-normal"
             >
-              Select All
+              تحديد الكل
             </button>
 
             <button
@@ -588,19 +592,18 @@ export default function ProjectDetail({ projectId }: { projectId: string }) {
               onClick={handleDeselectAllClips}
               className="btn-lux btn-outline !py-1.5 !px-3 !text-xs !font-normal text-mist-2 hover:text-white"
             >
-              Clear
+              إلغاء التحديد
             </button>
 
-            {selectedClipIds.size < project.clips.length && selectedClipIds.size > 0 && (
+            {selectedClipIds.size > 0 && (
               <button
                 type="button"
                 onClick={handlePurgeUnselected}
                 disabled={purging}
                 className="btn-lux btn-gold !py-1.5 !px-3.5 !text-xs !font-semibold flex items-center gap-1.5 shadow-[0_0_20px_rgba(212,175,55,0.3)] hover:scale-[1.02] transition-transform"
-                title="Keep only the selected clips and permanently delete the unselected ones"
               >
-                {purging ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
-                <span>Keep Selected & Discard {project.clips.length - selectedClipIds.size} Remaining</span>
+                {purging ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CheckCircle2 className="h-3.5 w-3.5" />}
+                <span>تأكيد الاختيار وخصم {selectedClipIds.size} كريديت لفتح التحميل</span>
               </button>
             )}
           </div>
@@ -614,14 +617,15 @@ export default function ProjectDetail({ projectId }: { projectId: string }) {
       ) : (
         <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
           {project.clips.map((c, _cIndex) => {
-            const isSelectedToKeep = selectedClipIds.has(c.id)
+            const unlocked = isClipUnlocked(c)
+            const isSelectedToKeep = unlocked || selectedClipIds.has(c.id)
             return (
             <div
               key={c.id}
               className={`glass-card group !p-0 overflow-hidden transition-all duration-300 ${
                 isSelectedToKeep
                   ? 'border-2 border-gold shadow-[0_0_35px_rgba(212,175,55,0.25)] ring-1 ring-gold/60'
-                  : 'border border-hair/50 opacity-80 hover:opacity-100 hover:-translate-y-1'
+                  : 'border border-hair/50 opacity-85 hover:opacity-100 hover:-translate-y-1'
               }`}
             >
               <div className="relative aspect-[9/13] bg-black">
@@ -669,13 +673,17 @@ export default function ProjectDetail({ projectId }: { projectId: string }) {
                     <span className="text-white/80 font-medium">{c.viralScore}%</span>
                   )}
                 </div>
-                {isSelectedToKeep ? (
-                  <span className="absolute left-2.5 top-2.5 flex items-center gap-1.5 rounded-lg border border-gold bg-black/90 px-2.5 py-1 font-mono text-[11px] font-bold uppercase tracking-wider text-gold backdrop-blur z-20 shadow-lg">
-                    <CheckCircle2 className="h-3.5 w-3.5 text-gold" /> Selected to Keep
+                {unlocked ? (
+                  <span className="absolute left-2.5 top-2.5 flex items-center gap-1.5 rounded-lg border border-emerald-400/60 bg-black/90 px-2.5 py-1 font-mono text-[11px] font-bold text-emerald-400 backdrop-blur z-20 shadow-lg">
+                    <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400" /> التحميل متاح
+                  </span>
+                ) : isSelectedToKeep ? (
+                  <span className="absolute left-2.5 top-2.5 flex items-center gap-1.5 rounded-lg border border-gold bg-black/90 px-2.5 py-1 font-mono text-[11px] font-bold text-gold backdrop-blur z-20 shadow-lg">
+                    <CheckCircle2 className="h-3.5 w-3.5 text-gold" /> تم التحديد (بانتظار التأكيد)
                   </span>
                 ) : (
-                  <span className="absolute left-2.5 top-2.5 rounded-lg border border-red-500/30 bg-black/75 px-2 py-0.5 font-mono text-[10px] text-red-300 backdrop-blur z-20">
-                    Unselected (Will be deleted)
+                  <span className="absolute left-2.5 top-2.5 rounded-lg border border-white/20 bg-black/75 px-2 py-0.5 font-mono text-[10px] text-mist backdrop-blur z-20">
+                    غير محدد
                   </span>
                 )}
               </div>
@@ -716,37 +724,55 @@ export default function ProjectDetail({ projectId }: { projectId: string }) {
                 </div>
 
                 <div className="mt-4 space-y-2 pt-2 border-t border-hair-soft">
-                  {/* Multi-Clip Selection Toggle */}
-                  <button
-                    type="button"
-                    onClick={() => toggleSelectClip(c.id)}
-                    disabled={c.status === 'GENERATING'}
-                    className={`w-full flex items-center justify-center gap-2 rounded-xl py-2 px-3 text-xs font-semibold transition-all ${
-                      isSelectedToKeep
-                        ? 'bg-gradient-to-r from-gold to-champagne text-black shadow-[0_0_15px_rgba(212,175,55,0.35)]'
-                        : 'border border-hair/80 bg-white/5 text-mist hover:text-white hover:border-gold/50'
-                    }`}
-                  >
-                    {isSelectedToKeep ? (
-                      <>
-                        <CheckCircle2 className="h-4 w-4 stroke-[2.5]" />
-                        <span>Selected to Keep (مُختار للحفظ)</span>
-                      </>
-                    ) : (
-                      <>
-                        <Sparkles className="h-4 w-4 text-mist-2" />
-                        <span>Select to Keep (اختر للحفظ)</span>
-                      </>
-                    )}
-                  </button>
-                  <p className="text-[10px] text-center text-mist-2">
-                    {isSelectedToKeep ? '✓ Saved clip' : '⚠ Will be deleted if you discard unselected'}
-                  </p>
+                  {!unlocked ? (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => toggleSelectClip(c.id)}
+                        disabled={c.status === 'GENERATING'}
+                        className={`w-full flex items-center justify-center gap-2 rounded-xl py-2 px-3 text-xs font-semibold transition-all ${
+                          isSelectedToKeep
+                            ? 'bg-gradient-to-r from-gold to-champagne text-black shadow-[0_0_15px_rgba(212,175,55,0.35)]'
+                            : 'border border-hair/80 bg-white/5 text-mist hover:text-white hover:border-gold/50'
+                        }`}
+                      >
+                        {isSelectedToKeep ? (
+                          <>
+                            <CheckCircle2 className="h-4 w-4 stroke-[2.5]" />
+                            <span>تم اختيار هذا المقطع ✓</span>
+                          </>
+                        ) : (
+                          <>
+                            <Sparkles className="h-4 w-4 text-gold" />
+                            <span>اختر هذا المقطع (1 كريديت)</span>
+                          </>
+                        )}
+                      </button>
 
-                  {/* Primary Actions: Download HD & Viral Kit */}
-                  <div className="grid grid-cols-2 gap-2 mt-2">
-                    {(c.exportUrl || c.videoUrl) && (
-                      isSelectedToKeep ? (
+                      {selectedClipIds.size > 0 && (
+                        <button
+                          type="button"
+                          onClick={handlePurgeUnselected}
+                          disabled={purging}
+                          className="btn-lux btn-gold w-full !py-2 !px-3 !text-xs !font-bold flex items-center justify-center gap-1.5 shadow-[0_0_15px_rgba(212,175,55,0.3)] min-h-[40px]"
+                        >
+                          {purging ? (
+                            <>
+                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                              <span>جاري التفعيل...</span>
+                            </>
+                          ) : (
+                            <>
+                              <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />
+                              <span>تأكيد الاختيار وخصم الكريديت ({selectedClipIds.size}) لفتح التحميل</span>
+                            </>
+                          )}
+                        </button>
+                      )}
+                    </>
+                  ) : (
+                    <div className="grid grid-cols-2 gap-2 mt-2">
+                      {(c.exportUrl || c.videoUrl) && (
                         <button
                           type="button"
                           onClick={() => handleDownload(c)}
@@ -766,33 +792,20 @@ export default function ProjectDetail({ projectId }: { projectId: string }) {
                             </>
                           )}
                         </button>
-                      ) : (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            toggleSelectClip(c.id)
-                            toast.success('تم تحديد المقطع للحفظ وتأكيد اختياره — أصبح زر التنزيل متاحاً لك الآن!')
-                          }}
-                          className="btn-lux btn-outline !py-2 !px-2.5 !text-xs !font-medium flex items-center justify-center gap-1.5 text-mist hover:text-white border-hair/60 min-h-[40px]"
-                          title="يجب تحديد المقطع للحفظ وتأكيد اختياره قبل التنزيل"
-                        >
-                          <Download className="h-3.5 w-3.5 text-gold/60 shrink-0" />
-                          <span className="truncate">تنزيل (احفظ أولاً)</span>
-                        </button>
-                      )
-                    )}
+                      )}
 
-                    <button
-                      type="button"
-                      onClick={() => setExportKitClip(c)}
-                      disabled={c.status === 'GENERATING'}
-                      className="btn-lux btn-outline !py-2 !px-2.5 !text-xs !font-medium flex items-center justify-center gap-1.5 text-gold border-gold/30 hover:!border-gold hover:bg-gold/10 min-h-[40px]"
-                      title="Viral Social Kit (Hooks, Description, Hashtags & Best Times)"
-                    >
-                      <Sparkles className="h-3.5 w-3.5 text-gold shrink-0" />
-                      <span className="truncate">Viral Kit</span>
-                    </button>
-                  </div>
+                      <button
+                        type="button"
+                        onClick={() => setExportKitClip(c)}
+                        disabled={c.status === 'GENERATING'}
+                        className="btn-lux btn-outline !py-2 !px-2.5 !text-xs !font-medium flex items-center justify-center gap-1.5 text-gold border-gold/30 hover:!border-gold hover:bg-gold/10 min-h-[40px]"
+                        title="Viral Social Kit (Hooks, Description, Hashtags & Best Times)"
+                      >
+                        <Sparkles className="h-3.5 w-3.5 text-gold shrink-0" />
+                        <span className="truncate">Viral Kit</span>
+                      </button>
+                    </div>
+                  )}
 
                   {/* Secondary Actions: Studio Editor, Direct Publish, Share Link, Discard */}
                   <div className="flex items-center gap-1.5 mt-2">
@@ -809,29 +822,33 @@ export default function ProjectDetail({ projectId }: { projectId: string }) {
                       <span className="truncate">{editingClipId === c.id ? 'Close' : 'Editor'}</span>
                     </button>
 
-                    <button
-                      type="button"
-                      onClick={() => openPublishModal(c)}
-                      disabled={c.status === 'GENERATING'}
-                      className="btn-lux btn-outline flex-1 !py-1.5 !px-2 !text-xs !font-normal min-h-[38px] flex items-center justify-center gap-1 text-champagne hover:!border-champagne"
-                      title="Direct publish clip to TikTok, YouTube Shorts, or Instagram Reels"
-                    >
-                      <Send className="h-3.5 w-3.5 shrink-0" />
-                      <span className="truncate">Publish</span>
-                    </button>
+                    {unlocked && (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => openPublishModal(c)}
+                          disabled={c.status === 'GENERATING'}
+                          className="btn-lux btn-outline flex-1 !py-1.5 !px-2 !text-xs !font-normal min-h-[38px] flex items-center justify-center gap-1 text-champagne hover:!border-champagne"
+                          title="Direct publish clip to TikTok, YouTube Shorts, or Instagram Reels"
+                        >
+                          <Send className="h-3.5 w-3.5 shrink-0" />
+                          <span className="truncate">Publish</span>
+                        </button>
 
-                    <button
-                      type="button"
-                      onClick={() => copyVideoLink(c)}
-                      className="btn-lux btn-outline !py-1.5 !px-2.5 !text-xs min-h-[38px] shrink-0"
-                      title="Copy direct video stream link"
-                    >
-                      {copiedId === `link-${c.id}` ? (
-                        <Check className="h-3.5 w-3.5 text-emerald-400" />
-                      ) : (
-                        <Share2 className="h-3.5 w-3.5 text-mist-2 hover:text-white" />
-                      )}
-                    </button>
+                        <button
+                          type="button"
+                          onClick={() => copyVideoLink(c)}
+                          className="btn-lux btn-outline !py-1.5 !px-2.5 !text-xs min-h-[38px] shrink-0"
+                          title="Copy direct video stream link"
+                        >
+                          {copiedId === `link-${c.id}` ? (
+                            <Check className="h-3.5 w-3.5 text-emerald-400" />
+                          ) : (
+                            <Share2 className="h-3.5 w-3.5 text-mist-2 hover:text-white" />
+                          )}
+                        </button>
+                      </>
+                    )}
 
                     <button
                       type="button"
@@ -1000,7 +1017,7 @@ export default function ProjectDetail({ projectId }: { projectId: string }) {
                           disabled={
                             adjusting ||
                             adjustState.end - adjustState.start < 15 ||
-                            adjustState.end - adjustState.start > 120
+                            adjustState.end - adjustState.start > 60
                           }
                           className="btn-lux btn-primary flex-1 !py-1.5 !text-xs disabled:opacity-50"
                         >
@@ -1017,39 +1034,6 @@ export default function ProjectDetail({ projectId }: { projectId: string }) {
                           )}
                         </button>
                       </div>
-                    </div>
-                  )}
-
-                  {(c.exportUrl || c.videoUrl) && (
-                    <div className="space-y-2">
-                      <button
-                        type="button"
-                        onClick={() => handleDownload(c)}
-                        disabled={downloadingClipId === c.id}
-                        className="btn-lux btn-primary w-full !py-2 !text-xs !font-medium flex items-center justify-center gap-1.5"
-                      >
-                        {downloadingClipId === c.id ? (
-                          <>
-                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                            <span>Generating HD Master ({downloadProgress ? `${downloadProgress}%` : '...'})</span>
-                          </>
-                        ) : (
-                          <>
-                            <Download className="h-3.5 w-3.5" /> Download HD 9:16 MP4
-                          </>
-                        )}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => openPublishModal(c)}
-                        className="btn-lux btn-outline w-full !py-2 !text-xs !font-medium flex items-center justify-center gap-1.5"
-                      >
-                        <Send className="h-3.5 w-3.5 text-gold" />
-                        <span>Direct Publish</span>
-                        <span className="rounded-full bg-gold/15 text-champagne text-[10px] font-bold px-2 py-0.5 border border-gold/30">
-                          Coming Soon
-                        </span>
-                      </button>
                     </div>
                   )}
                 </div>
@@ -1447,7 +1431,7 @@ export default function ProjectDetail({ projectId }: { projectId: string }) {
               </button>
 
               <div className="flex items-center gap-2">
-                {exportKitClip.videoUrl || exportKitClip.exportUrl ? (
+                {isClipUnlocked(exportKitClip) && (exportKitClip.videoUrl || exportKitClip.exportUrl) ? (
                   <button
                     type="button"
                     onClick={() => handleDownload(exportKitClip)}

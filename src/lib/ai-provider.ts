@@ -45,7 +45,7 @@ export async function executeAiChatCompletion(options: AiCompletionOptions): Pro
   let groqKey = process.env.GROQ_API_KEY?.trim() || ''
   let openaiKey = process.env.OPENAI_API_KEY?.trim() || ''
   let nvidiaModel = customNvidiaModel || process.env.NVIDIA_SCORE_MODEL?.trim() || 'deepseek-ai/deepseek-v4.1-flash'
-  let groqModel = customGroqModel || process.env.GROQ_SCORE_MODEL?.trim() || 'qwen/qwen3.8-27b'
+  let groqModel = customGroqModel || process.env.GROQ_SCORE_MODEL?.trim() || 'openai/gpt-oss-120b'
 
   try {
     const settings = await prisma.setting.findMany({
@@ -66,14 +66,20 @@ export async function executeAiChatCompletion(options: AiCompletionOptions): Pro
     // DB lookup fallback if prisma is unavailable
   }
 
-  // Upgrade deprecated Groq model IDs automatically
-  if (groqModel === 'llama-3.3-70b-versatile' || groqModel === 'llama3-70b-8192') {
-    groqModel = 'qwen/qwen3.8-27b'
+  // Upgrade deprecated or low-TPM Groq model IDs automatically to flagship 120B
+  if (
+    groqModel === 'llama-3.3-70b-versatile' ||
+    groqModel === 'llama3-70b-8192' ||
+    groqModel === 'qwen/qwen3.8-27b'
+  ) {
+    groqModel = 'openai/gpt-oss-120b'
   }
 
-  // --- ATTEMPT 1: GROQ API (PRIMARY ULTRA-FAST ~500ms: qwen/qwen3.8-27b -> openai/gpt-oss-120b) ---
+  // --- ATTEMPT 1: GROQ API (PRIMARY ULTRA-FAST ~200-500ms: openai/gpt-oss-120b -> openai/gpt-oss-20b -> qwen/qwen3.8-27b) ---
   if (groqKey) {
-    const groqCandidates = Array.from(new Set([groqModel, 'qwen/qwen3.8-27b', 'openai/gpt-oss-120b']))
+    const groqCandidates = Array.from(
+      new Set([groqModel, 'openai/gpt-oss-120b', 'openai/gpt-oss-20b', 'qwen/qwen3.8-27b'])
+    )
     for (const candidateModel of groqCandidates) {
       const t0 = Date.now()
       try {

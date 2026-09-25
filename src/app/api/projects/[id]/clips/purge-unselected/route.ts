@@ -41,7 +41,7 @@ export async function POST(
     // Fetch all clips for this project to verify
     const allClips = await prisma.clip.findMany({
       where: { projectId: id },
-      select: { id: true },
+      select: { id: true, captionData: true },
     })
 
     const allClipIds = allClips.map((c) => c.id)
@@ -57,22 +57,23 @@ export async function POST(
     const clipsToDelete = allClipIds.filter((cid) => !validKeepIds.includes(cid))
 
     // Credit calculation: 1 credit per chosen final video.
-    // The initial project creation covered project.creditsUsed (defaults to 1 credit).
     const totalCost = validKeepIds.length
-    const alreadyPaid = Math.max(0, project.creditsUsed ?? 1)
-    const diff = totalCost - alreadyPaid
+    const alreadyPaid = Math.max(0, project.creditsUsed ?? 0)
 
     const result = await prisma.$transaction(async (tx) => {
       const user = await tx.user.findUnique({
         where: { id: session.user.id },
-        select: { credits: true },
+        select: { credits: true, role: true },
       })
 
       if (!user) throw new Error('User not found')
 
+      const isAdmin = user.role === 'ADMIN'
+      const diff = isAdmin ? 0 : totalCost - alreadyPaid
+
       if (diff > 0 && user.credits < diff) {
         const err = new Error(
-          `Insufficient credits: Keeping ${totalCost} final videos costs ${totalCost} credits (1 credit per final video). You have ${user.credits} credits, but need ${diff} more credit(s).`
+          `Insufficient credits (رصيد غير كافٍ): اختيار ${totalCost} مقطع يتطلب ${totalCost} كريديت. رصيدك الحالي ${user.credits} كريديت.`
         )
         ;(err as unknown as { statusCode: number }).statusCode = 402
         throw err
@@ -89,7 +90,7 @@ export async function POST(
             userId: session.user.id,
             amount: -diff,
             type: 'usage',
-            description: `Final video selection for "${project.title}" (${totalCost} final videos kept, 1 credit each)`,
+            description: `Final video selection & download unlock for "${project.title}" (${totalCost} clip(s), 1 credit each)`,
             metadata: { projectId: id, keptCount: totalCost, additionalCredits: diff },
           },
         })
@@ -113,8 +114,29 @@ export async function POST(
 
       await tx.project.update({
         where: { id },
-        data: { creditsUsed: totalCost },
+        data: { creditsUsed: isAdmin ? 0 : totalCost },
       })
+
+      // Mark kept clips as unlocked so download is enabled
+      if (typeof tx.clip.update === 'function') {
+        for (const clip of allClips) {
+          if (validKeepIds.includes(clip.id)) {
+            const existingData =
+              typeof clip.captionData === 'object' && clip.captionData !== null
+                ? (clip.captionData as Record<string, unknown>)
+                : {}
+            await tx.clip.update({
+              where: { id: clip.id },
+              data: {
+                captionData: {
+                  ...existingData,
+                  unlocked: true,
+                },
+              },
+            })
+          }
+        }
+      }
 
       let deletedCount = 0
       if (clipsToDelete.length > 0) {
@@ -145,11 +167,11 @@ export async function POST(
     return NextResponse.json({
       success: true,
       ...result,
-      message: `Kept ${result.kept} final video(s) (1 credit each). ${
+      message: `تم تأكيد اختيار ${result.kept} مقطع وفتح زر التحميل بنجاح.${
         result.creditsDeducted > 0
-          ? `Deducted ${result.creditsDeducted} additional credit(s).`
+          ? ` تم خصم ${result.creditsDeducted} كريديت.`
           : ''
-      } ${result.deleted > 0 ? `Deleted ${result.deleted} unselected clip(s).` : ''}`.trim(),
+      }`,
     })
   } catch (error: unknown) {
     console.error('Purge unselected clips error:', error)

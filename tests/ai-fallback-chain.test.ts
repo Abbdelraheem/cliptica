@@ -26,16 +26,17 @@ describe('AI Resilience: Strongest-First Fallback Chain', () => {
     global.fetch = originalFetch
   })
 
-  it('falls through to Tier 2 (Groq) when Tier 1 (NVIDIA NIM) times out', async () => {
+  it('uses Tier 1 (Groq) first and falls through to Tier 2 (NVIDIA NIM) when Groq fails', async () => {
     global.fetch = vi.fn().mockImplementation(async (url: string) => {
-      if (url.includes('integrate.api.nvidia.com')) {
-        // Simulate NVIDIA NIM timing out after per-attempt limit
-        const err = new Error('The operation was aborted due to timeout')
-        err.name = 'TimeoutError'
-        throw err
+      if (url.includes('api.groq.com')) {
+        return {
+          ok: false,
+          status: 429,
+          text: async () => 'Rate limit exceeded: TPM limit reached',
+        }
       }
 
-      if (url.includes('api.groq.com')) {
+      if (url.includes('integrate.api.nvidia.com')) {
         return {
           ok: true,
           status: 200,
@@ -60,12 +61,12 @@ describe('AI Resilience: Strongest-First Fallback Chain', () => {
     })
 
     expect(result).toBeDefined()
-    expect(result.provider).toBe('groq')
+    expect(result.provider).toBe('nvidia')
     expect(result.content).toContain('Viral Moment')
-    expect(global.fetch).toHaveBeenCalledTimes(2)
+    expect(global.fetch).toHaveBeenCalledTimes(4)
   })
 
-  it('falls through to Tier 3 (OpenAI) when both NVIDIA and Groq error or time out', async () => {
+  it('falls through to Tier 3 (OpenAI) when both Groq and NVIDIA error or time out', async () => {
     global.fetch = vi.fn().mockImplementation(async (url: string) => {
       if (url.includes('integrate.api.nvidia.com')) {
         throw new Error('NVIDIA NIM 504 Gateway Timeout')
@@ -106,6 +107,6 @@ describe('AI Resilience: Strongest-First Fallback Chain', () => {
     expect(result).toBeDefined()
     expect(result.provider).toBe('openai')
     expect(result.content).toBe('OpenAI fallback succeeded')
-    expect(global.fetch).toHaveBeenCalledTimes(3)
+    expect(global.fetch).toHaveBeenCalledTimes(5)
   })
 })

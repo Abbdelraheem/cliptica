@@ -138,8 +138,8 @@ export async function POST(request: Request) {
         ? `Project from ${safeHost(sourceUrl)}`
         : (d.fileName ?? 'Uploaded project'))
 
-    // Atomic credit reservation: hold minCredits upfront so concurrent requests
-    // cannot overdraft the balance. Admins bypass credit deduction.
+    // Verify balance without deducting upfront — credits are only deducted
+    // after the user selects their desired clips to unlock downloads.
     const project = await withDbRetry(() =>
       prisma.$transaction(
         async (tx) => {
@@ -149,23 +149,6 @@ export async function POST(request: Request) {
           })
           if (!isAdmin && (!u || u.credits < minCredits)) {
             throw new Error('INSUFFICIENT_CREDITS')
-          }
-
-          if (!isAdmin) {
-            await tx.user.update({
-              where: { id: session.user.id },
-              data: { credits: { decrement: minCredits } },
-            })
-
-            await tx.creditTransaction.create({
-              data: {
-                userId: session.user.id,
-                amount: -minCredits,
-                type: 'usage',
-                description: `Credit reservation for "${title.slice(0, 60)}"`,
-                metadata: { minCreditsReserved: minCredits },
-              },
-            })
           }
 
           const p = await tx.project.create({
@@ -182,7 +165,7 @@ export async function POST(request: Request) {
               captionStyle: d.captionStyle,
               aspectRatio: d.aspectRatio,
               status: 'PENDING',
-              creditsUsed: isAdmin ? 0 : minCredits,
+              creditsUsed: 0,
             },
           })
 
