@@ -1786,6 +1786,116 @@ async function processClipRenderHd(job) {
   }
 }
 
+/**
+ * Autonomous Worker-Level Long-Form Raw Video Discovery:
+ * If a campaign project's initial sourceUrl turns out to be a short pre-edited example clip (<120s),
+ * the worker uses AI + YouTube search to automatically find an unused 3-to-19.5 minute long-form
+ * raw video matching the campaign creator/topic so clips are always cut from scratch from long videos.
+ */
+async function discoverLongFormYoutubeSourceViaAi(project, extraContext = '') {
+  const usedYtIds = new Set()
+  try {
+    const past = await prisma.project.findMany({
+      where: { userId: project.userId },
+      orderBy: { createdAt: 'desc' },
+      take: 60,
+      select: { sourceUrl: true },
+    })
+    for (const p of past) {
+      const m = (p.sourceUrl || '').match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([a-zA-Z0-9_-]{11})/)
+      if (m) usedYtIds.add(m[1])
+    }
+  } catch {}
+
+  let queries = []
+  const providers = getAiProviders()
+  for (const p of providers) {
+    try {
+      const res = await fetch(p.url, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${p.key}`, 'Content-Type': 'application/json' },
+        signal: AbortSignal.timeout(6000),
+        body: JSON.stringify({
+          model: p.model,
+          response_format: { type: 'json_object' },
+          temperature: 0.2,
+          messages: [
+            {
+              role: 'system',
+              content:
+                'You are an AI research director for a viral video clipping studio. Given a campaign title, instructions, and sample transcript/context from an example clip, output strict JSON {"queries":["query 1","query 2","query 3"]} with 3 specific YouTube search queries to find 4-to-19 minute LONG-FORM raw videos, full streams, or highlight compilations of the exact creator/streamer/brand so we can cut brand-new viral clips from scratch.',
+            },
+            {
+              role: 'user',
+              content: `Campaign Title: ${project.title || ''}\nInstructions: ${project.instructions || ''}\nExample Clip Context: ${extraContext.slice(0, 800)}`,
+            },
+          ],
+        }),
+      })
+      if (res.ok) {
+        const data = await res.json()
+        const raw = data.choices?.[0]?.message?.content || data.choices?.[0]?.message?.reasoning_content || '{}'
+        const parsed = JSON.parse(raw)
+        if (Array.isArray(parsed.queries) && parsed.queries.length) {
+          queries = parsed.queries.map(String).filter(Boolean)
+          break
+        }
+      }
+    } catch {}
+  }
+
+  const cleanTitle = (project.title || '').replace(/campaign|v\d+|by/gi, ' ').replace(/\s+/g, ' ').trim()
+  const allQueries = Array.from(
+    new Set([
+      ...queries,
+      `${cleanTitle} gameplay highlights`,
+      `${cleanTitle} full stream`,
+    ].map((q) => q.trim()).filter((q) => q.length >= 3))
+  ).slice(0, 4)
+
+  const parseDur = (s) => {
+    const parts = String(s || '').split(':').map((n) => parseInt(n, 10))
+    if (parts.some((n) => Number.isNaN(n))) return 0
+    if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2]
+    if (parts.length === 2) return parts[0] * 60 + parts[1]
+    return parts[0] || 0
+  }
+
+  for (const q of allQueries) {
+    try {
+      const r = await fetch(`https://www.youtube.com/results?search_query=${encodeURIComponent(q)}`, {
+        headers: {
+          'User-Agent':
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/124.0.0.0 Safari/537.36',
+          'Accept-Language': 'en-US,en;q=0.9',
+        },
+        signal: AbortSignal.timeout(5000),
+      })
+      if (!r.ok) continue
+      const html = await r.text()
+      const chunks = html.split('"videoRenderer":{"videoId":"').slice(1, 15)
+      for (const chunk of chunks) {
+        const videoId = chunk.slice(0, 11)
+        if (!/^[a-zA-Z0-9_-]{11}$/.test(videoId) || usedYtIds.has(videoId)) continue
+        const titleMatch = chunk.match(/"title":\{"runs":\[\{"text":"([^"]+)"/)
+        const lenMatch = chunk.match(/"lengthText":\{[^}]*?"simpleText":"([0-9:]+)"/)
+        if (!titleMatch || !lenMatch) continue
+        const durSec = parseDur(lenMatch[1])
+        // Require 3 min to 19.5 min long-form video
+        if (durSec < 180 || durSec > 1170) continue
+        const vTitle = titleMatch[1].replace(/\\u0026/g, '&').trim()
+        if (/#shorts|\bshorts\b|\btiktok\b/i.test(vTitle)) continue
+        return {
+          url: `https://www.youtube.com/watch?v=${videoId}`,
+          title: vTitle,
+          durationSec: durSec,
+        }
+      }
+    } catch {}
+  }
+  return null
+}
+
 async function processJob(job) {
   if (job.type === 'clip_adjust') {
     return processClipAdjust(job)
@@ -1812,9 +1922,56 @@ async function processJob(job) {
   try {
     console.log(`[worker] ${job.id}: fetching source (${project.sourceFile ? 'upload' : 'youtube'})`)
     await setP(8, 'Fetching video source media...')
-    const src = project.sourceFile
+    let src = project.sourceFile
       ? await downloadFromR2(project.sourceFile, dir)
       : (await ensureWithinPlan(project), await download(project.sourceUrl, dir))
+
+    let duration = await probeDuration(src)
+    const owner = await prisma.user.findUnique({ where: { id: project.userId }, select: { role: true } })
+
+    // If a campaign/Drive URL turned out to be a short pre-edited example clip (<120s),
+    // automatically use AI to discover a fresh long-form raw video (3-19.5 min) on YouTube and cut from scratch!
+    const isCampaignOrDriveShort =
+      !project.sourceFile &&
+      duration < 120 &&
+      (Boolean(project.instructions) ||
+        /drive\.google\.com/i.test(project.sourceUrl || '') ||
+        /campaign|whop|reward/i.test(project.title || ''))
+
+    if (isCampaignOrDriveShort) {
+      console.log(
+        `[worker] ${job.id}: initial source is a short example clip (${Math.round(duration)}s < 120s). Discovering long-form raw video via AI...`
+      )
+      await setP(14, 'Example clip detected — AI searching for full long-form raw video...')
+      let sampleHint = ''
+      try {
+        const sampleTr = await transcribe(src, dir, project.language ?? 'auto')
+        sampleHint = sampleTr.text || ''
+      } catch {}
+
+      const discovered = await discoverLongFormYoutubeSourceViaAi(project, sampleHint)
+      if (discovered) {
+        console.log(
+          `[worker] ${job.id}: AI replaced short example clip with long-form raw video: ${discovered.url} ("${discovered.title}", ${Math.round(discovered.durationSec / 60)}m)`
+        )
+        await setP(18, `Downloading AI-discovered long-form video (${Math.round(discovered.durationSec / 60)}m)...`)
+        const longDir = path.join(dir, 'longform')
+        await mkdir(longDir, { recursive: true })
+        const newSrc = await download(discovered.url, longDir)
+        const newDur = await probeDuration(newSrc)
+        if (newDur >= 120) {
+          src = newSrc
+          duration = newDur
+          project.sourceUrl = discovered.url
+          await prisma.project
+            .update({
+              where: { id: project.id },
+              data: { sourceUrl: discovered.url },
+            })
+            .catch(() => {})
+        }
+      }
+    }
 
     // Cache source video for fast subsequent clip adjustments
     try {
@@ -1823,10 +1980,6 @@ async function processJob(job) {
       await copyFile(src, path.join(cacheDir, `${project.id}.mp4`))
     } catch {}
 
-    // Probe BEFORE transcribing — a too-long source must fail fast and
-    // cheaply instead of paying for transcription of an out-of-plan video.
-    const duration = await probeDuration(src)
-    const owner = await prisma.user.findUnique({ where: { id: project.userId }, select: { role: true } })
     const maxMin = planMaxMinutes(owner?.role)
     if (exceedsPlanMinutes(duration / 60, owner?.role)) {
       throw new Error(

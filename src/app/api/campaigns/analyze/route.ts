@@ -426,12 +426,12 @@ export async function POST(req: Request) {
       }
     }
 
-    // 2. Google Drive (expand folders into individual video files and filter out non-video images & <15MB short example clips)
+    // 2. Google Drive (expand folders first, then verify all Drive files to filter out images & <25MB pre-edited example clips)
     const driveMatches =
       combinedSearchHtml.match(/https?:\/\/(?:drive|docs)\.google\.com\/(?:drive\/folders|file\/d)\/[^\s"'<>\\]+/gi) ||
       []
     const driveFoldersToExpand: string[] = []
-    const driveFilesToVerify: string[] = []
+    const driveCandidates = new Map<string, string>() // fileId -> known title hint
     for (const dUrl of driveMatches) {
       let clean = dUrl
         .replace(/\\+$/, '')
@@ -442,28 +442,38 @@ export async function POST(req: Request) {
       const fileIdMatch = clean.match(/\/file\/d\/([a-zA-Z0-9_-]{15,})/)
       if (folderIdMatch) {
         clean = `https://drive.google.com/drive/folders/${folderIdMatch[1]}`
-        if (!assetMap.has(clean)) {
-          if (driveFoldersToExpand.length < 4) driveFoldersToExpand.push(clean)
-          assetMap.set(clean, {
-            type: 'drive',
-            url: clean,
-            label: 'Google Drive Raw Assets Folder',
-          })
+        if (!driveFoldersToExpand.includes(clean) && driveFoldersToExpand.length < 4) {
+          driveFoldersToExpand.push(clean)
+        }
+        if (!referenceLinks.some((r) => r.url === clean)) {
+          referenceLinks.push({ url: clean, label: 'Google Drive Campaign Folder' })
         }
       } else if (fileIdMatch) {
         const fileId = fileIdMatch[1]
-        if (!driveFilesToVerify.includes(fileId) && driveFilesToVerify.length < 10) {
-          driveFilesToVerify.push(fileId)
+        if (!driveCandidates.has(fileId) && driveCandidates.size < 16) {
+          driveCandidates.set(fileId, '')
         }
       }
     }
 
-    await Promise.all(
-      driveFilesToVerify.map(async (fileId) => {
+    for (const folderUrl of driveFoldersToExpand) {
+      const expandedFiles = await expandGoogleDriveFolder(folderUrl, reqHeaders)
+      for (const fileAsset of expandedFiles) {
+        const m = fileAsset.url.match(/\/file\/d\/([a-zA-Z0-9_-]{15,})/)
+        if (m && !driveCandidates.has(m[1]) && driveCandidates.size < 20) {
+          const cleanHint = fileAsset.label.replace(/^Google Drive Video:\s*/i, '').trim()
+          driveCandidates.set(m[1], cleanHint)
+        }
+      }
+    }
+
+    const exampleClipTitles: string[] = []
+    const verifiedDriveResults = await Promise.all(
+      Array.from(driveCandidates.entries()).slice(0, 14).map(async ([fileId, titleHint]) => {
         const canonicalFileUrl = `https://drive.google.com/file/d/${fileId}/view`
-        if (assetMap.has(canonicalFileUrl)) return
-        let isExcluded = false
-        let fileLabel = 'Google Drive Raw Video File'
+        let status: 'raw_video' | 'example_clip' | 'brand_asset' | 'unverified' = 'unverified'
+        let fileName = titleHint || ''
+        let sizeMb = ''
         try {
           const headRes = await fetch(
             `https://drive.usercontent.google.com/download?id=${fileId}&export=download&confirm=t`,
@@ -474,53 +484,69 @@ export async function POST(req: Request) {
             const cDisp = headRes.headers.get('content-disposition') || ''
             const cLen = parseInt(headRes.headers.get('content-length') || '0', 10)
             const fnMatch = cDisp.match(/filename="([^"]+)"/i)
-            const fileName = fnMatch?.[1] || ''
+            if (fnMatch?.[1]) fileName = fnMatch[1]
             if (
               cType.startsWith('image/') ||
               cType.startsWith('application/pdf') ||
               /\.(png|jpe?g|gif|webp|svg|pdf|zip|rar|psd|ai)$/i.test(fileName)
             ) {
-              isExcluded = true
-              if (!referenceLinks.some((r) => r.url === canonicalFileUrl)) {
-                referenceLinks.push({
-                  url: canonicalFileUrl,
-                  label: fileName ? `Brand Asset (${fileName})` : 'Google Drive Brand Asset',
-                })
-              }
-            } else if (cLen > 0 && cLen < 15 * 1024 * 1024) {
-              // Standalone Drive video under 15MB is a pre-edited short example clip (<60s), NOT raw long-form footage
-              isExcluded = true
-              const mb = (cLen / (1024 * 1024)).toFixed(1)
-              if (!referenceLinks.some((r) => r.url === canonicalFileUrl)) {
-                referenceLinks.push({
-                  url: canonicalFileUrl,
-                  label: fileName
-                    ? `Pre-Edited Example Clip (${fileName} · ${mb}MB)`
-                    : `Pre-Edited Example Clip (${mb}MB)`,
-                })
-              }
-            } else if (fileName) {
-              fileLabel = `Google Drive Raw Video: ${fileName}`
+              status = 'brand_asset'
+            } else if (cLen > 0 && cLen < 25 * 1024 * 1024) {
+              // Any Drive video under 25MB is a short pre-edited clip (<90s), NOT a full long-form raw stream!
+              status = 'example_clip'
+              sizeMb = (cLen / (1024 * 1024)).toFixed(1)
+            } else if (cLen >= 25 * 1024 * 1024) {
+              status = 'raw_video'
+              sizeMb = (cLen / (1024 * 1024)).toFixed(0)
             }
           }
         } catch {}
 
-        if (!isExcluded) {
-          assetMap.set(canonicalFileUrl, {
-            type: 'drive',
-            url: canonicalFileUrl,
-            label: fileLabel,
-          })
-        }
+        return { fileId, canonicalFileUrl, status, fileName, sizeMb }
       })
     )
 
-    for (const folderUrl of driveFoldersToExpand) {
-      const expandedFiles = await expandGoogleDriveFolder(folderUrl, reqHeaders)
-      for (const fileAsset of expandedFiles) {
-        if (!assetMap.has(fileAsset.url)) {
-          assetMap.set(fileAsset.url, fileAsset)
+    const hasShortExampleClips = verifiedDriveResults.some((r) => r.status === 'example_clip')
+    const hasConfirmedLargeRawDrive = verifiedDriveResults.some((r) => r.status === 'raw_video')
+
+    for (const item of verifiedDriveResults) {
+      if (item.status === 'brand_asset') {
+        if (!referenceLinks.some((r) => r.url === item.canonicalFileUrl)) {
+          referenceLinks.push({
+            url: item.canonicalFileUrl,
+            label: item.fileName ? `Brand Asset (${item.fileName})` : 'Google Drive Brand Asset',
+          })
         }
+        continue
+      }
+
+      const looksLikeRawLongFormTitle = /\b(raw|podcast|episode|ep\s*\d|full\s*stream|vod|interview|lecture)\b/i.test(
+        item.fileName
+      )
+
+      // If this file is a <25MB short clip, OR if it's an unverified file inside a folder/doc of short example clips
+      if (
+        item.status === 'example_clip' ||
+        (item.status === 'unverified' && hasShortExampleClips && !hasConfirmedLargeRawDrive && !looksLikeRawLongFormTitle)
+      ) {
+        if (item.fileName) exampleClipTitles.push(item.fileName.replace(/\.(mp4|mov|webm|mkv)$/i, ''))
+        if (!referenceLinks.some((r) => r.url === item.canonicalFileUrl)) {
+          referenceLinks.push({
+            url: item.canonicalFileUrl,
+            label: item.fileName
+              ? `Pre-Edited Example Clip (${item.fileName}${item.sizeMb ? ` · ${item.sizeMb}MB` : ''})`
+              : 'Pre-Edited Example Clip',
+          })
+        }
+        continue
+      }
+
+      if (!assetMap.has(item.canonicalFileUrl)) {
+        assetMap.set(item.canonicalFileUrl, {
+          type: 'drive',
+          url: item.canonicalFileUrl,
+          label: item.fileName ? `Google Drive Video: ${item.fileName}` : 'Google Drive Raw Video File',
+        })
       }
     }
 
@@ -692,10 +718,15 @@ export async function POST(req: Request) {
         })
         .join('\n')
 
+      const examplesHint =
+        exampleClipTitles.length > 0
+          ? `\nExample Clip Titles Found in Campaign Brief (use these creator/streamer names to generate searchQueries for long-form YouTube videos!): ${exampleClipTitles.join(' | ')}`
+          : ''
+
       const promptSystem =
         'You are an autonomous AI clipping campaign director and viral media strategist for TikTok, YouTube Shorts, and Instagram Reels. ' +
-        'Analyze the provided web page text, Google Doc campaign brief, and detected raw media assets of a clipping bounty/campaign. ' +
-        'Understand the creators, brand, core objectives, and rules to formulate an integrated viral clip strategy AND discover fresh long-form raw videos. ' +
+        'Analyze the provided web page text, Google Doc campaign brief, example clip titles, and detected raw media assets of a clipping bounty/campaign. ' +
+        'Understand the exact creators/streamers, brand, core objectives, and rules to formulate an integrated viral clip strategy AND discover fresh long-form raw videos on YouTube. ' +
         'Output a valid JSON object with: ' +
         'title (string), payout (string or null), guidelines (string array), requiredHashtags (string array), ' +
         'recommendedInstructions (string: detailed instructions for the AI video cutter/director specifying what moments, creators, hooks, and 30s-60s narrative arcs to extract), ' +
@@ -703,7 +734,7 @@ export async function POST(req: Request) {
         'recommendedCaptionStyle (string: one of ["hormozi", "neon", "luxury", "beast", "bold"]), ' +
         'recommendedAssetUrl (string: the exact URL from the detected assets list that is the best UNUSED long-form raw footage), ' +
         'aiRationale (string: 1 clear sentence explaining why this raw asset and cutting strategy were chosen), ' +
-        'searchQueries (array of 3 specific YouTube search queries to find 5-to-20 minute raw long-form streams/videos/highlights featuring the exact creators, streamers, or brand mentioned in this campaign brief so we can cut fresh clips from scratch).'
+        'searchQueries (array of 3 specific YouTube search queries to find 4-to-19 minute raw long-form streams/videos/highlights featuring the exact creators, streamers, or brand mentioned in this campaign brief and example titles so we can cut fresh clips from scratch).'
 
       const aiRes = await executeAiChatCompletion({
         responseFormat: 'json_object',
@@ -712,7 +743,7 @@ export async function POST(req: Request) {
           { role: 'system', content: promptSystem },
           {
             role: 'user',
-            content: `Campaign Title: ${rawTitle}\nCampaign URL: ${campaignUrl}\nExtracted Rules: ${extractedGuidelines.join(' | ')}\n\nPage & Brief Text:\n${cleanText}\n\nDetected Raw Media Assets:\n${assetsPrompt || 'None detected yet — provide strong searchQueries to find raw long-form YouTube footage for this campaign!'}`,
+            content: `Campaign Title: ${rawTitle}\nCampaign URL: ${campaignUrl}\nExtracted Rules: ${extractedGuidelines.join(' | ')}${examplesHint}\n\nPage & Brief Text:\n${cleanText}\n\nDetected Raw Media Assets:\n${assetsPrompt || 'None detected yet — provide strong searchQueries to find raw long-form YouTube footage for this campaign!'}`,
           },
         ],
       })
@@ -763,52 +794,56 @@ export async function POST(req: Request) {
       console.warn('AI campaign analysis fallback:', aiErr)
     }
 
-    // Count how many UNUSED individual raw video files we currently have
-    const unusedVideoAssets = rawAssets.filter(
-      (a) => !a.url.includes('/folders/') && !usedSourceKeys.has(normalizeMediaUrlKey(a.url))
+    // Always run AI YouTube Search for long-form raw videos (3m-19.5m) unless the campaign already has >=2 unused YouTube VODs
+    const unusedYoutubeAssets = rawAssets.filter(
+      (a) => a.type === 'youtube' && !usedSourceKeys.has(normalizeMediaUrlKey(a.url))
     )
+    const isHubOnlyUrl =
+      isWhop && !parsedWhop?.campaignId && rawAssets.length === 0 && referenceLinks.length === 0
 
-    // If the campaign has fewer than 2 unused long-form video files (e.g., it only had short <15MB example clips
-    // or the user already clipped the previous video), use AI Search to discover fresh long-form raw YouTube videos!
-    const isHubOnlyUrl = isWhop && !parsedWhop?.campaignId && rawAssets.length === 0 && referenceLinks.length === 0
-    if (!isHubOnlyUrl && unusedVideoAssets.length < 2) {
-      const fallbackQueries = [
+    if (!isHubOnlyUrl && unusedYoutubeAssets.length < 2) {
+      const cleanedTitle = campaignAnalysis.title.replace(/campaign|v\d+|by/gi, ' ').replace(/\s+/g, ' ').trim()
+      const exampleKeywords = exampleClipTitles
+        .slice(0, 2)
+        .map((t) => t.replace(/\$?\d+[kKmM]?/g, '').replace(/\s+/g, ' ').trim())
+        .filter((t) => t.length >= 3)
+
+      const searchQueries = [
         ...campaignAnalysis.searchQueries,
-        `${campaignAnalysis.title.replace(/campaign|v\d+|by/gi, ' ').trim()} gameplay highlights`,
-        `${campaignAnalysis.title.replace(/campaign|v\d+|by/gi, ' ').trim()} full stream`,
+        ...exampleKeywords.map((kw) => `${kw} ${cleanedTitle.split(' ')[0] || ''} highlights`.trim()),
+        `${cleanedTitle} gameplay highlights`,
+        `${cleanedTitle} full stream`,
       ]
       const aiDiscoveredVideos = await searchYoutubeLongFormVideos(
-        fallbackQueries,
+        searchQueries,
         usedSourceKeys,
         reqHeaders
       )
-      for (const vid of aiDiscoveredVideos) {
-        if (!assetMap.has(vid.url)) {
-          assetMap.set(vid.url, vid)
-        }
+      // Prepend AI-discovered long-form YouTube videos so they are prioritized first
+      const combined = [...aiDiscoveredVideos, ...rawAssets]
+      assetMap.clear()
+      for (const item of combined) {
+        if (!assetMap.has(item.url)) assetMap.set(item.url, item)
       }
       rawAssets = Array.from(assetMap.values())
     }
 
-    // Determine the primary raw asset: strictly prefer UNUSED individual video files over already-used ones or folders!
+    // Determine the primary raw asset: strictly prefer UNUSED long-form YouTube videos or verified >25MB raw files
     const isUnusedIndividualVideo = (a: { url: string }) =>
       !a.url.includes('/folders/') && !usedSourceKeys.has(normalizeMediaUrlKey(a.url))
 
-    let primaryAsset = rawAssets.find(
-      (a) => a.url === campaignAnalysis.recommendedAssetUrl && isUnusedIndividualVideo(a)
-    )
-    if (!primaryAsset) {
-      primaryAsset =
-        rawAssets.find((a) => a.type === 'youtube' && isUnusedIndividualVideo(a)) ||
-        rawAssets.find((a) => a.type === 'drive' && isUnusedIndividualVideo(a)) ||
-        rawAssets.find((a) => a.type === 'direct' && isUnusedIndividualVideo(a)) ||
-        rawAssets.find((a) => a.url === campaignAnalysis.recommendedAssetUrl && !a.url.includes('/folders/')) ||
-        rawAssets.find((a) => a.type === 'youtube') ||
-        rawAssets.find((a) => a.type === 'drive' && !a.url.includes('/folders/')) ||
-        rawAssets.find((a) => a.type === 'direct') ||
-        rawAssets.find((a) => a.type === 'drive') ||
-        rawAssets[0]
-    }
+    let primaryAsset =
+      rawAssets.find((a) => a.type === 'youtube' && isUnusedIndividualVideo(a) && a.label.startsWith('🤖')) ||
+      rawAssets.find(
+        (a) => a.url === campaignAnalysis.recommendedAssetUrl && isUnusedIndividualVideo(a)
+      ) ||
+      rawAssets.find((a) => a.type === 'youtube' && isUnusedIndividualVideo(a)) ||
+      rawAssets.find((a) => a.type === 'drive' && isUnusedIndividualVideo(a)) ||
+      rawAssets.find((a) => a.type === 'direct' && isUnusedIndividualVideo(a)) ||
+      rawAssets.find((a) => a.type === 'youtube') ||
+      rawAssets.find((a) => a.type === 'drive' && !a.url.includes('/folders/')) ||
+      rawAssets.find((a) => a.type === 'direct') ||
+      rawAssets[0]
 
     if (primaryAsset) {
       campaignAnalysis.recommendedAssetUrl = primaryAsset.url
