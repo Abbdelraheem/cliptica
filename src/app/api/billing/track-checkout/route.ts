@@ -20,9 +20,23 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Missing action' }, { status: 400 })
     }
 
-    const userId = session.user.id
-    const userEmail = session.user.email
-    const userName = session.user.name || null
+    const dbUser = await prisma.user.findFirst({
+      where: {
+        OR: [
+          ...(session.user.id ? [{ id: session.user.id }] : []),
+          ...(session.user.email ? [{ email: session.user.email }] : []),
+        ],
+      },
+      select: { id: true, email: true, name: true },
+    })
+
+    if (!dbUser) {
+      return NextResponse.json({ success: false, skipped: true })
+    }
+
+    const userId = dbUser.id
+    const userEmail = dbUser.email || session.user.email
+    const userName = dbUser.name || session.user.name || null
 
     if (action === 'initiated') {
       const plan = typeof body.plan === 'string' ? body.plan.toLowerCase() : undefined
