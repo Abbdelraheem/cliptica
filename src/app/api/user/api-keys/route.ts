@@ -1,6 +1,6 @@
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { randomBytes } from 'crypto'
+import { randomBytes, createHash } from 'crypto'
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 
@@ -28,13 +28,19 @@ export async function GET() {
     })
 
     // Mask keys so secrets are never re-exposed
-    const sanitized = keys.map((k) => ({
-      id: k.id,
-      name: k.name,
-      maskedKey: k.key.length > 12 ? (k.key.slice(0, 8) + '...' + k.key.slice(-4)) : '••••••••',
-      lastUsed: k.lastUsed,
-      createdAt: k.createdAt,
-    }))
+    const sanitized = keys.map((k: { id: string; name: string; key?: string | null; lastUsed: Date | null; createdAt: Date }) => {
+      let maskedKey = 'nlg_live_••••'
+      if (k.key && typeof k.key === 'string' && k.key.startsWith('nlg_live_')) {
+        maskedKey = `nlg_live...${k.key.slice(-4)}`
+      }
+      return {
+        id: k.id,
+        name: k.name,
+        maskedKey,
+        lastUsed: k.lastUsed,
+        createdAt: k.createdAt,
+      }
+    })
 
     return NextResponse.json({ keys: sanitized })
   } catch (error) {
@@ -56,23 +62,24 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: validated.error.errors[0]?.message || 'Invalid key name' }, { status: 400 })
     }
 
-    // Generate secure API key
+    // Generate secure API key and store only its SHA-256 hash at rest
     const rawKey = 'nlg_live_' + randomBytes(24).toString('hex')
+    const keyHash = createHash('sha256').update(rawKey).digest('hex')
 
     const created = await prisma.apiKey.create({
       data: {
         userId: session.user.id,
         name: validated.data.name,
-        key: rawKey,
+        key: keyHash,
       },
     })
 
-    // Return the full plaintext key ONCE
+    // Return the full plaintext key ONCE upon creation
     return NextResponse.json({
       key: {
         id: created.id,
         name: created.name,
-        rawKey: created.key,
+        rawKey,
         createdAt: created.createdAt,
       },
     }, { status: 201 })

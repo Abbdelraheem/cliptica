@@ -104,10 +104,11 @@ export async function POST(
 
     const job = await prisma.$transaction(async (tx) => {
       if (cost > 0) {
-        await tx.user.update({
-          where: { id: session.user.id },
+        const res = await tx.user.updateMany({
+          where: { id: session.user.id, credits: { gte: cost } },
           data: { credits: { decrement: cost } },
         })
+        if (res.count !== 1) throw new Error('INSUFFICIENT_CREDITS')
         await tx.creditTransaction.create({
           data: {
             userId: session.user.id,
@@ -171,6 +172,15 @@ export async function POST(
       chargedCredits: cost,
     })
   } catch (error) {
+    if (error instanceof Error && error.message === 'INSUFFICIENT_CREDITS') {
+      return NextResponse.json(
+        {
+          error: 'Insufficient credits. Clip adjustment costs 1 credit after the initial 15-minute free edit window.',
+          requiredCredits: 1,
+        },
+        { status: 402 }
+      )
+    }
     console.error('Clip adjust error:', error)
     return NextResponse.json({ error: 'Failed to queue clip adjustment' }, { status: 500 })
   }

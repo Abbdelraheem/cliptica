@@ -497,14 +497,22 @@ async function download(url, dir, onProgress = null) {
   throw new Error('Could not download the video from the provided link. Please check that the link is a public video or upload the file directly.')
 }
 
-/** Uploaded files live in R2 — pull them with the same AWS creds. */
+/** Uploaded files live in R2 or local storage — pull them. */
 async function downloadFromR2(key, dir) {
   const out = path.join(dir, 'source.mp4')
-  await sh('aws', ['s3', 'cp', `s3://${CFG.r2Bucket}/${key}`, out, '--endpoint-url', CFG.r2Endpoint], {
-    env: { ...process.env, AWS_ACCESS_KEY_ID: CFG.r2Key, AWS_SECRET_ACCESS_KEY: CFG.r2Secret, AWS_DEFAULT_REGION: 'auto' },
-    timeout: 1000 * 60 * 20,
-  })
-  return out
+  const localFile = path.resolve(__dirname, '../public/storage', key)
+  if (existsSync(localFile)) {
+    await copyFile(localFile, out)
+    return out
+  }
+  if (CFG.r2Endpoint && CFG.r2Key && CFG.r2Secret) {
+    await sh('aws', ['s3', 'cp', `s3://${CFG.r2Bucket}/${key}`, out, '--endpoint-url', CFG.r2Endpoint], {
+      env: { ...process.env, AWS_ACCESS_KEY_ID: CFG.r2Key, AWS_SECRET_ACCESS_KEY: CFG.r2Secret, AWS_DEFAULT_REGION: 'auto' },
+      timeout: 1000 * 60 * 20,
+    })
+    return out
+  }
+  throw new Error(`Source video not found on disk or R2: ${key}`)
 }
 
 async function findFile(dir, re) {
@@ -1856,22 +1864,42 @@ async function renderAll(src, moments, dir, transcript, framing = 'smart', capti
 /* ---------- storage ---------- */
 
 async function uploadToR2(file, key, contentType = 'video/mp4') {
-  await sh('aws', ['s3', 'cp', file, `s3://${CFG.r2Bucket}/${key}`, '--endpoint-url', CFG.r2Endpoint, '--content-type', contentType], {
-    env: { ...process.env, AWS_ACCESS_KEY_ID: CFG.r2Key, AWS_SECRET_ACCESS_KEY: CFG.r2Secret, AWS_DEFAULT_REGION: 'auto' },
-    timeout: 1000 * 60 * 15,
-  })
-  return `${CFG.r2Endpoint}/${CFG.r2Bucket}/${key}`
+  if (CFG.r2Endpoint && CFG.r2Key && CFG.r2Secret) {
+    try {
+      await sh('aws', ['s3', 'cp', file, `s3://${CFG.r2Bucket}/${key}`, '--endpoint-url', CFG.r2Endpoint, '--content-type', contentType], {
+        env: { ...process.env, AWS_ACCESS_KEY_ID: CFG.r2Key, AWS_SECRET_ACCESS_KEY: CFG.r2Secret, AWS_DEFAULT_REGION: 'auto' },
+        timeout: 1000 * 60 * 15,
+      })
+      return `${CFG.r2Endpoint}/${CFG.r2Bucket}/${key}`
+    } catch (e) {
+      console.warn(`[worker] R2 S3 upload failed (${e.message}), saving to local storage fallback`)
+    }
+  }
+
+  // Local filesystem fallback
+  const dest = path.resolve(__dirname, '../public/storage', key)
+  await mkdir(path.dirname(dest), { recursive: true })
+  await copyFile(file, dest)
+  return `/storage/${key}`
 }
 
 async function deleteFromR2(key) {
   try {
-    await sh('aws', ['s3', 'rm', `s3://${CFG.r2Bucket}/${key}`, '--endpoint-url', CFG.r2Endpoint], {
-      env: { ...process.env, AWS_ACCESS_KEY_ID: CFG.r2Key, AWS_SECRET_ACCESS_KEY: CFG.r2Secret, AWS_DEFAULT_REGION: 'auto' },
-      timeout: 1000 * 60 * 2,
-    })
-    console.log(`[worker] deleted R2 object: ${key}`)
+    const local = path.resolve(__dirname, '../public/storage', key)
+    if (existsSync(local)) {
+      const { unlink } = await import('fs/promises')
+      await unlink(local).catch(() => {})
+      console.log(`[worker] deleted local storage object: ${key}`)
+    }
+    if (CFG.r2Endpoint && CFG.r2Key && CFG.r2Secret) {
+      await sh('aws', ['s3', 'rm', `s3://${CFG.r2Bucket}/${key}`, '--endpoint-url', CFG.r2Endpoint], {
+        env: { ...process.env, AWS_ACCESS_KEY_ID: CFG.r2Key, AWS_SECRET_ACCESS_KEY: CFG.r2Secret, AWS_DEFAULT_REGION: 'auto' },
+        timeout: 1000 * 60 * 2,
+      })
+      console.log(`[worker] deleted R2 object: ${key}`)
+    }
   } catch (e) {
-    console.warn(`[worker] failed to delete R2 object ${key}:`, e.message)
+    console.warn(`[worker] failed to delete object ${key}:`, e.message)
   }
 }
 
@@ -2543,6 +2571,8 @@ async function cleanExpiredHdClips() {
         let key = null
         if (clip.exportUrl.includes(`/${CFG.r2Bucket}/`)) {
           key = clip.exportUrl.split(`/${CFG.r2Bucket}/`)[1]?.split('?')[0]
+        } else if (clip.exportUrl.startsWith('/storage/')) {
+          key = clip.exportUrl.replace('/storage/', '')
         }
         if (key) {
           await deleteFromR2(key)

@@ -1,9 +1,10 @@
-import { exec } from 'child_process'
+import { execFile } from 'child_process'
 import { promisify } from 'util'
 import { prisma } from '@/lib/prisma'
+import { assertPublicHttpUrl } from '@/lib/ssrf'
 import type { CampaignSubmission } from '@prisma/client'
 
-const execAsync = promisify(exec)
+const execFileAsync = promisify(execFile)
 
 export interface TrackResult {
   views: number
@@ -18,14 +19,29 @@ export interface TrackResult {
   earnings: number
 }
 
+function hostMatches(hostname: string, base: string): boolean {
+  const h = hostname.toLowerCase()
+  const b = base.toLowerCase()
+  return h === b || h.endsWith('.' + b)
+}
+
 /**
  * Detects social platform from URL.
  */
 export function detectPlatform(url: string): 'TIKTOK' | 'INSTAGRAM' | 'YOUTUBE' | 'UNKNOWN' {
-  if (/tiktok\.com/i.test(url)) return 'TIKTOK'
-  if (/instagram\.com/i.test(url)) return 'INSTAGRAM'
-  if (/youtube\.com|youtu\.be/i.test(url)) return 'YOUTUBE'
-  return 'UNKNOWN'
+  try {
+    const parsed = new URL(url)
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+      return 'UNKNOWN'
+    }
+    const hostname = parsed.hostname.toLowerCase()
+    if (hostMatches(hostname, 'tiktok.com')) return 'TIKTOK'
+    if (hostMatches(hostname, 'instagram.com')) return 'INSTAGRAM'
+    if (hostMatches(hostname, 'youtube.com') || hostMatches(hostname, 'youtu.be')) return 'YOUTUBE'
+    return 'UNKNOWN'
+  } catch {
+    return 'UNKNOWN'
+  }
 }
 
 /**
@@ -40,9 +56,11 @@ export async function fetchVideoStatsWithYtDlp(url: string): Promise<{
   uploader: string
 }> {
   try {
-    // Run yt-dlp in JSON dump mode without downloading the video
-    const cmd = `yt-dlp --dump-json --skip-download --no-warnings --no-check-certificates "${url}"`
-    const { stdout } = await execAsync(cmd, { timeout: 20000 })
+    await assertPublicHttpUrl(url)
+
+    // Run yt-dlp safely with argument array without shell execution
+    const args = ['--dump-json', '--skip-download', '--no-warnings', '--no-check-certificates', '--', url]
+    const { stdout } = await execFileAsync('yt-dlp', args, { timeout: 20000 })
     const data = JSON.parse(stdout)
 
     const views = Number(data.view_count ?? data.views ?? 0)

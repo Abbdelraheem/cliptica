@@ -96,20 +96,61 @@ export async function POST(request: Request) {
       }
     }
 
-    const payout = await prisma.payout.create({
-      data: {
-        userId: session.user.id,
-        campaignId: campaignId || null,
-        clipId: clipId || null,
-        amount,
-        status: 'PENDING',
-        periodStart,
-        periodEnd,
-        notes,
-      },
+    const result = await prisma.$transaction(async (tx) => {
+      const [submissionEarnings, clipEarnings, existingPayouts] = await Promise.all([
+        tx.campaignSubmission.aggregate({
+          where: {
+            userId: session.user.id,
+            status: { in: ['APPROVED', 'PAID'] },
+          },
+          _sum: { earnings: true },
+        }),
+        tx.campaignClip.aggregate({
+          where: {
+            clip: { userId: session.user.id },
+          },
+          _sum: { estEarnings: true },
+        }),
+        tx.payout.aggregate({
+          where: {
+            userId: session.user.id,
+            status: { in: ['PENDING', 'APPROVED', 'PAID'] },
+          },
+          _sum: { amount: true },
+        }),
+      ])
+
+      const totalEarned =
+        Number(submissionEarnings._sum.earnings ?? 0) +
+        Number(clipEarnings._sum.estEarnings ?? 0)
+      const totalReservedOrPaid = Number(existingPayouts._sum.amount ?? 0)
+      const available = totalEarned - totalReservedOrPaid
+
+      if (amount > available) {
+        return { error: 'Requested amount exceeds your available balance' } as const
+      }
+
+      const payout = await tx.payout.create({
+        data: {
+          userId: session.user.id,
+          campaignId: campaignId || null,
+          clipId: clipId || null,
+          amount,
+          status: 'PENDING',
+          periodStart,
+          periodEnd,
+          notes,
+        },
+      })
+
+      return { payout } as const
     })
 
-    return NextResponse.json({ payout })
+    if ('error' in result) {
+      return NextResponse.json({ error: result.error }, { status: 400 })
+    }
+
+    return NextResponse.json({ payout: result.payout })
   } catch (error) {
     console.error('Payout creation error:', error)
     return NextResponse.json({ error: 'Failed to create payout' }, { status: 500 })

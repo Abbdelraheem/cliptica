@@ -37,7 +37,7 @@ export async function POST(request: Request) {
 
   if (userRole !== 'ADMIN' && userRole !== 'STUDIO') {
     return NextResponse.json(
-      { error: 'Auto-Pilot Autonomous Ingestion is an exclusive feature for Studio ($59/mo) and Admin accounts. Please upgrade to Studio to activate Auto-Pilot.' },
+      { error: 'Auto-Pilot Autonomous Ingestion is an exclusive feature for Pro Creator ($59/mo) and Admin accounts. Please upgrade to Pro Creator to activate Auto-Pilot.' },
       { status: 403 }
     )
   }

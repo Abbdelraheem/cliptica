@@ -439,7 +439,7 @@ export default function StudioVideoEditor({
             <div className="min-w-0 flex-1 max-w-md">
               <div className="flex items-center gap-2">
                 <span className="font-display text-sm font-bold text-white tracking-wide">
-                  Cliptica Studio NLE
+                  Clipzila Studio
                 </span>
                 <span className="rounded-md bg-gold/15 border border-gold/30 px-2 py-0.5 font-mono text-[10px] font-semibold text-gold">
                   Remotion × OpenMontage Engine

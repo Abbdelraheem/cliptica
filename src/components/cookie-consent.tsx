@@ -10,7 +10,12 @@ export function CookieConsent() {
 
   useEffect(() => {
     setMounted(true)
-    const consent = localStorage.getItem('clipzila_cookie_consent') || localStorage.getItem('cliptica_cookie_consent')
+    let consent: string | null = null
+    try {
+      consent = localStorage.getItem('clipzila_cookie_consent') || localStorage.getItem('cliptica_cookie_consent')
+    } catch {
+      consent = null
+    }
     if (!consent) {
       // Delay display slightly so it doesn't jarringly block initial render
       const timer = setTimeout(() => setVisible(true), 1200)

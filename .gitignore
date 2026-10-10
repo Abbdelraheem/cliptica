@@ -66,6 +66,7 @@ worker/node_modules/
 
 # Uploads
 /public/uploads/
+/public/storage/
 *.log
 *.err
 .vercel
@@ -83,3 +84,4 @@ inspect-backup.mjs
 test-neon-conn.mjs
 scripts/set-password.mjs
 deploy/import-db.mjs
+remotion-ads/

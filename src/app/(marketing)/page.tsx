@@ -151,8 +151,8 @@ function Hero() {
 
           <div className="mt-10 flex flex-wrap items-center gap-x-10 gap-y-4">
             {[
-              ['50,000+', 'Creators & Editors'],
-              ['4.9 / 5', 'Render Quality'],
+              ['Vertical', '9:16 face-tracked exports'],
+              ['Captions', 'Word-level timing'],
               ['9:16', 'Face Tracked HD'],
             ].map(([stat, label]) => (
               <div key={label}>
@@ -182,7 +182,7 @@ function Hero() {
             <div className="mb-6 space-y-2 rounded-2xl border border-hair/60 bg-black/40 p-4">
               {[
                 ['Transcribing audio', 100],
-                ['Scoring 214 moments', 100],
+                ['Scoring moments', 100],
                 ['Rendering 9:16 crops', 100],
               ].map(([label, pct]) => (
                 <div key={label as string}>
@@ -596,8 +596,7 @@ function FinalCta() {
         </div>
         <p className="eyebrow relative">Ready When You Are</p>
         <h2 className="display-md relative mx-auto mt-5 max-w-2xl">
-          Your next <span className="gold-text">million views</span> are already inside your last
-          upload
+          Your next upload, <span className="gold-text">cut into shorts</span>.
         </h2>
         <p className="relative mx-auto mt-5 max-w-md text-mist">
           Start free with 5 credits. Paste one link and watch the clips come back scored,

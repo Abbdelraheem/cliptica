@@ -216,11 +216,11 @@ async function handleTransactionCompleted(tx: Tx, transaction: PaddleTransaction
     // One-off credit pack purchase
     creditsToAdd = creditPack.credits
     description = `Paddle: Purchased ${creditPack.name} (+${creditPack.credits} credits)`
-  } else if (planKey && (transaction.origin === 'subscription_recurring' || transaction.origin === 'subscription_charge')) {
-    // Subscription cycle payment
+  } else if (planKey) {
+    // Subscription payment (initial checkout or recurring renewal)
     const plan = PLANS[planKey]
     creditsToAdd = plan.credits
-    description = `Paddle: Monthly ${plan.name} plan renewal (+${plan.credits} credits)`
+    description = `Paddle: ${plan.name} plan credits (+${plan.credits} credits)`
   }
 
   if (creditsToAdd > 0) {

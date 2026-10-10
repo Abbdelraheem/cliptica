@@ -32,11 +32,17 @@ export default function LoginPage() {
     setError('')
     setLoading(true)
     try {
+      let currentDevice = deviceId
+      if (!currentDevice) {
+        currentDevice = await getDeviceId()
+        setDeviceId(currentDevice)
+      }
+
       // Pre-check: precise message when this device belongs to another account.
       const check = await fetchWithTimeout('/api/device/check', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ deviceId, email }),
+        body: JSON.stringify({ deviceId: currentDevice, email }),
       })
       if (check.status === 403) {
         const data = await check.json().catch(() => null)
@@ -86,7 +92,7 @@ export default function LoginPage() {
     <div className="relative flex min-h-screen items-center justify-center px-4 py-8 sm:px-6 text-pearl">
 
       <div className="relative z-[2] w-full max-w-md">
-        <Link href="/" className="mb-10 flex justify-center" aria-label="Cliptica home">
+        <Link href="/" className="mb-10 flex justify-center" aria-label="Clipzila home">
           <Wordmark size={30} />
         </Link>
 

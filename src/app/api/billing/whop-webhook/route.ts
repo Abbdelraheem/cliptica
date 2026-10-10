@@ -42,7 +42,7 @@ function verifyWhopSignature(
   headersList: { get: (name: string) => string | null },
   secret: string
 ): boolean {
-  if (!secret) return true
+  if (!secret) return false
 
   const sigHeader =
     headersList.get('webhook-signature') ||
@@ -144,17 +144,19 @@ function verifyWhopSignature(
 
 export async function POST(request: Request) {
   try {
+    const secret = process.env.WHOP_WEBHOOK_SECRET || ''
+    if (!secret) {
+      console.error('[Whop Webhook] WHOP_WEBHOOK_SECRET is not configured')
+      return NextResponse.json({ error: 'Webhook not configured' }, { status: 503 })
+    }
+
     const rawBody = await request.text()
     const headersList = await headers()
 
-    const secret = process.env.WHOP_WEBHOOK_SECRET || ''
-
-    if (secret && process.env.NODE_ENV === 'production') {
-      const isValid = verifyWhopSignature(rawBody, headersList, secret)
-      if (!isValid) {
-        console.warn('[Whop Webhook] Signature mismatch or invalid signature header')
-        return NextResponse.json({ error: 'Invalid webhook signature' }, { status: 400 })
-      }
+    const isValid = verifyWhopSignature(rawBody, headersList, secret)
+    if (!isValid) {
+      console.warn('[Whop Webhook] Signature mismatch or invalid signature header')
+      return NextResponse.json({ error: 'Invalid webhook signature' }, { status: 400 })
     }
 
     let payload: WhopPayload

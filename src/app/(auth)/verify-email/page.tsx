@@ -148,7 +148,7 @@ export default function VerifyEmailPage() {
     <div className="relative flex min-h-screen items-center justify-center px-4 py-8 sm:px-6 text-pearl">
 
       <div className="relative z-[2] w-full max-w-md">
-        <Link href="/" className="mb-10 flex justify-center" aria-label="Cliptica home">
+        <Link href="/" className="mb-10 flex justify-center" aria-label="Clipzila home">
           <Wordmark size={30} />
         </Link>
 

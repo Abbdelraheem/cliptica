@@ -40,6 +40,12 @@ export default function RegisterPage() {
     setError('')
     setLoading(true)
     try {
+      let currentDevice = deviceId
+      if (!currentDevice) {
+        currentDevice = await getDeviceId()
+        setDeviceId(currentDevice)
+      }
+
       const res = await fetchWithTimeout('/api/auth/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -47,7 +53,7 @@ export default function RegisterPage() {
           name,
           email,
           password,
-          deviceId,
+          deviceId: currentDevice,
           ref: refCode || undefined,
           website_hp: websiteHp || undefined,
         }),
@@ -56,7 +62,7 @@ export default function RegisterPage() {
         const data = await res.json().catch(() => null)
         setError(
           data?.error === 'DEVICE_LIMIT'
-            ? (data?.message ?? 'This device already has a Cliptica account. One account per device.')
+            ? (data?.message ?? 'This device already has a Clipzila account. One account per device.')
             : (data?.error === 'Email already registered'
                 ? 'This email is already registered.'
                 : (data?.error ?? 'Something went wrong. Try again.'))
@@ -64,6 +70,28 @@ export default function RegisterPage() {
         setLoading(false)
         return
       }
+
+      const data = await res.json().catch(() => null)
+      if (data?.autoVerified) {
+        const loginRes = await signIn('credentials', {
+          email,
+          password,
+          deviceId,
+          redirect: false,
+        })
+        setLoading(false)
+        if (loginRes?.error) {
+          router.push('/login?registered=true')
+          return
+        }
+        const target = pendingVideo
+          ? `/dashboard/projects/new?url=${encodeURIComponent(pendingVideo)}`
+          : '/dashboard'
+        router.push(target)
+        router.refresh()
+        return
+      }
+
       setLoading(false)
       const redirectParam = pendingVideo ? `&next=${encodeURIComponent(`/dashboard/projects/new?url=${encodeURIComponent(pendingVideo)}`)}` : ''
       router.push(`/verify-email?email=${encodeURIComponent(email)}&registered=true${redirectParam}`)
@@ -99,7 +127,7 @@ export default function RegisterPage() {
 
         {/* Form card */}
         <div className="rounded-3xl border border-hair bg-gradient-to-b from-pearl/[0.05] to-pearl/[0.01] p-5 sm:p-9 backdrop-blur-xl">
-          <Link href="/" className="mb-8 flex justify-center md:hidden" aria-label="Cliptica home">
+          <Link href="/" className="mb-8 flex justify-center md:hidden" aria-label="Clipzila home">
             <Wordmark size={26} />
           </Link>
 

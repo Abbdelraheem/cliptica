@@ -254,6 +254,19 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    const dbUser = await prisma.user.findUnique({
+      where: { id: session.user.id },
+      select: { role: true, canCreateCampaigns: true },
+    })
+
+    const isAllowed = dbUser?.role === 'ADMIN' || Boolean(dbUser?.canCreateCampaigns)
+    if (!isAllowed) {
+      return NextResponse.json(
+        { error: 'Campaign analysis is restricted to administrators and authorized partners.' },
+        { status: 403 }
+      )
+    }
+
     const body = await req.json().catch(() => null)
     const parsed = requestSchema.safeParse(body)
     if (!parsed.success) {

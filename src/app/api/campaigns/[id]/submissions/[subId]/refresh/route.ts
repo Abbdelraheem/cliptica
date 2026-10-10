@@ -1,7 +1,7 @@
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { NextResponse } from 'next/server'
-import { verifyAndTrackSubmission } from '@/lib/campaign-tracker'
+import { detectPlatform, verifyAndTrackSubmission } from '@/lib/campaign-tracker'
 import { apiMutationLimiter, enforceRateLimit } from '@/lib/rate-limit'
 
 export async function POST(
@@ -23,6 +23,10 @@ export async function POST(
 
     if (!submission || submission.campaignId !== campaignId) {
       return NextResponse.json({ error: 'Submission not found' }, { status: 404 })
+    }
+
+    if (detectPlatform(submission.postUrl) === 'UNKNOWN') {
+      return NextResponse.json({ error: 'Unsupported video platform' }, { status: 400 })
     }
 
     const isOwnerOrAdmin =

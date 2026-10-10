@@ -133,7 +133,17 @@ export const authOptions: NextAuthOptions = {
 
       // An unverified credentials account cannot be entered through OAuth —
       // that would silently bypass the email-verification gate (admins exempt).
-      if (!isAdm && existing.passwordHash && !existing.emailVerified) return false
+      // If RESEND_API_KEY is unset, auto-verify immediately so users are not blocked.
+      if (!isAdm && existing.passwordHash && !existing.emailVerified) {
+        if (!process.env.RESEND_API_KEY) {
+          await prisma.user.update({
+            where: { id: existing.id },
+            data: { emailVerified: new Date() },
+          }).catch(() => {})
+        } else {
+          return false
+        }
+      }
 
       return true
     },
@@ -228,9 +238,17 @@ export const authOptions: NextAuthOptions = {
         const isValid = await compare(password, user.passwordHash)
         if (!isValid) return null
 
-        // Unverified accounts can't sign in — the login page surfaces a
-        // precise message via /api/auth/verification-status (admins exempt).
-        if (!user.emailVerified && user.role !== 'ADMIN' && !isAdm) return null
+        // Unverified accounts: if Resend is not configured, auto-verify immediately so the user can enter.
+        if (!user.emailVerified) {
+          if (!process.env.RESEND_API_KEY || user.role === 'ADMIN' || isAdm) {
+            await prisma.user.update({
+              where: { id: user.id },
+              data: { emailVerified: new Date() },
+            }).catch(() => {})
+          } else {
+            return null
+          }
+        }
 
         let userRole = user.role
         if (isAdm && userRole !== 'ADMIN') {

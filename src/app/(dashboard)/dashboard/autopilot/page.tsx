@@ -175,7 +175,7 @@ export default function AutoPilotPage() {
           </span>
           <h2 className="display-md mt-3 text-2xl font-bold">Autonomous Auto-Pilot Ingestion</h2>
           <p className="mt-2 text-sm font-light text-mist max-w-xl mx-auto leading-relaxed">
-            Continuous channel ingestion, automated transcription, and hands-free viral clip rendering are exclusive to <span className="font-semibold text-pearl">Studio ($59/mo)</span> and Administrator accounts. Connect your YouTube channels and our AI pipeline will instantly convert any newly published video into ready-to-post Shorts and Reels with zero manual work!
+            Continuous channel ingestion, automated transcription, and hands-free viral clip rendering are exclusive to <span className="font-semibold text-pearl">Pro Creator ($59/mo)</span> and Administrator accounts. Connect your YouTube channels and our AI pipeline will instantly convert any newly published video into ready-to-post Shorts and Reels with zero manual work!
           </p>
           <div className="mt-6 flex justify-center">
             <Link
@@ -183,7 +183,7 @@ export default function AutoPilotPage() {
               className="btn-lux btn-gold !py-3 !px-4 sm:!px-8 text-xs sm:text-sm font-bold inline-flex items-center gap-2 shadow-[0_0_25px_rgba(212,175,55,0.3)] hover:scale-105 transition-transform"
             >
               <Sparkles className="h-4 w-4" />
-              <span>Upgrade Account to Studio ($59/mo)</span>
+              <span>Upgrade Account to Pro Creator ($59/mo)</span>
             </Link>
           </div>
         </div>

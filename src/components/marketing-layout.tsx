@@ -98,7 +98,7 @@ export function MarketingLayout({
             <div className="space-y-4">
               <Wordmark />
               <p className="max-w-xs text-sm leading-relaxed text-mist">
-                One link in. High-bitrate vertical clips out. Built for creators and studios who demand broadcast-grade precision.
+                One link in. Vertical clips out.
               </p>
               <div className="flex gap-3 pt-2">
                 {[

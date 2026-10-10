@@ -58,20 +58,6 @@ import { isCrawler, COUNTRY_TO_LOCALE, isValidLocale } from '@/lib/seo/constants
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
 
-  // Handle CORS preflight OPTIONS requests immediately
-  if (request.method === 'OPTIONS') {
-    const origin = request.headers.get('origin') || process.env.NEXT_PUBLIC_APP_URL || 'https://clipzila.com'
-    return new NextResponse(null, {
-      status: 204,
-      headers: {
-        'Access-Control-Allow-Origin': origin,
-        'Access-Control-Allow-Methods': 'GET,DELETE,PATCH,POST,PUT,OPTIONS',
-        'Access-Control-Allow-Headers': 'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version, Authorization',
-        'Access-Control-Allow-Credentials': 'true',
-        'Access-Control-Max-Age': '86400',
-      },
-    })
-  }
 
   if (pathname.startsWith('/api/auth/callback')) {
     const limited = await rateLimitLoginCallback(request)

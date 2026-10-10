@@ -21,7 +21,7 @@ function signClipMedia<T extends { videoUrl?: string | null; thumbnailUrl?: stri
   const signed = { ...clip }
   for (const field of ['videoUrl', 'thumbnailUrl', 'exportUrl'] as const) {
     const url = signed[field]
-    if (!url) continue
+    if (!url || url.startsWith('/storage/')) continue
     const key = r2KeyFromUrl(url)
     if (!key) continue
     try {

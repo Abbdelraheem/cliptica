@@ -424,8 +424,8 @@ export default function AdminUsersPage() {
                 <div className="grid grid-cols-2 gap-2.5">
                   {[
                     { id: 'FREE', title: 'Free', desc: 'Standard account with trial credits only, no campaign access' },
-                    { id: 'CLIPPER', title: 'Clipper ($29/mo)', desc: 'Individual creator plan with 150 clips per month' },
-                    { id: 'STUDIO', title: 'Studio ($59/mo)', desc: 'Studio plan with campaign creation and full autopilot' },
+                    { id: 'CLIPPER', title: 'Starter ($29/mo)', desc: 'Individual creator plan with 150 clips per month' },
+                    { id: 'STUDIO', title: 'Pro Creator ($59/mo)', desc: 'Studio plan with campaign creation and full autopilot' },
                     { id: 'ADMIN', title: 'Admin', desc: 'Unlimited credits (∞) and full access to the Admin Panel' },
                   ].map((r) => (
                     <button

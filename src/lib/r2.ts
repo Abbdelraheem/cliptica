@@ -9,6 +9,24 @@ const enc = (s: string) => encodeURIComponent(s).replace(/[!'()*]/g, (c) => `%${
 const hmac = (key: Buffer | string, data: string) => createHmac('sha256', key).update(data).digest()
 const sha256hex = (data: string) => createHash('sha256').update(data).digest('hex')
 
+function getAccountId(): string | null {
+  if (process.env.R2_ACCOUNT_ID) return process.env.R2_ACCOUNT_ID
+  if (process.env.R2_ENDPOINT) {
+    try {
+      const u = new URL(process.env.R2_ENDPOINT)
+      return u.hostname.split('.')[0] || null
+    } catch {
+      return null
+    }
+  }
+  return null
+}
+
+export function isR2Configured(): boolean {
+  const accountId = getAccountId()
+  return Boolean(accountId && process.env.R2_ACCESS_KEY_ID && process.env.R2_SECRET_ACCESS_KEY)
+}
+
 /**
  * Build a SigV4 presigned URL for an R2 object (GET or PUT).
  * Zero dependencies — used both for uploads (PUT) and clip playback (GET),
@@ -19,7 +37,7 @@ export function r2Presign(
   method: 'GET' | 'PUT',
   opts: { contentType?: string; expiresInSec?: number } = {}
 ): string {
-  const accountId = process.env.R2_ACCOUNT_ID!
+  const accountId = getAccountId()
   if (!accountId || !process.env.R2_ACCESS_KEY_ID || !process.env.R2_SECRET_ACCESS_KEY) {
     throw new Error('R2 env vars missing')
   }
@@ -92,5 +110,8 @@ export function r2PresignPut(
 
 /** Presigned GET for clip playback / thumbnails — long expiry so a playing video doesn't cut out. */
 export function r2PresignGet(key: string, expiresInSec = 7200): string {
+  if (!isR2Configured()) {
+    return `/storage/${key}`
+  }
   return r2Presign(key, 'GET', { expiresInSec })
 }

@@ -1,15 +1,29 @@
 import crypto from 'crypto'
 
+function requireSecret(name: string, value: string | undefined, devFallback: string): string {
+  if (value && value.trim()) {
+    return value.trim()
+  }
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error(`${name} is required in production`)
+  }
+  return devFallback
+}
+
 /**
  * Derives a 32-byte key suitable for AES-256-GCM from the provided secret
  * or environment variables (ENCRYPTION_SECRET, NEXTAUTH_SECRET).
  */
 export function getEncryptionKey(overrideSecret?: string): Buffer {
-  const secret =
+  const candidate =
     overrideSecret ||
     process.env.ENCRYPTION_SECRET ||
-    process.env.NEXTAUTH_SECRET ||
+    process.env.NEXTAUTH_SECRET
+  const secret = requireSecret(
+    'ENCRYPTION_SECRET (or NEXTAUTH_SECRET)',
+    candidate,
     'cliptica-dev-stable-encryption-seed-2026'
+  )
   return crypto.createHash('sha256').update(secret).digest()
 }
 
@@ -68,7 +82,11 @@ export interface OAuthStatePayload {
  * Resistant to CSRF, forgery, and replay attacks.
  */
 export function signOAuthState(payload: OAuthStatePayload, overrideSecret?: string): string {
-  const secret = overrideSecret || process.env.NEXTAUTH_SECRET || 'cliptica-oauth-state-secret'
+  const secret = requireSecret(
+    'NEXTAUTH_SECRET',
+    overrideSecret || process.env.NEXTAUTH_SECRET,
+    'cliptica-oauth-state-secret'
+  )
   const data = {
     ...payload,
     ts: typeof payload.ts === 'number' ? payload.ts : Date.now(),
@@ -90,7 +108,11 @@ export function verifyOAuthState<T extends OAuthStatePayload = OAuthStatePayload
   const [serialized, signature] = stateStr.split('.')
   if (!serialized || !signature) return null
 
-  const secret = overrideSecret || process.env.NEXTAUTH_SECRET || 'cliptica-oauth-state-secret'
+  const secret = requireSecret(
+    'NEXTAUTH_SECRET',
+    overrideSecret || process.env.NEXTAUTH_SECRET,
+    'cliptica-oauth-state-secret'
+  )
   const expectedSig = crypto.createHmac('sha256', secret).update(serialized).digest('base64url')
 
   // Timing-safe comparison to prevent timing attacks

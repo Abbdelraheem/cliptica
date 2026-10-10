@@ -62,13 +62,13 @@ describe('clipAdjustSchema', () => {
     expect(result.success).toBe(true)
   })
 
-  it('rejects duration longer than 120 seconds', () => {
-    const result = clipAdjustSchema.safeParse({ start: 0, end: 121 })
+  it('rejects duration longer than 60 seconds', () => {
+    const result = clipAdjustSchema.safeParse({ start: 0, end: 61 })
     expect(result.success).toBe(false)
   })
 
-  it('accepts maximum 120-second clip duration', () => {
-    const result = clipAdjustSchema.safeParse({ start: 10, end: 130 })
+  it('accepts maximum 60-second clip duration', () => {
+    const result = clipAdjustSchema.safeParse({ start: 10, end: 70 })
     expect(result.success).toBe(true)
   })
 

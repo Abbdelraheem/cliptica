@@ -80,10 +80,15 @@ export async function POST(
       }
 
       if (diff > 0) {
-        await tx.user.update({
-          where: { id: session.user.id },
+        const res = await tx.user.updateMany({
+          where: { id: session.user.id, credits: { gte: diff } },
           data: { credits: { decrement: diff } },
         })
+        if (res.count !== 1) {
+          const err = new Error('INSUFFICIENT_CREDITS')
+          ;(err as unknown as { statusCode: number }).statusCode = 402
+          throw err
+        }
 
         await tx.creditTransaction.create({
           data: {
@@ -176,8 +181,9 @@ export async function POST(
   } catch (error: unknown) {
     console.error('Purge unselected clips error:', error)
     const err = error as { statusCode?: number; message?: string }
-    if (err?.statusCode === 402) {
-      return NextResponse.json({ error: err.message }, { status: 402 })
+    if (err?.statusCode === 402 || (error instanceof Error && error.message === 'INSUFFICIENT_CREDITS')) {
+      const msg = err?.message && err.message !== 'INSUFFICIENT_CREDITS' ? err.message : 'Insufficient credits'
+      return NextResponse.json({ error: msg }, { status: 402 })
     }
     return NextResponse.json(
       { error: err instanceof Error ? err.message : 'Failed to purge clips' },

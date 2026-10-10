@@ -75,12 +75,14 @@ export async function POST(request: Request) {
     }
 
     const passwordHash = await hash(password, 12)
+    const isResendConfigured = Boolean(process.env.RESEND_API_KEY && process.env.RESEND_API_KEY.trim().length > 0)
 
     const user = await prisma.user.create({
       data: {
         email: cleanEmail,
         passwordHash,
         name,
+        emailVerified: (!isResendConfigured || isAdmin) ? new Date() : null,
         credits: isAdmin ? 999999 : 5,
         role: isAdmin ? 'ADMIN' : 'FREE',
         referredByAffiliateId: affiliateId,
@@ -118,25 +120,27 @@ export async function POST(request: Request) {
     // Bind this device to the new account.
     await bindDevice(deviceId, user.id, userAgent)
 
-    // Email verification — account exists but can't log in until confirmed.
-    const { token, tokenHash } = generateVerificationToken()
-    await prisma.emailVerificationToken.create({
-      data: {
-        userId: user.id,
-        tokenHash,
-        expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
-      },
-    })
-
-    try {
-      const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'
-      await sendEmail({
-        to: user.email,
-        subject: 'Confirm your Clipzila email',
-        html: verificationEmailHtml(`${appUrl}/verify-email?token=${token}`),
+    // Email verification — if Resend is configured, send the link. Otherwise account is auto-verified.
+    if (isResendConfigured && !isAdmin) {
+      const { token, tokenHash } = generateVerificationToken()
+      await prisma.emailVerificationToken.create({
+        data: {
+          userId: user.id,
+          tokenHash,
+          expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+        },
       })
-    } catch (err) {
-      console.error('Failed to deliver verification email:', err)
+
+      try {
+        const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'
+        await sendEmail({
+          to: user.email,
+          subject: 'Confirm your Clipzila email',
+          html: verificationEmailHtml(`${appUrl}/verify-email?token=${token}`),
+        })
+      } catch (err) {
+        console.error('Failed to deliver verification email:', err)
+      }
     }
 
     await prisma.creditTransaction.create({
@@ -149,7 +153,7 @@ export async function POST(request: Request) {
     })
 
     const { passwordHash: _, ...userWithoutPassword } = user
-    return NextResponse.json({ user: userWithoutPassword })
+    return NextResponse.json({ user: userWithoutPassword, autoVerified: !isResendConfigured || isAdmin })
   } catch (error) {
     console.error('Registration error:', error)
     return NextResponse.json({ error: 'Failed to create account' }, { status: 500 })

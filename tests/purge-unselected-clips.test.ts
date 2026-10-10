@@ -12,6 +12,7 @@ const mockPrisma = vi.hoisted(() => ({
   user: {
     findUnique: vi.fn(),
     update: vi.fn(),
+    updateMany: vi.fn().mockResolvedValue({ count: 1 }),
   },
   creditTransaction: {
     create: vi.fn(),
@@ -134,8 +135,8 @@ describe('POST /api/projects/[id]/clips/purge-unselected', () => {
     expect(data.creditsDeducted).toBe(2)
     expect(data.totalCreditsUsed).toBe(3)
 
-    expect(mockPrisma.user.update).toHaveBeenCalledWith({
-      where: { id: 'u1' },
+    expect(mockPrisma.user.updateMany).toHaveBeenCalledWith({
+      where: { id: 'u1', credits: { gte: 2 } },
       data: { credits: { decrement: 2 } },
     })
     expect(mockPrisma.creditTransaction.create).toHaveBeenCalledWith({

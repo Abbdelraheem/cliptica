@@ -68,7 +68,8 @@ describe('Whop & Content Rewards Campaign Ingestion', () => {
     mockPrisma.user.findUnique.mockResolvedValue({
       id: 'usr_test_whop',
       credits: 10,
-      role: 'PRO',
+      role: 'ADMIN',
+      canCreateCampaigns: true,
       referredByAffiliateId: null,
     })
     mockPrisma.project.count.mockResolvedValue(0)

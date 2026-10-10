@@ -10,7 +10,7 @@ export function getPaddleInstance(): Paddle {
   if (paddleInstance) return paddleInstance
 
   const apiKey = process.env.PADDLE_API_KEY || ''
-  const isProduction = process.env.NEXT_PUBLIC_PADDLE_ENV === 'production'
+  const isProduction = process.env.NEXT_PUBLIC_PADDLE_ENV === 'production' || process.env.NEXT_PUBLIC_PADDLE_ENV === 'live'
 
   paddleInstance = new Paddle(apiKey, {
     environment: isProduction ? Environment.production : Environment.sandbox,
@@ -24,20 +24,20 @@ export function getPaddleInstance(): Paddle {
  * Mapping of Clipzila plan keys to Paddle Price IDs.
  */
 export const PADDLE_PLAN_PRICES: Record<string, string> = {
-  basic: process.env.PADDLE_PRICE_BASIC || 'pri_01m2wsjgyn37f85t920yeqpkjs',
-  starter: process.env.PADDLE_PRICE_CLIPPER_MONTHLY || 'pri_01m2wsnkn3qeswx68fx71c1p6y',
-  clipper: process.env.PADDLE_PRICE_CLIPPER_MONTHLY || 'pri_01m2wsnkn3qeswx68fx71c1p6y',
-  pro: process.env.PADDLE_PRICE_STUDIO_MONTHLY || 'pri_01m2wsscq76fefjd7sfkf1awnv',
-  studio: process.env.PADDLE_PRICE_STUDIO_MONTHLY || 'pri_01m2wsscq76fefjd7sfkf1awnv',
+  basic: process.env.PADDLE_PRICE_BASIC || 'pri_01m4ah11k04t59zkq0ma69pjs8',
+  starter: process.env.PADDLE_PRICE_CLIPPER_MONTHLY || 'pri_01m2nx9y8rg1wbckx613dz2zs6',
+  clipper: process.env.PADDLE_PRICE_CLIPPER_MONTHLY || 'pri_01m2nx9y8rg1wbckx613dz2zs6',
+  pro: process.env.PADDLE_PRICE_STUDIO_MONTHLY || 'pri_01m2nx9yqxxyx21gqjs9zqpsde',
+  studio: process.env.PADDLE_PRICE_STUDIO_MONTHLY || 'pri_01m2nx9yqxxyx21gqjs9zqpsde',
 }
 
 /**
  * Mapping of Clipzila credit pack keys to Paddle Price IDs.
  */
 export const PADDLE_PACK_PRICES: Record<string, string> = {
-  pack_50: process.env.PADDLE_PRICE_PACK_50 || 'pri_01m2x2qyx780p7crsd2p2ggmm1',
-  pack_150: process.env.PADDLE_PRICE_PACK_150 || 'pri_01m2x2t7vp1ajkpq1w2be4s47w',
-  pack_500: process.env.PADDLE_PRICE_PACK_500 || 'pri_01m2x2xa5wvsxnhq990vyrycan',
+  pack_50: process.env.PADDLE_PRICE_PACK_50 || 'pri_01m2nx9z9zytfxzzxfmqfhqd42',
+  pack_150: process.env.PADDLE_PRICE_PACK_150 || 'pri_01m2nx9zx0fs3fdd4e4x092js5',
+  pack_500: process.env.PADDLE_PRICE_PACK_500 || 'pri_01m2nxa0g077kecxbw213t6pdp',
 }
 
 /**

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, Suspense } from 'react'
 import Link from 'next/link'
 import { useSession } from 'next-auth/react'
 import { useSearchParams } from 'next/navigation'
@@ -115,7 +115,7 @@ interface ActiveCheckoutState {
   sessionId?: string | null
 }
 
-export default function BillingPage() {
+function BillingContent() {
   const { data: session } = useSession()
   const [loading, setLoading] = useState<string | null>(null)
   const [error, setError] = useState('')
@@ -200,7 +200,8 @@ export default function BillingPage() {
 
   useEffect(() => {
     const token = process.env.NEXT_PUBLIC_PADDLE_CLIENT_TOKEN
-    const env = (process.env.NEXT_PUBLIC_PADDLE_ENV || 'sandbox') as 'sandbox' | 'production'
+    const rawEnv = process.env.NEXT_PUBLIC_PADDLE_ENV || 'production'
+    const env: 'sandbox' | 'production' = rawEnv === 'sandbox' ? 'sandbox' : 'production'
     if (token && !paddle) {
       initializePaddle({
         token,
@@ -729,5 +730,13 @@ export default function BillingPage() {
         </div>
       )}
     </div>
+  )
+}
+
+export default function BillingPage() {
+  return (
+    <Suspense fallback={null}>
+      <BillingContent />
+    </Suspense>
   )
 }
