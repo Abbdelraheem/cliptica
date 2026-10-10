@@ -12,8 +12,26 @@ vi.mock('@/lib/rate-limit', () => ({
   enforceRateLimit: vi.fn().mockResolvedValue(null),
 }))
 
+interface MockPrisma {
+  user: {
+    findUnique: ReturnType<typeof vi.fn>
+    update: ReturnType<typeof vi.fn>
+  }
+  project: {
+    count: ReturnType<typeof vi.fn>
+    create: ReturnType<typeof vi.fn>
+  }
+  processingJob: {
+    create: ReturnType<typeof vi.fn>
+  }
+  creditTransaction: {
+    create: ReturnType<typeof vi.fn>
+  }
+  $transaction?: ReturnType<typeof vi.fn>
+}
+
 // Mock prisma
-const mockPrisma: any = {
+const mockPrisma: MockPrisma = {
   user: {
     findUnique: vi.fn(),
     update: vi.fn(),
@@ -29,15 +47,15 @@ const mockPrisma: any = {
     create: vi.fn(),
   },
 }
-mockPrisma.$transaction = vi.fn().mockImplementation(async (callback: any) => {
+mockPrisma.$transaction = vi.fn().mockImplementation(async (callback: unknown) => {
   if (typeof callback === 'function') {
     return callback(mockPrisma)
   }
-  return Promise.all(callback)
+  return Promise.all(callback as Promise<unknown>[])
 })
 vi.mock('@/lib/prisma', () => ({
   prisma: mockPrisma,
-  withDbRetry: (fn: () => any) => fn(),
+  withDbRetry: <T>(fn: () => Promise<T> | T): Promise<T> | T => fn(),
 }))
 
 // Mock ssrf
@@ -185,7 +203,7 @@ describe('Whop & Content Rewards Campaign Ingestion', () => {
     expect(data.campaign.platform).toBe('Whop Campaign')
     expect(data.campaign.primaryAsset).toBeDefined()
     // Must NOT include competitor topClips from /downloaded-videos/
-    const allAssetUrls = data.campaign.assets.map((a: any) => a.url)
+    const allAssetUrls = (data.campaign.assets as Array<{ url: string }>).map((a) => a.url)
     expect(allAssetUrls.some((u: string) => u.includes('/downloaded-videos/'))).toBe(false)
     // Must include expanded Google Drive file and YouTube VOD
     expect(allAssetUrls.some((u: string) => u.includes('1AbCdEfGhIjKlMnOpQrStUv'))).toBe(true)
@@ -284,7 +302,7 @@ describe('Whop & Content Rewards Campaign Ingestion', () => {
     expect(res.status).toBe(200)
     const data = await res.json()
     expect(data.success).toBe(true)
-    const assetUrls = data.campaign.assets.map((a: any) => a.url)
+    const assetUrls = (data.campaign.assets as Array<{ url: string }>).map((a) => a.url)
     // Must exclude the 3.8MB pre-edited short example clip
     expect(assetUrls).not.toContain('https://drive.google.com/file/d/1VUKlZoT878GkjNTcEkB21e_9NM30Vc6N/view')
     // Must exclude already-used video and select the fresh 12:48 long-form video

@@ -85,12 +85,12 @@ describe('NextAuth Name Persistence & Sync', () => {
     }
 
     const resSession = await sessionCallback!({
-      session: sessionObj as any,
-      token: tokenObj as any,
+      session: sessionObj as unknown as Parameters<NonNullable<typeof sessionCallback>>[0]['session'],
+      token: tokenObj as unknown as Parameters<NonNullable<typeof sessionCallback>>[0]['token'],
     })
 
     expect(resSession.user.name).toBe('Verified Display Name')
-    expect((resSession.user as any).role).toBe('STUDIO')
-    expect((resSession.user as any).credits).toBe(1200)
+    expect((resSession.user as Record<string, unknown>).role).toBe('STUDIO')
+    expect((resSession.user as Record<string, unknown>).credits).toBe(1200)
   })
 })

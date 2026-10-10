@@ -130,7 +130,7 @@ describe('Paddle Billing Integration', () => {
       vi.mocked(prisma.user.findUnique).mockResolvedValue({
         paddleCustomerId: null,
         paddleSubscriptionId: null,
-      } as any)
+      } as unknown as Awaited<ReturnType<typeof prisma.user.findUnique>>)
 
       const req = new Request('http://localhost:3000/api/billing/paddle-portal')
       const res = await portalGET(req)
@@ -145,7 +145,7 @@ describe('Paddle Billing Integration', () => {
       vi.mocked(prisma.user.findUnique).mockResolvedValue({
         paddleCustomerId: 'ctm_12345',
         paddleSubscriptionId: 'sub_12345',
-      } as any)
+      } as unknown as Awaited<ReturnType<typeof prisma.user.findUnique>>)
 
       const req = new Request('http://localhost:3000/api/billing/paddle-portal')
       const res = await portalGET(req)

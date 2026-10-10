@@ -20,16 +20,16 @@ describe('Health Check Endpoint Security (Phase 10)', () => {
 
     const res = await GET()
     expect(res.status).toBe(200)
-    const json = await res.json()
+    const json = (await res.json()) as Record<string, unknown>
 
     expect(Object.keys(json).sort()).toEqual(['status', 'timestamp'])
     expect(json.status).toBe('healthy')
     expect(typeof json.timestamp).toBe('string')
     // Verify no system info leaked
-    expect((json as any).system).toBeUndefined()
-    expect((json as any).pid).toBeUndefined()
-    expect((json as any).node_version).toBeUndefined()
-    expect((json as any).checks).toBeUndefined()
+    expect(json.system).toBeUndefined()
+    expect(json.pid).toBeUndefined()
+    expect(json.node_version).toBeUndefined()
+    expect(json.checks).toBeUndefined()
   })
 
   it('returns 503 with exactly { status, timestamp } keys when DB fails', async () => {
@@ -37,11 +37,11 @@ describe('Health Check Endpoint Security (Phase 10)', () => {
 
     const res = await GET()
     expect(res.status).toBe(503)
-    const json = await res.json()
+    const json = (await res.json()) as Record<string, unknown>
 
     expect(Object.keys(json).sort()).toEqual(['status', 'timestamp'])
     expect(json.status).toBe('degraded')
     expect(typeof json.timestamp).toBe('string')
-    expect((json as any).system).toBeUndefined()
+    expect(json.system).toBeUndefined()
   })
 })
