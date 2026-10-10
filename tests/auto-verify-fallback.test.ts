@@ -57,7 +57,7 @@ describe('Auto-Verification Fallback when Resend is Unset', () => {
 
   it('register route: auto-verifies user and sets emailVerified to Date when RESEND_API_KEY is unset', async () => {
     mockPrisma.user.findFirst.mockResolvedValue(null) // no existing user
-    mockPrisma.user.create.mockImplementation(({ data }: any) =>
+    mockPrisma.user.create.mockImplementation(({ data }: { data: Record<string, unknown> }) =>
       Promise.resolve({
         id: 'usr_new_123',
         ...data,

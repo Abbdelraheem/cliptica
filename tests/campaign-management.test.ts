@@ -27,7 +27,7 @@ const mockPrisma = {
 }
 vi.mock('@/lib/prisma', () => ({
   prisma: mockPrisma,
-  withDbRetry: (fn: () => any) => fn(),
+  withDbRetry: <T>(fn: () => Promise<T> | T): Promise<T> | T => fn(),
 }))
 
 describe('Campaign Management API', () => {
