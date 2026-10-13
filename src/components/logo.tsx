@@ -20,7 +20,7 @@ export function Wordmark({ size = 28 }: { size?: number }) {
   return (
     <span className="inline-flex items-center gap-2.5">
       <ClipzilaMark size={size} />
-      <span className="font-display text-lg font-extrabold tracking-[0.08em] bg-gradient-to-r from-white via-pearl to-champagne bg-clip-text text-transparent">
+      <span className="font-display text-lg font-bold tracking-[0.08em] text-gold">
         CLIPZILA
       </span>
     </span>

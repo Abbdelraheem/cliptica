@@ -133,7 +133,7 @@ function Hero() {
           <h1 className="display-xl mt-5 leading-[1.02]">
             One video in.
             <br />
-            A week of <span className="gold-text">clips</span> out.
+            A week of <span className="text-gold">clips</span> out.
           </h1>
           <p className="mt-6 max-w-lg text-lg leading-relaxed text-mist">
             Paste a YouTube link. Clipzila finds the viral moments, cuts them vertical with
@@ -302,8 +302,8 @@ function HowItWorks() {
     <section id="how" className="mx-auto max-w-6xl scroll-mt-28 px-5 pt-20 sm:px-6 sm:pt-28">
       <p className="eyebrow rv">How It Works</p>
       <h2 className="display-md mt-4 max-w-xl rv">
-        From raw footage to posted shorts in{' '}
-        <span className="gold-text">four moves</span>
+        From raw footage to posted shorts in four{' '}
+        <span className="text-gold">moves</span>
       </h2>
       <div className="mt-14 grid gap-5 md:grid-cols-2 xl:grid-cols-4">
         {STEPS.map((s, i) => (
@@ -375,7 +375,7 @@ function Features() {
     <section id="features" className="mx-auto max-w-6xl scroll-mt-28 px-5 pt-20 sm:px-6 sm:pt-28">
       <p className="eyebrow rv">Inside The Engine</p>
       <h2 className="display-md mt-4 max-w-2xl rv">
-        An editor that works while <span className="gold-text">you sleep</span>
+        An editor that works while you <span className="text-gold">sleep</span>
       </h2>
       <div className="mt-14 grid gap-5 md:grid-cols-3">
         {FEATURES.map((f, i) => (
@@ -412,11 +412,8 @@ function TimeCompare() {
           <div>
             <p className="eyebrow">The Math</p>
             <h2 className="display-md mt-4">
-              <span className="gold-text">
-                <CountUp end={8} suffix=" hours" />
-              </span>{' '}
-              becomes{' '}
-              <span className="gold-text">
+              <CountUp end={8} suffix=" hours" /> becomes{' '}
+              <span className="text-gold">
                 <CountUp end={20} suffix=" min" />
               </span>
             </h2>
@@ -523,7 +520,7 @@ function Pricing() {
     <section id="pricing" className="mx-auto max-w-6xl scroll-mt-28 px-5 pt-20 sm:px-6 sm:pt-28">
       <p className="eyebrow rv">Pricing</p>
       <h2 className="display-md mt-4 max-w-xl rv">
-        Cheaper than <span className="gold-text">one edit</span>
+        Cheaper than one <span className="text-gold">edit</span>
       </h2>
       <p className="mt-4 max-w-xl text-mist rv">
         1 credit = 1 final video (never pay for unused raw footage minutes). Credits refresh every monthly billing cycle.
@@ -596,7 +593,7 @@ function FinalCta() {
         </div>
         <p className="eyebrow relative">Ready When You Are</p>
         <h2 className="display-md relative mx-auto mt-5 max-w-2xl">
-          Your next upload, <span className="gold-text">cut into shorts</span>.
+          Your next upload, cut into <span className="text-gold">shorts</span>.
         </h2>
         <p className="relative mx-auto mt-5 max-w-md text-mist">
           Start free with 5 credits. Paste one link and watch the clips come back scored,
