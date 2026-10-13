@@ -137,14 +137,14 @@ function Hero() {
           </h1>
           <p className="mt-6 max-w-lg text-lg leading-relaxed text-mist">
             Paste a YouTube link. Clipzila finds the viral moments, cuts them vertical with
-            face-tracking, burns word-perfect captions, and hands you ready-to-post shorts —
+            face-tracking, burns word-perfect captions, and hands you ready-to-post shorts,
             with a score explaining why each one will pop.
           </p>
 
           <div className="mt-8 max-w-lg">
             <PasteBar />
             <p className="mt-3 flex items-center gap-2 text-xs text-mist-2">
-              <Check className="h-3.5 w-3.5 text-champagne" /> 5 free credits — no card required
+              <Check className="h-3.5 w-3.5 text-champagne" /> 5 free credits, no card required
               <span className="mx-1 opacity-40">·</span> ~4 min per hour of video
             </p>
           </div>
@@ -280,7 +280,7 @@ const STEPS = [
   {
     icon: Target,
     title: 'AI hunts the moments',
-    body: 'The engine reads every second — hooks, emotional peaks, punchlines — and scores each candidate moment out of 100, with the reason written out.',
+    body: 'The engine reads every second for hooks, emotional peaks, and punchlines, then scores each candidate moment out of 100 with the reason written out.',
     tag: 'STEP 02',
   },
   {
@@ -335,7 +335,7 @@ const FEATURES = [
   {
     icon: Gauge,
     name: 'Viral Score™',
-    desc: 'Every candidate moment gets a 0–100 score for hook strength, retention risk, and shareability — plus a plain-English reason so you know exactly why it was picked.',
+    desc: 'Every candidate moment gets a 0 to 100 score for hook strength, retention risk, and shareability, plus a plain-English reason so you know exactly why it was picked.',
     span: 'md:col-span-2',
   },
   {
@@ -359,7 +359,7 @@ const FEATURES = [
   {
     icon: Palette,
     name: 'Brand kit',
-    desc: 'Your fonts, colors, and caption style saved once — applied to every future project by default.',
+    desc: 'Your fonts, colors, and caption style saved once. Applied to every future project by default.',
     span: '',
   },
   {
@@ -422,7 +422,7 @@ function TimeCompare() {
             </h2>
             <p className="mt-5 max-w-md leading-relaxed text-mist">
               One podcast episode. The old way, you scrub, cut, reframe, and caption until
-              midnight — for maybe two clips. Clipzila returns six scored, captioned, vertical
+              midnight for maybe two clips. Clipzila returns six scored, captioned, vertical
               clips before your coffee gets cold.
             </p>
             <Link

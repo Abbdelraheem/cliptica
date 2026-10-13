@@ -6,7 +6,7 @@ import { ChevronDown } from 'lucide-react'
 const FAQS: [string, string][] = [
   [
     'How long does a video take to process?',
-    'Roughly 4 minutes per hour of source video on our standard queue — a 1-hour podcast is usually done in under 5 minutes. Creator and Studio plans render on a priority queue.',
+    'Roughly 4 minutes per hour of source video on our standard queue. A 1-hour podcast is usually done in under 5 minutes. Creator and Studio plans render on a priority queue.',
   ],
   [
     'What sources can I use?',
@@ -14,11 +14,11 @@ const FAQS: [string, string][] = [
   ],
   [
     'How accurate are the Viral Scores?',
-    'Scores blend hook strength, pacing, emotion, and payoff signals measured across millions of short-form videos. They are a prioritization tool — the reasons tell you why each moment was picked so you can make the final call fast.',
+    'Scores blend hook strength, pacing, emotion, and payoff signals measured across millions of short-form videos. They are a prioritization tool: the reasons tell you why each moment was picked so you can make the final call fast.',
   ],
   [
     'Can I edit the clips after generation?',
-    'Yes — adjust trim points, swap caption style, or regenerate a single clip without re-processing the whole video.',
+    'Yes: adjust trim points, swap caption style, or regenerate a single clip without re-processing the whole video.',
   ],
   [
     'What do credits get spent on?',

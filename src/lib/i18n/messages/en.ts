@@ -4,7 +4,7 @@ export const en: MessageCatalog = {
   locale: 'en',
   dir: 'ltr',
   meta: {
-    title: 'Clipzila — One video in. A week of viral clips out.',
+    title: 'Clipzila. One video in. A week of viral clips out.',
     description:
       'Clipzila is an AI video clipping platform that turns long YouTube videos and podcasts into viral short-form clips with automated Arabic and English karaoke captions, speaker face tracking, and viral moment scoring.',
     oneLiner:
@@ -122,9 +122,9 @@ export const en: MessageCatalog = {
     proPeriod: '/ month',
     proCredits: '400 credits / month ($0.14 / video)',
     packsTitle: 'One-Time Credit Packs (No Subscription Required)',
-    pack50: '50 Credits — $18 ($0.36 / credit)',
-    pack150: '150 Credits — $35 ($0.23 / credit · Most Popular)',
-    pack500: '500 Credits — $89 ($0.17 / credit · Best Value)',
+    pack50: '50 Credits: $18 ($0.36 / credit)',
+    pack150: '150 Credits: $35 ($0.23 / credit · Most Popular)',
+    pack500: '500 Credits: $89 ($0.17 / credit · Best Value)',
   },
   faqs: [
     {
