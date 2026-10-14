@@ -1,24 +1,6 @@
 import Link from 'next/link'
 import Image from 'next/image'
-import {
-  Play,
-  Flame,
-  Zap,
-  Target,
-  Scissors,
-  Captions,
-  ScanFace,
-  Sparkles,
-  ArrowRight,
-  Check,
-  Clock,
-  Youtube,
-  Wand2,
-  Gauge,
-  Layers,
-  Palette,
-  Share2,
-} from 'lucide-react'
+import { Play, Check } from 'lucide-react'
 import { MarketingLayout } from '@/components/marketing-layout'
 import { buildSoftwareApplicationSchema, buildOrganizationSchema, buildWebSiteSchema } from '@/lib/seo/schema'
 import { CountUp } from '@/components/marketing/count-up'
@@ -34,10 +16,9 @@ function ScoreBadge({ score }: { score: number }) {
         : 'border-white/10 bg-white/[0.04] text-mist-2'
   return (
     <span
-      className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-bold ${tone}`}
+      className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-bold ${tone}`}
     >
-      <Flame className="h-3 w-3" />
-      {score}
+      {score}/100
     </span>
   )
 }
@@ -79,7 +60,7 @@ function ClipCard({
         <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/25 to-black/30" />
         <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-champagne/60 to-transparent" />
         {/* face box */}
-        <div className="scanface absolute left-1/2 top-[22%] h-16 w-16 -translate-x-1/2 rounded-lg border-2 border-champagne/80 shadow-md backdrop-blur-[1px]" />
+        <div className="scanface absolute left-1/2 top-[22%] h-16 w-16 -translate-x-1/2 rounded-lg border-2 border-champagne/80 shadow-md" />
         {/* caption line */}
         <div className="absolute inset-x-3 bottom-8 text-center z-10">
           <span className="inline-block rounded-md bg-black/80 px-2 py-1 font-display text-[12px] font-extrabold uppercase tracking-wide text-white shadow-xl border border-white/10">
@@ -97,8 +78,7 @@ function ClipCard({
         <ScoreBadge score={score} />
       </div>
       <p className="truncate px-1 pb-1 font-mono text-[10px] text-mist-2">{dur}</p>
-      <p className="flex items-start gap-1 px-1 text-[10px] leading-snug text-mist-2">
-        <Flame className="mt-0.5 h-3 w-3 shrink-0 text-gold" />
+      <p className="px-1 text-[10px] leading-snug text-mist-2">
         {reason}
       </p>
     </div>
@@ -258,7 +238,7 @@ function FactTicker() {
                   key={`${half}-${i}`}
                   className="mx-6 flex items-center gap-3 whitespace-nowrap font-display text-xs font-extrabold tracking-[0.3em] text-mist-2"
                 >
-                  <Zap className="h-3.5 w-3.5 text-champagne" />
+                  <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-champagne/70" />
                   {f}
                 </span>
               ))}
@@ -272,25 +252,21 @@ function FactTicker() {
 
 const STEPS = [
   {
-    icon: Youtube,
     title: 'Paste your link',
     body: 'Drop any YouTube URL or upload a file. Clipzila pulls the video and builds a transcription within seconds.',
     tag: 'STEP 01',
   },
   {
-    icon: Target,
     title: 'AI hunts the moments',
     body: 'The engine reads every second for hooks, emotional peaks, and punchlines, then scores each candidate moment out of 100 with the reason written out.',
     tag: 'STEP 02',
   },
   {
-    icon: Scissors,
     title: 'Auto-edit to vertical',
     body: 'Clips are cropped to 9:16 with the speaker’s face locked in frame, and captions burned in word-by-word.',
     tag: 'STEP 03',
   },
   {
-    icon: Share2,
     title: 'Post everywhere',
     body: 'Download clean MP4s sized for TikTok, Reels, and Shorts. Track what you posted and watch the views stack up in your ledger.',
     tag: 'STEP 04',
@@ -315,15 +291,9 @@ function HowItWorks() {
             <span className="absolute -right-3 -top-5 font-display text-7xl font-extrabold text-white/[0.04]">
               {i + 1}
             </span>
-            <span className="icon-gem flex h-11 w-11 items-center justify-center rounded-2xl">
-              <s.icon className="h-5 w-5 text-champagne" />
-            </span>
-            <p className="mt-6 font-mono text-[10px] tracking-[0.25em] text-mist-2">{s.tag}</p>
-            <h3 className="mt-2 font-display text-lg font-extrabold text-pearl">{s.title}</h3>
+            <p className="font-mono text-[10px] tracking-[0.25em] text-champagne">{s.tag}</p>
+            <h3 className="mt-3 font-display text-lg font-extrabold text-pearl">{s.title}</h3>
             <p className="mt-3 text-sm leading-relaxed text-mist">{s.body}</p>
-            {i < STEPS.length - 1 && (
-              <ArrowRight className="absolute -right-2 top-1/2 hidden h-5 w-5 -translate-y-1/2 text-champagne/40 xl:block" />
-            )}
           </div>
         ))}
       </div>
@@ -331,66 +301,131 @@ function HowItWorks() {
   )
 }
 
-const FEATURES = [
+const FEATURE_STEPS = [
   {
-    icon: Gauge,
-    name: 'Viral Score™',
-    desc: 'Every candidate moment gets a 0 to 100 score for hook strength, retention risk, and shareability, plus a plain-English reason so you know exactly why it was picked.',
-    span: 'md:col-span-2',
+    step: '01',
+    title: 'Paste a link, AI surfaces the moments',
+    description:
+      'Drop any YouTube URL or upload raw video. Clipzila scans the entire timeline for hooks, pacing, and punchlines, scoring candidate moments so you never scrub footage by hand.',
+    image: '/marketing/clipzila_amber_vault.jpg',
+    alt: 'Clipzila library vault of candidate moments',
+    width: 1024,
+    height: 640,
+    aspect: 'aspect-[16/10]',
   },
   {
-    icon: Captions,
-    name: 'Word-perfect captions',
-    desc: 'Word-level timing from Whisper means captions land on the exact syllable. 15 styles from clean to beast-mode.',
-    span: '',
+    step: '02',
+    title: 'Auto-edit to vertical with face tracking',
+    description:
+      'Every selected moment is reframed into 9:16 vertical video with the speaker centered automatically. Multi-speaker podcast setups get smooth speaker switching without keyframing.',
+    image: '/marketing/clipzila_story_reel.jpg',
+    alt: 'Vertical 9:16 phone clips with face-tracking and viral scores',
+    width: 768,
+    height: 960,
+    aspect: 'aspect-[4/5]',
   },
   {
-    icon: ScanFace,
-    name: 'Face-tracked 9:16',
-    desc: 'The crop follows the speaker automatically. Two-shot conversations get smart speaker switching.',
-    span: '',
-  },
-  {
-    icon: Wand2,
-    name: 'Dynamic framing',
-    desc: 'Auto zoom-punches and viral hook pacing calibrated for high-retention short-form feeds.',
-    span: '',
-  },
-  {
-    icon: Palette,
-    name: 'Brand kit',
-    desc: 'Your fonts, colors, and caption style saved once. Applied to every future project by default.',
-    span: '',
-  },
-  {
-    icon: Layers,
-    name: 'Campaign ledger',
-    desc: 'Log which clip went to which platform, keep a posting calendar, and see pending vs paid earnings per campaign.',
-    span: 'md:col-span-2',
+    step: '03',
+    title: 'Word-perfect captions and instant export',
+    description:
+      'Word-level timing from Whisper burns kinetic captions on the exact syllable in 15 creator presets. Download clean, high-bitrate MP4s sized for TikTok, Reels, and Shorts.',
+    image: '/marketing/clipzila_story_reel.jpg',
+    alt: 'Burned-in word-level subtitles and multi-platform exports',
+    width: 768,
+    height: 960,
+    aspect: 'aspect-[4/5]',
   },
 ]
 
 function Features() {
   return (
-    <section id="features" className="mx-auto max-w-6xl scroll-mt-28 px-5 pt-20 sm:px-6 sm:pt-28">
+    <section id="features" className="mx-auto max-w-6xl scroll-mt-28 px-4 sm:px-6 pt-20 sm:pt-28">
       <p className="eyebrow rv">Inside The Engine</p>
       <h2 className="display-md mt-4 max-w-2xl rv">
         An editor that works while you <span className="text-gold">sleep</span>
       </h2>
-      <div className="mt-14 grid gap-5 md:grid-cols-3">
-        {FEATURES.map((f, i) => (
-          <div
-            key={f.name}
-            className={`glass-card group rounded-3xl p-7 rv ${f.span}`}
-            style={{ transitionDelay: `${(i % 3) * 90}ms` }}
-          >
-            <span className="icon-gem flex h-11 w-11 items-center justify-center rounded-2xl">
-              <f.icon className="h-5 w-5 text-champagne" />
-            </span>
-            <h3 className="mt-5 font-display text-lg font-extrabold text-pearl">{f.name}</h3>
-            <p className="mt-2.5 text-sm leading-relaxed text-mist">{f.desc}</p>
+
+      <div className="mt-14 space-y-8">
+        {/* Step 1: Largest hero card with wide image */}
+        <div className="glass-card relative overflow-hidden rounded-3xl p-6 sm:p-10 rv">
+          <div className="grid gap-8 lg:grid-cols-12 lg:items-center">
+            <div className="lg:col-span-5">
+              <span className="font-mono text-xs font-bold uppercase tracking-[0.25em] text-champagne">
+                Step {FEATURE_STEPS[0].step}
+              </span>
+              <h3 className="mt-3 font-display text-2xl font-extrabold text-pearl sm:text-3xl">
+                {FEATURE_STEPS[0].title}
+              </h3>
+              <p className="mt-4 text-base leading-relaxed text-mist">
+                {FEATURE_STEPS[0].description}
+              </p>
+            </div>
+            <div className="relative overflow-hidden rounded-2xl border border-hair/80 bg-black/40 lg:col-span-7">
+              <Image
+                src={FEATURE_STEPS[0].image}
+                alt={FEATURE_STEPS[0].alt}
+                width={FEATURE_STEPS[0].width}
+                height={FEATURE_STEPS[0].height}
+                className={`w-full object-cover ${FEATURE_STEPS[0].aspect}`}
+                loading="lazy"
+              />
+            </div>
           </div>
-        ))}
+        </div>
+
+        {/* Step 2: Smaller step, text on left, image on right */}
+        <div className="glass-card relative overflow-hidden rounded-3xl p-6 sm:p-8 rv">
+          <div className="grid gap-8 md:grid-cols-2 md:items-center">
+            <div>
+              <span className="font-mono text-xs font-bold uppercase tracking-[0.25em] text-champagne">
+                Step {FEATURE_STEPS[1].step}
+              </span>
+              <h3 className="mt-3 font-display text-xl font-extrabold text-pearl sm:text-2xl">
+                {FEATURE_STEPS[1].title}
+              </h3>
+              <p className="mt-3 text-sm leading-relaxed text-mist">
+                {FEATURE_STEPS[1].description}
+              </p>
+            </div>
+            <div className="relative overflow-hidden rounded-2xl border border-hair/80 bg-black/40">
+              <Image
+                src={FEATURE_STEPS[1].image}
+                alt={FEATURE_STEPS[1].alt}
+                width={FEATURE_STEPS[1].width}
+                height={FEATURE_STEPS[1].height}
+                className={`w-full object-cover object-top ${FEATURE_STEPS[1].aspect}`}
+                loading="lazy"
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Step 3: Smaller step, alternating sides (image on left, text on right) */}
+        <div className="glass-card relative overflow-hidden rounded-3xl p-6 sm:p-8 rv">
+          <div className="grid gap-8 md:grid-cols-2 md:items-center">
+            <div className="order-2 md:order-1 relative overflow-hidden rounded-2xl border border-hair/80 bg-black/40">
+              <Image
+                src={FEATURE_STEPS[2].image}
+                alt={FEATURE_STEPS[2].alt}
+                width={FEATURE_STEPS[2].width}
+                height={FEATURE_STEPS[2].height}
+                className={`w-full object-cover object-bottom ${FEATURE_STEPS[2].aspect}`}
+                loading="lazy"
+              />
+            </div>
+            <div className="order-1 md:order-2">
+              <span className="font-mono text-xs font-bold uppercase tracking-[0.25em] text-champagne">
+                Step {FEATURE_STEPS[2].step}
+              </span>
+              <h3 className="mt-3 font-display text-xl font-extrabold text-pearl sm:text-2xl">
+                {FEATURE_STEPS[2].title}
+              </h3>
+              <p className="mt-3 text-sm leading-relaxed text-mist">
+                {FEATURE_STEPS[2].description}
+              </p>
+            </div>
+          </div>
+        </div>
       </div>
     </section>
   )
@@ -427,13 +462,12 @@ function TimeCompare() {
               className="btn-lux btn-primary mt-8 inline-flex !rounded-2xl !px-7 !py-3.5"
             >
               Try it free
-              <ArrowRight className="h-4 w-4" />
             </Link>
           </div>
           <div className="space-y-6">
             <div className="space-y-3 rounded-2xl border border-hair bg-black/30 p-6">
-              <p className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.2em] text-mist-2">
-                <Clock className="h-3.5 w-3.5" /> Old way
+              <p className="mb-2 text-xs font-semibold uppercase tracking-[0.2em] text-mist-2">
+                Old way
               </p>
               {oldTasks.map(([task, mins]) => (
                 <div key={task}>
@@ -451,8 +485,8 @@ function TimeCompare() {
               ))}
             </div>
             <div className="space-y-3 rounded-2xl border border-[#ff5a1f]/40 bg-[#ff5a1f]/[0.06] p-6">
-              <p className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.2em] text-[#ffb27a]">
-                <Zap className="h-3.5 w-3.5" /> With Clipzila
+              <p className="mb-2 text-xs font-semibold uppercase tracking-[0.2em] text-[#ffb27a]">
+                With Clipzila
               </p>
               {['You paste the link', 'Engine does the rest'].map((task, i) => (
                 <div key={task}>
@@ -575,10 +609,19 @@ function Pricing() {
 
 function Faq() {
   return (
-    <section id="faq" className="mx-auto max-w-3xl scroll-mt-28 px-5 pt-20 sm:px-6 sm:pt-28">
-      <p className="eyebrow rv">FAQ</p>
-      <h2 className="display-md mt-4 rv">Questions, answered</h2>
-      <FaqAccordion />
+    <section id="faq" className="mx-auto max-w-6xl scroll-mt-28 px-5 pt-20 sm:px-6 sm:pt-28">
+      <div className="grid gap-10 lg:grid-cols-12">
+        <div className="lg:col-span-4">
+          <p className="eyebrow rv">FAQ</p>
+          <h2 className="display-md mt-4 rv">Questions, answered</h2>
+          <p className="mt-4 text-sm leading-relaxed text-mist rv">
+            Everything you need to know about processing limits, credits, and exports.
+          </p>
+        </div>
+        <div className="lg:col-span-8">
+          <FaqAccordion />
+        </div>
+      </div>
     </section>
   )
 }
@@ -605,7 +648,6 @@ function FinalCta() {
             className="btn-lux btn-primary inline-flex !rounded-2xl !px-8 !py-4 !text-base"
           >
             Start Free
-            <ArrowRight className="h-4 w-4" />
           </Link>
           <a href="#how" className="btn-lux btn-outline inline-flex !rounded-2xl !px-8 !py-4 !text-base">
             See How It Works
