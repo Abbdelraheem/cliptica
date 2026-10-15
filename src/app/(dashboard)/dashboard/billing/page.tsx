@@ -620,7 +620,7 @@ function BillingContent() {
 
       <p className="mt-10 text-center text-sm font-light text-mist">
         Need invoice history or a custom tier?{' '}
-        <a href="mailto:support@cliptica.com" className="text-gold underline underline-offset-4">
+        <a href="mailto:support@clipzila.com" className="text-gold underline underline-offset-4">
           Contact support
         </a>
       </p>
