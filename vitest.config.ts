@@ -9,6 +9,7 @@ export default defineConfig({
     env: {
       DATABASE_URL: 'postgresql://test:test@localhost:5432/test',
       NEXTAUTH_SECRET: 'test-secret-for-unit-tests',
+      NEXTAUTH_URL: 'https://clipzila.com',
     },
   },
   resolve: {
