@@ -166,7 +166,6 @@ function BillingContent() {
 
   const handlePaddleEvent = useCallback((event: { name?: string; data?: unknown }) => {
     if (!event?.name) return
-    console.log('[Paddle Event]', event.name, event.data)
 
     if (event.name === 'checkout.loaded') {
       setIsCheckoutLoading(false)
