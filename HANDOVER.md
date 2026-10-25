@@ -142,6 +142,12 @@ During the autonomous preparation of the repository for technical acquisition, t
    - Added proprietary commercial `LICENSE` preserving intellectual property for the acquiring buyer.
    - Verified multi-stage production `Dockerfile` bundling Node 20, Python 3, FFmpeg, and InsightFace.
 
+9. **Email Verification via Email Disabled**:
+   - Disabled mandatory email verification gating by default via `REQUIRE_EMAIL_VERIFICATION="false"`.
+   - New user registrations immediately receive `emailVerified: new Date()` and automatic sign-in forwarding directly to the dashboard without waiting for an email confirmation link.
+   - Credentials and OAuth sign-in flows self-heal legacy unverified accounts upon login, ensuring zero friction or registration abandonment.
+   - If an operator explicitly wishes to enforce email verification in the future, setting `REQUIRE_EMAIL_VERIFICATION="true"` restores the verification email link delivery.
+
 ---
 
 ## 6. Known Issues & Limitations

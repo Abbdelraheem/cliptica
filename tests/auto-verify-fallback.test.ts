@@ -91,4 +91,43 @@ describe('Auto-Verification Fallback when Resend is Unset', () => {
     // Verification token is NOT created when Resend is unset
     expect(mockPrisma.emailVerificationToken.create).not.toHaveBeenCalled()
   })
+
+  it('register route: auto-verifies user even when RESEND_API_KEY is present if REQUIRE_EMAIL_VERIFICATION is not true', async () => {
+    process.env.RESEND_API_KEY = 're_test_key_123'
+    delete process.env.REQUIRE_EMAIL_VERIFICATION
+
+    mockPrisma.user.findFirst.mockResolvedValue(null)
+    mockPrisma.user.create.mockImplementation(({ data }: any) =>
+      Promise.resolve({
+        id: 'usr_new_456',
+        ...data,
+      })
+    )
+    mockPrisma.creditTransaction.create.mockResolvedValue({})
+
+    const { POST } = await import('@/app/api/auth/register/route')
+    const req = new Request('http://localhost/api/auth/register', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: 'Auto Verified Creator',
+        email: 'autoverify@example.com',
+        password: 'ValidPassword123!',
+        deviceId: 'dev_test_456',
+      }),
+    })
+
+    const res = await POST(req)
+    expect(res.status).toBe(200)
+    const data = await res.json()
+    expect(data.autoVerified).toBe(true)
+    expect(mockPrisma.user.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          emailVerified: expect.any(Date),
+        }),
+      })
+    )
+    expect(mockPrisma.emailVerificationToken.create).not.toHaveBeenCalled()
+  })
 })
