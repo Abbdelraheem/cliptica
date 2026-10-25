@@ -124,13 +124,10 @@ COPY --from=web-builder /opt/nology/node_modules/zod ./node_modules/zod
 COPY --from=web-builder /opt/nology/node_modules/@tanstack ./node_modules/@tanstack
 COPY --from=web-builder /opt/nology/node_modules/clsx ./node_modules/clsx
 COPY --from=web-builder /opt/nology/node_modules/tailwind-merge ./node_modules/tailwind-merge
-COPY --from=web-builder /opt/nology/node_modules/class-variance-authority ./node_modules/class-variance-authority
 COPY --from=web-builder /opt/nology/node_modules/lucide-react ./node_modules/lucide-react
 COPY --from=web-builder /opt/nology/node_modules/sonner ./node_modules/sonner
 COPY --from=web-builder /opt/nology/node_modules/next-themes ./node_modules/next-themes
-COPY --from=web-builder /opt/nology/node_modules/@radix-ui ./node_modules/@radix-ui
 COPY --from=web-builder /opt/nology/node_modules/jiti ./node_modules/jiti
-COPY --from=web-builder /opt/nology/node_modules/enhanced-resolve ./node_modules/enhanced-resolve
 
 # ============================================================
 # STAGE 5: Worker runtime (Node + Python + FFmpeg + InsightFace)
