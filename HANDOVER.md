@@ -52,6 +52,11 @@ The following safe technical decisions were applied during codebase preparation:
    - All claims reflect verified technical capabilities: 5 free trial credits, 9:16 face-tracked vertical exports, Whisper word-level timing, and actual plan credit allowances.
    - Verified legal agreement pages (`/terms`, `/privacy`, `/refund-policy`) with explicit Paddle MoR disclosures and verified contact channel (`support@clipzila.com`).
 
+7. **Step 6 - Stability & Root Error Boundaries**:
+   - Implemented `src/app/global-error.tsx` catching root layout render crashes with Sentry reporting and interactive recovery.
+   - Applied defensive mobile responsiveness safeguards: `overflow-x: hidden` on both `<html>` and `<body>` in `src/app/globals.css`, explicit `width: device-width` viewport tag in `src/app/layout.tsx`, and WCAG AAA `min-height: 44px; min-width: 44px` on `.btn-lux`.
+   - Created `docs/KNOWN_ISSUES.md` documenting the generic mobile crash report, defensive mitigations applied, and triage reproduction checklist.
+
 ---
 
 ## 3. Secrets That Must Be Rotated
@@ -78,3 +83,5 @@ The following secrets were committed to repository history in past revisions pri
    - `src/app/api/billing/paddle-webhook/route.ts` maps `basic` tier subscriptions to `UserRole.CLIPPER` because the database schema only provides `FREE`, `CLIPPER`, `STUDIO`, and `ADMIN`. Basic tier subscribers currently receive Starter duration and daily video allowances. See `docs/BILLING.md` for the single SQL migration required to add `BASIC`.
 2. **Legacy Tokens**:
    - `nlg_live_` prefix for developer API keys and `NOLOGY·fp·2026` canvas fingerprint string are preserved to avoid breaking existing users and API tokens.
+3. **Reported Mobile Crash**:
+   - Defensive mitigations applied in root error boundary (`src/app/global-error.tsx`), CSS overflow protection, and touch target sizing. Documented triage requirements in `docs/KNOWN_ISSUES.md`.
