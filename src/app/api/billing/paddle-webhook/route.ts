@@ -151,6 +151,10 @@ async function handleSubscriptionUpdated(tx: Tx, subscription: PaddleSubscriptio
   if (user.role === 'ADMIN' || isAdminEmail(user.email)) {
     role = 'ADMIN'
   } else if (subscription.status === 'active' || subscription.status === 'trialing') {
+    // TODO: KNOWN ISSUE - Paddle maps 'basic' -> 'CLIPPER' because the PostgreSQL/Prisma UserRole enum currently only has [FREE, CLIPPER, STUDIO, ADMIN].
+    // Proposed fix: Run a database migration to add 'BASIC' to the UserRole enum (`ALTER TYPE "UserRole" ADD VALUE 'BASIC';`),
+    // update prisma/schema.prisma, and map `if (planKey === 'basic') role = 'BASIC'`.
+    // Currently, Basic tier buyers are granted CLIPPER role limits as a safe access default to prevent service denial.
     if (planKey === 'basic' || planKey === 'clipper') role = 'CLIPPER'
     if (planKey === 'studio') role = 'STUDIO'
   } else if (subscription.status === 'canceled' || subscription.status === 'past_due') {
