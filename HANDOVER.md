@@ -47,6 +47,11 @@ The following safe technical decisions were applied during codebase preparation:
    - Verified fail-safe startup: all 3 providers instantiate cleanly without crashing if environment variables are absent.
    - Retained Paddle `basic` -> `CLIPPER` role mapping in `src/app/api/billing/paddle-webhook/route.ts` as the safe default for existing subscribers, added clearly marked `// TODO:` comment with proposed migration path.
 
+6. **Step 5 - Honest Public Copy & Legal Compliance**:
+   - Audited landing page (`src/app/(marketing)/page.tsx`), marketing layout, and i18n dictionaries. Confirmed zero fabricated social proof, fake user counts ("50,000+"), or synthetic testimonials.
+   - All claims reflect verified technical capabilities: 5 free trial credits, 9:16 face-tracked vertical exports, Whisper word-level timing, and actual plan credit allowances.
+   - Verified legal agreement pages (`/terms`, `/privacy`, `/refund-policy`) with explicit Paddle MoR disclosures and verified contact channel (`support@clipzila.com`).
+
 ---
 
 ## 3. Secrets That Must Be Rotated
