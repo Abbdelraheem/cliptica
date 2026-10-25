@@ -1,5 +1,5 @@
-import { describe, it, expect, vi } from 'vitest'
-import { assertDeviceAvailable, DeviceConflictError } from '@/lib/device'
+import { describe, it, expect } from 'vitest'
+import { assertDeviceAvailable } from '@/lib/device'
 
 describe('Admin Device Bypass', () => {
   it('should immediately bypass device check if userRole is ADMIN', async () => {

@@ -188,7 +188,7 @@ function Hero() {
                 caption="NOBODY TELLS YOU THIS"
                 reason="Strong hook + emotional peak at 12:04"
                 delay={0}
-                imageSrc="/marketing/clipzila_story_reel.jpg"
+                imageSrc="/marketing/clipzila_story_reel.webp"
               />
               <ClipCard
                 title="Why we almost quit"
@@ -197,7 +197,7 @@ function Hero() {
                 caption="WE LOST EVERYTHING"
                 reason="Story arc with retention spike at 31:20"
                 delay={1.2}
-                imageSrc="/marketing/clipzila_amber_vault.jpg"
+                imageSrc="/marketing/clipzila_amber_vault.webp"
               />
               <ClipCard
                 title="Hiring at 3AM"
@@ -206,7 +206,7 @@ function Hero() {
                 caption="BEST ADVICE EVER"
                 reason="Quotable punchline, high shareability"
                 delay={2.4}
-                imageSrc="/marketing/clipzila_viral_growth.jpg"
+                imageSrc="/marketing/clipzila_viral_growth.webp"
               />
             </div>
           </div>
@@ -307,7 +307,7 @@ const FEATURE_STEPS = [
     title: 'Paste a link, AI surfaces the moments',
     description:
       'Drop any YouTube URL or upload raw video. Clipzila scans the entire timeline for hooks, pacing, and punchlines, scoring candidate moments so you never scrub footage by hand.',
-    image: '/marketing/clipzila_amber_vault.jpg',
+    image: '/marketing/clipzila_amber_vault.webp',
     alt: 'Clipzila library vault of candidate moments',
     width: 1024,
     height: 640,
@@ -318,7 +318,7 @@ const FEATURE_STEPS = [
     title: 'Auto-edit to vertical with face tracking',
     description:
       'Every selected moment is reframed into 9:16 vertical video with the speaker centered automatically. Multi-speaker podcast setups get smooth speaker switching without keyframing.',
-    image: '/marketing/clipzila_story_reel.jpg',
+    image: '/marketing/clipzila_story_reel.webp',
     alt: 'Vertical 9:16 phone clips with face-tracking and viral scores',
     width: 768,
     height: 960,
@@ -329,7 +329,7 @@ const FEATURE_STEPS = [
     title: 'Word-perfect captions and instant export',
     description:
       'Word-level timing from Whisper burns kinetic captions on the exact syllable in 15 creator presets. Download clean, high-bitrate MP4s sized for TikTok, Reels, and Shorts.',
-    image: '/marketing/clipzila_story_reel.jpg',
+    image: '/marketing/clipzila_story_reel.webp',
     alt: 'Burned-in word-level subtitles and multi-platform exports',
     width: 768,
     height: 960,

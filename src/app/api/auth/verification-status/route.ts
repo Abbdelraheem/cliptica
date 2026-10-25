@@ -29,8 +29,9 @@ export async function POST(request: Request) {
     const { email, password } = validated.data
     const user = await prisma.user.findUnique({ where: { email: email.toLowerCase() } })
 
+    const requireEmailVerification = process.env.REQUIRE_EMAIL_VERIFICATION === 'true'
     const isResendConfigured = Boolean(process.env.RESEND_API_KEY && process.env.RESEND_API_KEY.trim().length > 0)
-    if (!isResendConfigured) {
+    if (!requireEmailVerification || !isResendConfigured) {
       return NextResponse.json({ needsVerification: false })
     }
 

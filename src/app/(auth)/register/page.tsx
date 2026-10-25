@@ -30,6 +30,7 @@ export default function RegisterPage() {
     if (vUrl) {
       setPendingVideo(vUrl)
       try {
+        sessionStorage.setItem('clipzila_pending_video_url', vUrl)
         sessionStorage.setItem('cliptica_pending_video_url', vUrl)
       } catch {}
     }

@@ -276,7 +276,7 @@ export default function CampaignsPage() {
                   <Sparkles className="h-3.5 w-3.5" />
                   How to Earn from Campaigns
                 </div>
-                <h3 className="text-lg font-bold text-pearl">1. Grab Raw Footage → 2. Clip with Cliptica AI → 3. Post & Submit Your Link</h3>
+                <h3 className="text-lg font-bold text-pearl">1. Grab Raw Footage → 2. Clip with Clipzila AI → 3. Post & Submit Your Link</h3>
                 <p className="text-xs text-mist leading-relaxed max-w-3xl">
                   Browse available campaigns below, access raw source footage to clip high-hook moments, post to TikTok, Reels, or Shorts adhering to rules, then submit your link to automatically track views and earn rewards!
                 </p>
@@ -311,6 +311,7 @@ export default function CampaignsPage() {
                       {/* Card Cover Image or Gradient */}
                       <div className="relative h-44 w-full overflow-hidden border-b border-hair/60 bg-onyx-3">
                         {c.imageUrl ? (
+                          /* eslint-disable-next-line @next/next/no-img-element */
                           <img
                             src={c.imageUrl}
                             alt={c.name}
@@ -630,7 +631,7 @@ export default function CampaignsPage() {
               <div className="rounded-lg bg-onyx/60 p-3 text-[11px] text-mist flex items-start gap-2 border border-hair/40">
                 <Info className="h-4 w-4 text-champagne flex-shrink-0 mt-0.5" />
                 <span>
-                  The Cliptica engine periodically and automatically verifies video views and engagement, crediting earnings once campaign requirements are verified.
+                  The Clipzila engine periodically and automatically verifies video views and engagement, crediting earnings once campaign requirements are verified.
                 </span>
               </div>
 
@@ -841,7 +842,7 @@ export default function CampaignsPage() {
                 <textarea
                   name="rules"
                   rows={2}
-                  placeholder="e.g. Must include hashtag #CLIPTICA and tag account, clip minimum 30s..."
+                  placeholder="e.g. Must include hashtag #CLIPZILA and tag account, clip minimum 30s..."
                   className="input-lux w-full text-xs"
                 />
               </div>

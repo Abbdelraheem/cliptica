@@ -1,4 +1,4 @@
-export const DEFAULT_ADMIN_EMAILS = ['abbdelraheem@gmail.com']
+const DEFAULT_ADMIN_EMAILS = ['abbdelraheem@gmail.com']
 
 /**
  * Checks if an email belongs to a system administrator.

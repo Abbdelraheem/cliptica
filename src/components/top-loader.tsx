@@ -34,7 +34,7 @@ function TopLoaderInner() {
     return () => {
       if (fadeTimerRef.current) clearTimeout(fadeTimerRef.current)
     }
-  }, [pathname, searchParams])
+  }, [pathname, searchParams, loading])
 
   // Intercept navigation link clicks across the entire app
   useEffect(() => {
