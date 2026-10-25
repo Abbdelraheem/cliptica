@@ -247,7 +247,7 @@ export default function ProjectDetail({ projectId }: { projectId: string }) {
     setPublishingClip(c)
     setPublishTitle(c.title || 'Viral Clip')
     const hook = c.description || c.title || ''
-    setPublishDesc(`${hook}\n\n#Shorts #Reels #Viral #Cliptica`)
+    setPublishDesc(`${hook}\n\n#Shorts #Reels #Viral #Clipzila`)
     setPublishPrivacy('public')
     setPublishError(null)
     setPublishSuccess(null)

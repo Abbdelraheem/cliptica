@@ -1,4 +1,4 @@
-# Cliptica — AI Video Clipping Platform
+# Clipzila — AI Video Clipping Platform
 
 Turns long videos (YouTube link or upload) into ready-to-post 9:16 short clips:
 transcription → LLM moment ranking → face-tracked reframing → karaoke captions → FFmpeg render → Cloudflare R2.

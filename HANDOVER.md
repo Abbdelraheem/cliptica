@@ -32,6 +32,16 @@ The following safe technical decisions were applied during codebase preparation:
 3. **Step 2 - Historical Git Secrets**:
    - In accordance with non-destructive handover guidelines, git history was NOT rewritten (`git filter-repo` / `bfg` was not executed to avoid breaking existing commits or remote references). All historical credentials found in git commits have been cataloged below for mandatory rotation.
 
+4. **Step 3 - Brand Unification to Clipzila**:
+   - Replaced remaining user-visible "Cliptica" mentions across login, registration, campaigns, earnings CSV exports, and project dashboard empty states with "Clipzila".
+   - Updated root `package.json` name to `"clipzila"` with metadata description.
+   - Preserved backward-compatible fallback references:
+     - `nlg_live_` prefix for developer API keys (`src/app/api/user/api-keys/route.ts`). Changing this would invalidate existing API tokens.
+     - `NOLOGY·fp·2026` hardware fingerprint seed string in `src/lib/device.ts` and `src/lib/fingerprint.ts`. Changing this would invalidate device limit locks for existing accounts.
+     - `cliptica_ref` cookie fallback alongside `clipzila_ref` (`src/app/r/[code]/route.ts`, `src/lib/auth.ts`) to avoid dropping in-flight affiliate attribution.
+     - `cliptica_cookie_consent` localStorage fallback (`src/components/cookie-consent.tsx`).
+     - `ClipticaMark` export alias in `src/components/logo.tsx`.
+
 ---
 
 ## 3. Secrets That Must Be Rotated

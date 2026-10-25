@@ -1,6 +1,7 @@
 {
-  "name": "cliptica",
+  "name": "clipzila",
   "version": "0.1.0",
+  "description": "Clipzila - AI Video Clipping Platform",
   "private": true,
   "scripts": {
     "dev": "next dev",
