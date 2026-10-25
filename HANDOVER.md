@@ -54,7 +54,7 @@ The sale includes the following software assets:
    - GitHub Actions CI workflow (`.github/workflows/ci.yml`).
 6. **Utility Scripts (`scripts/`)**:
    - Admin privilege assignment script (`scripts/set-admin.mjs`).
-   - AI provider connectivity and benchmark testing script (`scripts/test-ai.mjs`).
+   - AI provider connectivity and benchmark testing diagnostic endpoint (`/api/admin/ai-test`).
 
 ---
 
