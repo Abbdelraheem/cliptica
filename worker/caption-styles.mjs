@@ -425,7 +425,7 @@ const REACTION_STICKERS = [
   { words: ['ملايين', 'مليون', 'أرقام', 'نمو', 'chart', 'upgrade', 'مبيعات'], emoji: '📈' },
 ]
 
-function findStickerForText(text) {
+export function findStickerForText(text) {
   const norm = text.toLowerCase().replace(/^[^\w\u0600-\u06FF]+|[^\w\u0600-\u06FF]+$/g, '')
   for (const s of REACTION_STICKERS) {
     if (s.words.some((w) => norm.includes(w) || w.includes(norm))) {
@@ -467,7 +467,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 `
 }
 
-export function buildKaraokeAss(words, start, end, emoji = null, styleId = 'hormozi', W = 1080, H = 1920, hookHeadline = null) {
+export function buildKaraokeAss(words, start, end, _emoji = null, styleId = 'hormozi', W = 1080, H = 1920, _hookHeadline = null) {
   const style = getCaptionStyle(styleId)
   const inWin = (words ?? []).filter((w) => w.end > start && w.start < end && w.text)
   if (!inWin.length) return null

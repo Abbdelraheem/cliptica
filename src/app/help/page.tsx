@@ -13,8 +13,6 @@ import {
   ChevronDown,
   Mail,
   ArrowRight,
-  Sparkles,
-  Zap,
 } from 'lucide-react'
 import { MarketingLayout } from '@/components/marketing-layout'
 

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
-import { PLAN_MAX_MINUTES, planMaxMinutes, exceedsPlanMinutes, calcClipCredits } from '../worker/credits.mjs'
-import { PLANS, planForRole } from '../src/lib/stripe'
+import { planMaxMinutes, exceedsPlanMinutes } from '../worker/credits.mjs'
+import { PLANS } from '../src/lib/stripe'
 
 describe('Credit Reservation and Settlement Parity', () => {
   it('enforces exactly 1 credit reserved per video operation', () => {

@@ -311,6 +311,7 @@ export default function CampaignsPage() {
                       {/* Card Cover Image or Gradient */}
                       <div className="relative h-44 w-full overflow-hidden border-b border-hair/60 bg-onyx-3">
                         {c.imageUrl ? (
+                          /* eslint-disable-next-line @next/next/no-img-element */
                           <img
                             src={c.imageUrl}
                             alt={c.name}

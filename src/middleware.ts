@@ -53,7 +53,6 @@ async function rateLimitLoginCallback(request: NextRequest): Promise<NextRespons
   )
 }
 
-import { isCrawler, COUNTRY_TO_LOCALE, isValidLocale } from '@/lib/seo/constants'
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
