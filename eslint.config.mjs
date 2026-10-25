@@ -20,7 +20,13 @@ const eslintConfig = [
     },
   },
   {
-    ignores: [".next/**", "out/**", "build/**", "next-env.d.ts"],
+    files: ["tests/**"],
+    rules: {
+      "@typescript-eslint/no-explicit-any": "off",
+    },
+  },
+  {
+    ignores: [".next/**", "out/**", "build/**", "next-env.d.ts", "remotion-ads/**"],
   },
 ];
 
