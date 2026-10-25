@@ -170,3 +170,35 @@ YTDLP_PROXIES="http://user:pass@proxy1.example.com:8080,http://user:pass@proxy2.
 
 ### 2. Auto-Quarantine & Health Scoring
 The worker (`worker/proxy-pool.mjs`) tracks success/failure rates in memory. Proxies that encounter 2 consecutive errors are automatically quarantined for 15 minutes, prioritizing healthy proxies.
+
+
+---
+
+## 7. Operational & Maintenance Scripts
+
+### 7.1 Seeding an Admin Account
+To create a new administrator account with full balance or reset an existing account's credentials:
+```bash
+node scripts/seed-admin.mjs [admin_email] [admin_password]
+```
+If omitted, defaults to `admin@clipzila.com` and initial password.
+
+### 7.2 Promoting an Existing User to Admin
+To promote an existing registered user:
+```bash
+node scripts/set-admin.mjs user@example.com
+```
+Also accessible via `npm run db:admin`.
+
+### 7.3 YouTube Ingestion & Proxy Smoke Testing
+To test `yt-dlp` download functionality, Safari impersonation, and proxy failover against known video lengths:
+```bash
+node scripts/smoke-test-yt.mjs
+```
+
+### 7.4 Prometheus Infrastructure Metrics Exporter
+To run the background metrics collector for Prometheus:
+```bash
+/opt/nology-venv/bin/python scripts/metrics-exporter.py
+```
+Exports video processing queue depth, job failure counters, and worker latency.
