@@ -42,6 +42,11 @@ The following safe technical decisions were applied during codebase preparation:
      - `cliptica_cookie_consent` localStorage fallback (`src/components/cookie-consent.tsx`).
      - `ClipticaMark` export alias in `src/components/logo.tsx`.
 
+5. **Step 4 - Multi-Provider Billing Architecture**:
+   - Documented full billing mechanics across Paddle, Stripe, and Whop in `docs/BILLING.md`.
+   - Verified fail-safe startup: all 3 providers instantiate cleanly without crashing if environment variables are absent.
+   - Retained Paddle `basic` -> `CLIPPER` role mapping in `src/app/api/billing/paddle-webhook/route.ts` as the safe default for existing subscribers, added clearly marked `// TODO:` comment with proposed migration path.
+
 ---
 
 ## 3. Secrets That Must Be Rotated
@@ -64,4 +69,7 @@ The following secrets were committed to repository history in past revisions pri
 
 ## 4. Known Issues & Legacy Artifacts
 
-*(This section will be expanded during Steps 4, 5, and 6.)*
+1. **Paddle Basic Plan Mapping**:
+   - `src/app/api/billing/paddle-webhook/route.ts` maps `basic` tier subscriptions to `UserRole.CLIPPER` because the database schema only provides `FREE`, `CLIPPER`, `STUDIO`, and `ADMIN`. Basic tier subscribers currently receive Starter duration and daily video allowances. See `docs/BILLING.md` for the single SQL migration required to add `BASIC`.
+2. **Legacy Tokens**:
+   - `nlg_live_` prefix for developer API keys and `NOLOGY·fp·2026` canvas fingerprint string are preserved to avoid breaking existing users and API tokens.
