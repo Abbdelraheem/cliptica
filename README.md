@@ -39,7 +39,31 @@ Worker Process (`worker/worker.mjs` via PM2 / Docker)
 
 ---
 
-## 3. Local Development Setup (<10 Commands)
+## 3. Repository Structure
+
+```
+cliptica/
+├── .github/              # CI/CD GitHub Actions workflows
+├── deploy/               # PM2 configurations, Nginx templates, and deployment scripts
+├── docs/                 # Architecture, operations runbook, and billing specifications
+├── prisma/               # PostgreSQL schema and versioned migration history
+├── public/               # Static assets, branding vectors, and optimized WebP media
+├── scripts/              # Admin seed tools, YouTube smoke tests, and metric exporters
+├── src/                  # Next.js 15 App Router source code
+│   ├── app/              # Routes: marketing, auth, dashboard, admin, and API endpoints
+│   ├── components/       # Shared UI components and layout wrappers
+│   └── lib/              # Core business logic, auth, billing, and security guards
+├── tests/                # Automated Vitest test suite (39 suites, 341 tests)
+├── worker/               # Background video processing engine (FFmpeg, Whisper, LLM)
+├── Dockerfile            # Multi-stage container definition
+├── HANDOVER.md           # Technical buyer handover package and architecture ledger
+├── package.json          # Dependencies and operational scripts
+└── README.md             # Developer setup, architecture overview, and deployment runbook
+```
+
+---
+
+## 4. Local Development Setup (<10 Commands)
 
 Get Clipzila running locally in under 5 minutes:
 
@@ -66,7 +90,7 @@ Visit [http://localhost:3000](http://localhost:3000) to open the application.
 
 ---
 
-## 4. Running Tests & Quality Checks
+## 5. Running Tests & Quality Checks
 
 Clipzila maintains a 100% passing test suite across all billing, security, and rendering modules:
 
@@ -86,13 +110,13 @@ npm run build
 
 ---
 
-## 5. How the Background Worker Operates
+## 6. How the Background Worker Operates
 
 The video processing pipeline (`worker/worker.mjs`) is intentionally decoupled from Next.js web requests to ensure zero serverless timeout restrictions:
 
 1. **Queueing**: The `ProcessingJob` PostgreSQL table serves as the queue. Workers claim jobs atomically via conditional row updates (`claimNextJob()`). Multiple worker instances can run in parallel without race conditions.
 2. **Fail-Fast Safety**: Raw media duration is checked immediately via `ffprobe` before any costly AI API requests are triggered.
-3. **Resilience**: The scoring engine employs a 4-tier fallback chain (NVIDIA NIM ──► Groq ──► OpenAI ──► Offline Heuristics). If an external API is degraded, the job falls back seamlessly without failing.
+3. **Resilient Scoring**: The scoring engine employs a 4-tier fallback chain (NVIDIA NIM ──► Groq ──► OpenAI ──► Offline Heuristics). If an external API is degraded, the job falls back seamlessly without failing.
 4. **Local Worker Execution**:
    ```bash
    cd worker
@@ -102,7 +126,7 @@ The video processing pipeline (`worker/worker.mjs`) is intentionally decoupled f
 
 ---
 
-## 6. Production Deployment
+## 7. Production Deployment
 
 ### Option A: Ubuntu VPS with PM2 (Current Production Setup)
 Clipzila is currently provisioned on Ubuntu using PM2 for process management:
@@ -122,7 +146,7 @@ A multi-stage [Dockerfile](file:///Dockerfile) is provided at the repository roo
 
 ---
 
-## 7. Operational Documentation
+## 8. Operational Documentation
 
 - **System Architecture**: [docs/ARCHITECTURE.md](file:///docs/ARCHITECTURE.md)
 - **Production Operations Runbook**: [docs/OPERATIONS.md](file:///docs/OPERATIONS.md)
@@ -132,6 +156,6 @@ A multi-stage [Dockerfile](file:///Dockerfile) is provided at the repository roo
 
 ---
 
-## 8. License
+## 9. License
 
 Proprietary and confidential commercial software. See [LICENSE](file:///LICENSE) for details.

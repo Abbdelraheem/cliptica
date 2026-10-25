@@ -53,8 +53,10 @@ The sale includes the following software assets:
    - 39 Vitest test suites (340 passing tests) covering security, billing, SSRF guards, and rendering.
    - GitHub Actions CI workflow (`.github/workflows/ci.yml`).
 6. **Utility Scripts (`scripts/`)**:
+   - Admin account initialization & reset script (`scripts/seed-admin.mjs`).
    - Admin privilege assignment script (`scripts/set-admin.mjs`).
-   - AI provider connectivity and benchmark testing diagnostic endpoint (`/api/admin/ai-test`).
+   - YouTube ingestion & Safari impersonation smoke test (`scripts/smoke-test-yt.mjs`).
+   - Prometheus metrics exporter daemon (`scripts/metrics-exporter.py`).
 
 ---
 
