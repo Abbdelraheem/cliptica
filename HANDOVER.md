@@ -57,6 +57,10 @@ The following safe technical decisions were applied during codebase preparation:
    - Applied defensive mobile responsiveness safeguards: `overflow-x: hidden` on both `<html>` and `<body>` in `src/app/globals.css`, explicit `width: device-width` viewport tag in `src/app/layout.tsx`, and WCAG AAA `min-height: 44px; min-width: 44px` on `.btn-lux`.
    - Created `docs/KNOWN_ISSUES.md` documenting the generic mobile crash report, defensive mitigations applied, and triage reproduction checklist.
 
+8. **Step 7 - Automated CI Quality Gate**:
+   - Configured `.github/workflows/ci.yml` running on pull requests and pushes to `main`.
+   - Executes `npm ci`, `npx prisma generate`, `npx tsc --noEmit`, `npm run lint`, and `npm test` against mock build-time environment variables without exposing production credentials.
+
 ---
 
 ## 3. Secrets That Must Be Rotated
