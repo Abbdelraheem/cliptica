@@ -114,3 +114,20 @@ This document outlines the architecture, data flows, execution lifecycles, and t
 3. **SSRF Guard**: Every remote video URL fetched by worker or server actions is checked against private IP ranges using strict DNS pre-resolution.
 4. **Token Encryption at Rest**: Social OAuth publishing tokens (YouTube, TikTok, Instagram) are encrypted using AES-256-GCM (`ENCRYPTION_SECRET`).
 5. **Device Binding & Multi-Account Prevention**: Hardware fingerprints generated via WebGL/Canvas hashes prevent promotional credit abuse.
+
+
+---
+
+## 5. Design Tokens & UI Architecture
+
+### 5.1 Color Tokens & Palette
+- **Surfaces**: `--onyx` (`#050505` canvas background), `--onyx-2` (`#0a0a0a` elevated cards/sidebars), `--surface` (`rgba(255, 255, 255, 0.04)` card overlay).
+- **Ink / Typography**: `--pearl` (`#ffffff`, 21:1 AAA contrast), `--mist` (`rgba(255, 255, 255, 0.75)`, 12.4:1 AAA), `--mist-2` (`rgba(255, 255, 255, 0.58)`, 5.3:1 AA compliant).
+- **Forge Orange Brand Accents**: `--gold` (`#ff5a1f` primary action), `--gold-2` (`#e8430a` hover/gradient endpoint), `--champagne` (`#ff7a3d` focus ring / links), `--emerald-soft` (`rgba(255, 90, 31, 0.25)` ambient glow).
+- **Hairlines**: `--hair` (`rgba(255, 255, 255, 0.08)` border), `--hair-soft` (`rgba(255, 255, 255, 0.05)` divider).
+
+### 5.2 Typography & Radii
+- **Fonts**: Display font `Manrope`, body font `Inter`.
+- **Corner Radii**: `--radius-sm` (`10px`), `--radius` (`18px` cards/video containers), `--radius-lg` (`28px`), `pill` (`9999px`).
+- **Glassmorphism**: `.glass-card` uses `backdrop-filter: blur(20px)`, `border: 1px solid var(--hair)`, and `background: linear-gradient(165deg, rgba(255,255,255,0.045), rgba(255,255,255,0.012))`.
+- **Accessibility**: All interactive elements support WCAG 2.1 AA with `:focus-visible` styling (`outline: 2px solid var(--champagne)`).
