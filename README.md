@@ -113,7 +113,7 @@ sudo curl -L https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -o
 sudo chmod a+rx /usr/local/bin/yt-dlp
 
 # 2. Start web & worker via PM2 ecosystem
-pm2 start deploy/ecosystem.config.cjs
+pm2 start deploy/pm2.ecosystem.config.cjs
 pm2 save
 ```
 

@@ -46,7 +46,7 @@ The sale includes the following software assets:
    - Full PostgreSQL schema definition (`prisma/schema.prisma`) and versioned migrations.
 4. **Operations & Deployment Assets (`deploy/`, `docs/`)**:
    - Multi-stage Dockerfile (`Dockerfile`) for containerized deployment.
-   - PM2 ecosystem configuration (`deploy/ecosystem.config.cjs`) and Nginx reverse proxy template.
+   - PM2 ecosystem configuration (`deploy/pm2.ecosystem.config.cjs`) and Nginx reverse proxy template.
    - System architecture guide (`docs/ARCHITECTURE.md`) and operations runbook (`docs/OPERATIONS.md`).
    - Multi-provider billing documentation (`docs/BILLING.md`) and troubleshooting guide (`docs/KNOWN_ISSUES.md`).
 5. **Testing Suite & CI Automation (`tests/`, `.github/workflows/`)**:
