@@ -61,6 +61,13 @@ The following safe technical decisions were applied during codebase preparation:
    - Configured `.github/workflows/ci.yml` running on pull requests and pushes to `main`.
    - Executes `npm ci`, `npx prisma generate`, `npx tsc --noEmit`, `npm run lint`, and `npm test` against mock build-time environment variables without exposing production credentials.
 
+9. **Step 8 - Developer Experience & Operational Runbooks**:
+   - Rewrote `README.md` with 1-paragraph summary, ASCII architecture flow, tech stack, <10 local setup commands, test commands, and deployment guidance.
+   - Authored `docs/ARCHITECTURE.md` detailing request lifecycles, data flows, and third-party integration failure modes.
+   - Authored `docs/OPERATIONS.md` providing step-by-step terminal runbooks for key rotation, admin provisioning, stuck worker recovery, refunds via Paddle MoR, and zero-downtime rollbacks.
+   - Added proprietary commercial `LICENSE` preserving intellectual property for the acquiring buyer.
+   - Verified multi-stage production `Dockerfile` bundling Node 20, Python 3, FFmpeg, and InsightFace.
+
 ---
 
 ## 3. Secrets That Must Be Rotated
