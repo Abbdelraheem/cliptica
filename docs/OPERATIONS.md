@@ -151,3 +151,22 @@ pm2 restart nology-worker
 # 5. Verify system health:
 curl -i http://localhost:3000/api/health
 ```
+
+---
+
+## 6. Configuring YouTube Residential Proxies
+
+To prevent YouTube bot-detection blocks on cloud server IP ranges:
+
+### 1. Supported Format
+In the production `.env`:
+```env
+# Single rotating proxy gateway:
+YTDLP_PROXIES="http://user:password@proxy.example.com:8080"
+
+# Or comma-separated list of proxies:
+YTDLP_PROXIES="http://user:pass@proxy1.example.com:8080,http://user:pass@proxy2.example.com:8080"
+```
+
+### 2. Auto-Quarantine & Health Scoring
+The worker (`worker/proxy-pool.mjs`) tracks success/failure rates in memory. Proxies that encounter 2 consecutive errors are automatically quarantined for 15 minutes, prioritizing healthy proxies.

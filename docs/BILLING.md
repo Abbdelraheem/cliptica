@@ -126,3 +126,22 @@ To separate Basic and Starter roles at the schema level:
    if (planKey === 'clipper') role = 'CLIPPER'
    ```
 4. Update `planForRole` in `src/lib/stripe.ts` to map `BASIC: 'basic'`.
+
+---
+
+## 5. Unit Economics & Gross Margins
+
+Clipzila operates with a high-margin serverless/hybrid architecture. Every minute of source video processed incurs four direct infrastructure expenses:
+
+| Component | Provider & Specification | Rate | Cost / Source Minute |
+| :--- | :--- | :--- | :--- |
+| **Audio Transcription** | **Groq Whisper Large-v3 Turbo** | \$0.111 / hour | **\$0.001850** |
+| **AI Moment Scoring** | **Groq LLaMA 3.3 70B** | \$0.59 / 1M in, \$0.79 / 1M out | **\$0.000600** |
+| **Media Storage** | **Cloudflare R2** | \$0.015 / GB-month (Zero egress) | **\$0.000135** |
+| **Video Processing** | **AWS EC2 (c6i.xlarge)** | \$0.170 / hour | **\$0.000708** |
+| **Total Infra COGS** | — | — | **\$0.003293 / min** |
+
+At maximum subscription utilization (100% usage):
+- **Starter (`CLIPPER`)**: \$29.00/mo net of gateway fees (\$1.14) and infra costs (\$0.49) yields **94.4% Gross Margin**.
+- **Pro Creator (`STUDIO`)**: \$59.00/mo net of gateway fees (\$2.01) and infra costs (\$1.32) yields **94.4% Gross Margin**.
+
