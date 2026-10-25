@@ -76,13 +76,15 @@ export async function POST(request: Request) {
 
     const passwordHash = await hash(password, 12)
     const isResendConfigured = Boolean(process.env.RESEND_API_KEY && process.env.RESEND_API_KEY.trim().length > 0)
+    const requireEmailVerification = process.env.REQUIRE_EMAIL_VERIFICATION === 'true'
+    const shouldVerify = requireEmailVerification && isResendConfigured && !isAdmin
 
     const user = await prisma.user.create({
       data: {
         email: cleanEmail,
         passwordHash,
         name,
-        emailVerified: (!isResendConfigured || isAdmin) ? new Date() : null,
+        emailVerified: shouldVerify ? null : new Date(),
         credits: isAdmin ? 999999 : 5,
         role: isAdmin ? 'ADMIN' : 'FREE',
         referredByAffiliateId: affiliateId,
@@ -120,8 +122,8 @@ export async function POST(request: Request) {
     // Bind this device to the new account.
     await bindDevice(deviceId, user.id, userAgent)
 
-    // Email verification — if Resend is configured, send the link. Otherwise account is auto-verified.
-    if (isResendConfigured && !isAdmin) {
+    // Email verification — only if explicitly enabled via REQUIRE_EMAIL_VERIFICATION=true. Otherwise account is auto-verified.
+    if (shouldVerify) {
       const { token, tokenHash } = generateVerificationToken()
       await prisma.emailVerificationToken.create({
         data: {
@@ -153,7 +155,7 @@ export async function POST(request: Request) {
     })
 
     const { passwordHash: _, ...userWithoutPassword } = user
-    return NextResponse.json({ user: userWithoutPassword, autoVerified: !isResendConfigured || isAdmin })
+    return NextResponse.json({ user: userWithoutPassword, autoVerified: !shouldVerify })
   } catch (error) {
     console.error('Registration error:', error)
     return NextResponse.json({ error: 'Failed to create account' }, { status: 500 })

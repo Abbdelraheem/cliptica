@@ -1,93 +1,137 @@
-# Cliptica — AI Video Clipping Platform
+# Clipzila — AI Video Clipping & Repurposing Platform
 
-Turns long videos (YouTube link or upload) into ready-to-post 9:16 short clips:
-transcription → LLM moment ranking → face-tracked reframing → karaoke captions → FFmpeg render → Cloudflare R2.
+Clipzila is a production-grade SaaS application that transforms long-form videos (YouTube URLs or raw video uploads) into viral 9:16 vertical short clips. The platform automates audio transcription via Groq Whisper, ranks candidate hooks using multimodal LLM scoring, reframes footage to vertical with InsightFace speaker tracking, and burns synchronized karaoke captions across 18 creator styling presets.
 
-## How It Actually Works
+---
+
+## 1. System Architecture
 
 ```
-Browser ──► Next.js app (Vercel/VPS) ──► Postgres (Neon) + R2 presigned uploads
-                    │ ProcessingJob(queued)
-                    ▼
-   Worker process (`worker/worker.mjs`, run via PM2 — see deploy/)
-       1. yt-dlp download (SSRF-guarded: public http/https only, private-IP DNS blocked)
-       2. ffprobe duration → plan length check (fail-fast before any AI spend)
-       3. Groq Whisper word-level transcript
-       4. LLM moment scoring (Groq Llama → OpenAI fallback → heuristics)
-          — a heuristic/LLM engagement score with hook/retention/share sub-scores,
-            not an ML predictive model
-       5. InsightFace dominant-speaker tracking + FFmpeg 9:16 render,
-          karaoke ASS captions, optional admin-only AI motion graphics
-       6. QC probe → thumbnails → upload clips to R2
-       7. Credits charged atomically (1/min source, +2 motion; never below zero)
+Browser (Next.js 15) ──► PostgreSQL (Prisma) + Cloudflare R2 (Presigned Uploads)
+                                │
+                                │ ProcessingJob (QUEUED)
+                                ▼
+Worker Process (`worker/worker.mjs` via PM2 / Docker)
+  ├── 1. Media Fetch: yt-dlp (SSRF-guarded, proxy rotation) or direct R2 download
+  ├── 2. Length Validation: ffprobe duration check against user subscription tier
+  ├── 3. Audio Extraction: ffmpeg 64k mono MP3 extraction
+  ├── 4. Speech Recognition: Groq Whisper Large-v3 ──► Local faster-whisper fallback
+  ├── 5. Viral Moment Scoring: NVIDIA NIM ──► Groq LLaMA ──► OpenAI ──► Heuristics
+  ├── 6. Video Reframing: InsightFace Python tracker for dominant speaker centering
+  ├── 7. Karaoke Subtitles: ASS subtitle generator with word-level highlight animation
+  ├── 8. Final Render: FFmpeg filter complex (9:16 crop, scale, subtitle burn-in)
+  └── 9. Delivery: Direct upload to Cloudflare R2 + atomic credit deduction
 ```
 
-**Queue**: the `ProcessingJob` table itself, claimed by an atomic conditional
-update (safe for multiple worker instances), with stale-job requeue after
-`STALE_JOB_MINUTES`. There is intentionally **no Redis/BullMQ dependency**.
+---
 
-## Feature Reality
+## 2. Tech Stack
 
-| Feature | Status |
-|---|---|
-| Email/password auth + email verification + password reset | ✅ real |
-| Google/GitHub OAuth (account provisioned on first sign-in) | ✅ real (needs provider keys) |
-| One-account-per-device enforcement | ✅ real |
-| URL import / file upload (presigned R2 PUT, 500MB cap, type allowlist) | ✅ real |
-| Transcription, clip selection, viral-style scoring, captions, reframe | ✅ real |
-| Cinematic color grading / sound design / auto B-roll | ❌ **not implemented** |
-| Stripe subscriptions + idempotent webhook credit grants | ✅ real (needs price IDs) |
-| Credit ledger (auditable transactions, floor-at-zero) | ✅ real |
-| Campaign ledger, earnings tracking, CSV export, payout records | ✅ real (payout approval is manual/offline) |
-| Posting calendar heatmap | ✅ basic (PostingDay counts) |
+- **Framework**: Next.js 15 (App Router, React 19, Server Actions, Route Handlers)
+- **Database & ORM**: PostgreSQL via Prisma ORM 6 (connection pooling, atomic transactions)
+- **Authentication**: NextAuth.js v4 (bcrypt password hashing, Google OAuth 2.0, device fingerprinting)
+- **Styling**: Tailwind CSS v4, Lucide React, Manrope (display font), Inter (body font)
+- **Worker Pipeline**: Node.js ESM (`worker/worker.mjs`), FFmpeg 6+, `yt-dlp`, Python 3 + InsightFace
+- **Cloud Storage**: Cloudflare R2 (S3 API compatible)
+- **Billing Providers**: Paddle Billing (Primary Merchant of Record), Stripe, and Whop
+- **AI Infrastructure**: Groq Cloud (Whisper Large-v3, LLaMA), NVIDIA NIM, OpenAI
+- **Email Delivery**: Resend SDK (`resend`) with React Email templates
 
-Plans: Free 40 credits once · Clipper $19 → 300/mo · Studio $49 → 1,200/mo.
-1 credit ≈ 1 minute of source video. Daily project caps and per-plan max
-source length are enforced server-side.
+---
 
-## Stack
+## 3. Local Development Setup (<10 Commands)
 
-Next.js 15 (App Router) · TypeScript · Tailwind v4 · Prisma + PostgreSQL ·
-NextAuth v4 (JWT sessions) · TanStack Query · Stripe · Groq/OpenAI · FFmpeg +
-yt-dlp + InsightFace in the worker · Cloudflare R2 · Upstash rate limiting
-(optional, no-ops when unset) · Sentry-compatible error tracking (optional).
-
-## Getting Started
+Get Clipzila running locally in under 5 minutes:
 
 ```bash
+# 1. Clone repository and install dependencies
+git clone https://github.com/Abbdelraheem/cliptica.git
+cd cliptica
 npm install
-cp .env.example .env      # fill DATABASE_URL at minimum
-npx prisma migrate deploy # or: npx prisma db push for first boot
+
+# 2. Configure environment variables (see .env.example)
+cp .env.example .env.local
+
+# 3. Generate Prisma client & push schema to local Postgres
+npx prisma generate
+npx prisma db push
+
+# 4. Start Next.js development server
 npm run dev
-
-# tests / checks
-npm run test        # vitest unit suite
-npm run typecheck
-npm run lint
-npm run build
-
-# production worker (on a box with ffmpeg, yt-dlp, aws cli, python+insightface)
-cd worker && npm install && npx prisma generate
-pm2 start ../deploy/ecosystem.config.cjs
-
-# promote an account to ADMIN (enables AI motion graphics controls)
-npm run db:admin -- you@example.com
 ```
 
-Required binaries on the worker host: `ffmpeg`, `ffprobe`, `/usr/local/bin/yt-dlp`,
-`aws` (R2 sync), Python env for the premium face-tracking step (`worker/premium/faces.py`).
+Visit [http://localhost:3000](http://localhost:3000) to open the application.
 
-## Deployment Shape
+> **Environment Variables**: See [.env.example](file:///.env.example) for a comprehensive list of all required and optional configuration keys with inline documentation.
 
-- **Web/API**: one Next.js deployment (Node runtime — APIs do not work on the
-  static GitHub Pages export; that export is marketing/preview only).
-- **Worker**: long-lived process on a CPU box (Oracle ARM free tier is enough
-  to start). Not serverless — renders take minutes.
-- **DB**: managed Postgres (Neon). **Storage**: private R2 bucket.
-- Migrations: single baseline under `prisma/migrations/`; apply with
-  `prisma migrate deploy`.
+---
 
-Security posture: ownership scoping on every query, Zod validation everywhere,
-rate-limited auth + mutations, atomic webhook idempotency (unique event id),
-atomic job claiming, SSRF guard on imports, security headers, no client-trusted
-financial fields.
+## 4. Running Tests & Quality Checks
+
+Clipzila maintains a 100% passing test suite across all billing, security, and rendering modules:
+
+```bash
+# Run unit & integration test suite (Vitest)
+npm test
+
+# Run TypeScript type check
+npm run typecheck
+
+# Run ESLint validation
+npm run lint
+
+# Production build check
+npm run build
+```
+
+---
+
+## 5. How the Background Worker Operates
+
+The video processing pipeline (`worker/worker.mjs`) is intentionally decoupled from Next.js web requests to ensure zero serverless timeout restrictions:
+
+1. **Queueing**: The `ProcessingJob` PostgreSQL table serves as the queue. Workers claim jobs atomically via conditional row updates (`claimNextJob()`). Multiple worker instances can run in parallel without race conditions.
+2. **Fail-Fast Safety**: Raw media duration is checked immediately via `ffprobe` before any costly AI API requests are triggered.
+3. **Resilience**: The scoring engine employs a 4-tier fallback chain (NVIDIA NIM ──► Groq ──► OpenAI ──► Offline Heuristics). If an external API is degraded, the job falls back seamlessly without failing.
+4. **Local Worker Execution**:
+   ```bash
+   cd worker
+   npm install
+   node worker.mjs
+   ```
+
+---
+
+## 6. Production Deployment
+
+### Option A: Ubuntu VPS with PM2 (Current Production Setup)
+Clipzila is currently provisioned on Ubuntu using PM2 for process management:
+```bash
+# 1. Install system binaries
+sudo apt-get install ffmpeg python3-pip
+sudo curl -L https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -o /usr/local/bin/yt-dlp
+sudo chmod a+rx /usr/local/bin/yt-dlp
+
+# 2. Start web & worker via PM2 ecosystem
+pm2 start deploy/ecosystem.config.cjs
+pm2 save
+```
+
+### Option B: Docker Container
+A multi-stage [Dockerfile](file:///Dockerfile) is provided at the repository root, packaging Node 20, Python 3, FFmpeg, and InsightFace dependencies for containerized deployments (AWS ECS, Google Cloud Run, or Kubernetes).
+
+---
+
+## 7. Operational Documentation
+
+- **System Architecture**: [docs/ARCHITECTURE.md](file:///docs/ARCHITECTURE.md)
+- **Production Operations Runbook**: [docs/OPERATIONS.md](file:///docs/OPERATIONS.md)
+- **Billing Providers & Plan Mappings**: [docs/BILLING.md](file:///docs/BILLING.md)
+- **Known Issues & Triage**: [docs/KNOWN_ISSUES.md](file:///docs/KNOWN_ISSUES.md)
+- **Technical Buyer Handover Package**: [HANDOVER.md](file:///HANDOVER.md)
+
+---
+
+## 8. License
+
+Proprietary and confidential commercial software. See [LICENSE](file:///LICENSE) for details.

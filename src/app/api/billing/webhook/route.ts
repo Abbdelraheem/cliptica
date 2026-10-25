@@ -6,7 +6,7 @@ import { stripe, PLANS, getPlanFromPriceId } from '@/lib/stripe'
 import { isAdminEmail } from '@/lib/admin'
 import Stripe from 'stripe'
 
-const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET!
+const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET || ''
 
 /** Models the webhook handlers touch inside the idempotency transaction. */
 type Tx = Pick<PrismaClient, 'user' | 'creditTransaction' | 'processedWebhookEvent' | 'referralConversion'>

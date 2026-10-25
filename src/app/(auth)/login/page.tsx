@@ -46,7 +46,7 @@ export default function LoginPage() {
       })
       if (check.status === 403) {
         const data = await check.json().catch(() => null)
-        setError(data?.message ?? 'This device already has another Cliptica account.')
+        setError(data?.message ?? 'This device already has another Clipzila account.')
         return
       }
 
@@ -161,7 +161,7 @@ export default function LoginPage() {
           </div>
 
           <p className="mt-7 text-center text-sm font-light text-mist">
-            New to Cliptica?{' '}
+            New to Clipzila?{' '}
             <Link href="/register" className="text-gold underline underline-offset-4 hover:text-champagne">
               Create an account
             </Link>

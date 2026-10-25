@@ -22,6 +22,10 @@ export async function POST(request: Request) {
       )
     }
 
+    if (process.env.REQUIRE_EMAIL_VERIFICATION !== 'true') {
+      return NextResponse.json({ message: 'Email verification is not required.' })
+    }
+
     const email = validated.data.email.toLowerCase()
     const user = await prisma.user.findUnique({ where: { email } })
 

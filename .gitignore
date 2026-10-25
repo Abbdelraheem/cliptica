@@ -79,7 +79,13 @@ worker/node_modules/
 # Telegram bot deploy internals (contains owner chat id + runtime config)
 /deploy/tg-bot/
 
+# Database dumps & SQL
+*.dump
+*.sql
 backups/
+
+# Build and patch outputs
+outputs/
 inspect-backup.mjs
 test-neon-conn.mjs
 scripts/set-password.mjs

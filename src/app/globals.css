@@ -62,6 +62,7 @@ html {
   -webkit-text-size-adjust: 100%;
   text-size-adjust: 100%;
   background-color: #050507;
+  overflow-x: hidden;
 }
 
 body {
@@ -171,6 +172,8 @@ body {
   font-size: 0.95rem;
   font-weight: 500;
   padding: 13px 28px;
+  min-height: 44px;
+  min-width: 44px;
   transition: all 0.3s var(--ease-lux);
   white-space: nowrap;
 }
